@@ -1,0 +1,132 @@
+#!/usr/bin/env bash
+# --------------------( LICENSE                            )--------------------
+# Copyright (c) 2023-2024 Alexis Pietak & Cecil Curry.
+# See "LICENSE" for further details.
+#
+# --------------------( SYNOPSIS                           )--------------------
+# Bash shell script launching a new Tornado HTTP server securely isolated to the
+# local system, running a Streamlit web dashboard displaying this web app.
+#
+# This script is defined as a Bash rather than Bourne script purely for the
+# canonical ${BASH_SOURCE} string global, reliably providing the absolute
+# pathnames of this script and hence this script's directory.
+
+# ....................{ PREAMBLE                           }....................
+# Enable strictness for sanity.
+set -e
+
+# ....................{ ARRAYS                             }....................
+# Array of all arguments with which to invoke Python.
+PYTHON_ARGS=(
+    #FIXME: Comment this to run this app under the high-level "streamlit run"
+    #command rather than the low-level "python* -m streamlit run" importation.
+    #Although the latter is significantly more configurable and thus preferable
+    #for local development, the former is actually the approach that Streamlit
+    #Cloud uses to run deployed apps. Ergo, *ONLY* the "streamlit run" command
+    #suffices to run this app in a Streamlit Cloud-centric manner.
+
+    # # Python interpreter to be run.
+    # command python3.10
+    #
+    # # #FIXME: Uncomment this as needed (e.g., to debug hidden resource warnings).
+    # # # Enable the Python Development Mode (PDM). See also commentary for the
+    # # # ${PYTHONDEVMODE} shell variable in the "tox.ini" file.
+    # # -X dev
+    # #
+    # # # Enable tracing (i.e., debugging) of "import" statements.
+    # # -v
+    #
+    # # Implicitly import the "cellnition.__main__" dunder module, which
+    # # programmatically runs "streamlit run cellnition/main.py" in a portable
+    # # manner aware of Python packaging and distribution standards.
+    # #
+    # # Note that this is *NOT* the standard way Streamlit apps are run from the
+    # # command line. That's a good thing. By default, Streamlit apps run from the
+    # # command line via the "streamlit run" subcommand *CANNOT* be portably
+    # # distributed as standard Python packages published to standard Python
+    # # package repositories (e.g., PyPI, conda-forge).
+    # #
+    # # See the "cellnition.__main__" dunder module for further discussion.
+    # # -m cellnition
+    #
+    # #FIXME: Uncommand this as needed.
+    # # Implicitly import the "cellnition.__main__" dunder module, which
+    # # "streamlit.__main__" dunder submodule and run the
+    # # __main__() function defined by that submodule, launching a new Tornado
+    # # HTTP server running the Streamlit web dashboard displaying this web app.
+    # -m
+    streamlit
+
+    # Streamlit subcommand to be run, ordering Streamlit to show this web app.
+    run
+
+    # Relative filename of the Python script implementing the main entry-point
+    # for this web app.
+    #
+    # Note that this Bash script safely guarantees this filename to be relative
+    # to the directory defining this Bash script by temporarily changing the
+    # current working directory (CWD) to this directory *BEFORE* running this
+    # command. In other words, these are not the droids you're looking for.
+    cellnition/main.py
+
+    #FIXME: Uncomment to increase the debugging level.
+    # Log *ONLY* informational messages, warnings, errors, and exceptions.
+    --logger.level=info
+
+    # Unconditionally log *ALL* messages.
+    # --logger.level=debug
+
+    #FIXME: Uncomment to log to a file. Unneeded for the moment. If enabling
+    #this, also ensure this file is listed in our ".gitignore", please.
+    #log_file.log 2>&1
+
+    # Delimit Streamlit- from app-specific arguments.
+    --
+
+    # All passed arguments as app-specific arguments.
+    "${@}"
+)
+
+# ....................{ FUNCTIONS                          }....................
+# str canonicalize_path(str pathname)
+#
+# Canonicalize the passed pathname.
+function canonicalize_path() {
+    # Validate and localize all passed arguments.
+    (( $# == 1 )) || {
+        echo 'Expected exactly one argument.' 1>&2
+        return 1
+    }
+    local pathname="${1}"
+
+    # The "readlink" command's GNU-specific "-f" option would be preferable but
+    # is unsupported by macOS's NetBSD-specific version of "readlink". Instead,
+    # just defer to Python for portability.
+    command python3 -c "
+import os, sys
+print(os.path.realpath(os.path.expanduser(sys.argv[1])))" "${pathname}"
+}
+
+# ....................{ PATHS                              }....................
+# Absolute or relative filename of this script.
+script_filename="$(canonicalize_path "${BASH_SOURCE[0]}")"
+
+# Absolute or relative dirname of the directory directly containing this
+# script, equivalent to the top-level directory for this project.
+script_dirname="$(dirname "${script_filename}")"
+
+# ....................{ MAIN                               }....................
+# Temporarily change the current working directory to that of this project.
+pushd "${script_dirname}" >/dev/null
+
+# Deploy this web app with all passed arguments.
+"${PYTHON_ARGS[@]}"
+
+# 0-based exit code reported by the prior command.
+exit_code=$?
+
+# Revert the current working directory to the prior such directory.
+popd >/dev/null
+
+# Report the same exit code from this script.
+exit ${exit_code}
