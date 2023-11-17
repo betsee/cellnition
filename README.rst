@@ -59,7 +59,7 @@ Cellnition is `open-source software released <cellnition license_>`__ under the
 .. # ------------------( IMAGES                              )------------------
 .. |cellnition-banner| image:: https://github.com/betsee/cellnition/raw/main/cellnition/data/png/cellnition_logo_lion_banner_i.png
    :target: https://cellnition.streamlit.app
-   :alt: Cellnition: The cellular intelligence simulator
+   :alt: Cellnition
 
 .. # ------------------( IMAGES ~ badge                      )------------------
 .. |app-badge| image:: https://static.streamlit.io/badges/streamlit_badge_black_white.svg
