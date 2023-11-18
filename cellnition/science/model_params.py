@@ -11,7 +11,6 @@ from beartype import beartype
 from dataclasses import dataclass
 import numpy as np
 
-@beartype
 @dataclass
 class ModelParams(object):
     '''
@@ -54,8 +53,17 @@ class ModelParams(object):
         self.chan_cover_o: float = 0.002  # fraction of cell covered by water/glycerol Fsp1 channels; response time of H2O flux
 
         # Production and export of intracellular glycerol
-        self.chan_rate_gly: float = 1.0e-11  # Transport coefficient for glycerol/water channels (Fsp1) m^2 s
-        self.growth_gly_max: float = 0.25 # Maximum rate of glycerol production by cell (mol/(m^3 s))
+        self.chan_rate_gly: float = 5.0e-10  # Transport coefficient for glycerol/water channels (Fsp1) m^2 s
+        self.growth_gly_max: float = 0.5 # Maximum rate of glycerol production by cell (mol/(m^3 s))
+
+        # Adaptive control parameters
+        self.K_sln1 = 20.0 # Slope constant of the Sln1 strain-sensor
+        self.eo_sln1 = -0.2 # midpoint strain of the Sln1 strain-sensor
+
+        self.ka_sln1 = 0.5  # value of sln1 activation response that is 1/2 max activation
+        self.ki_sln1 = 0.5  # value of sln1 inhibition response that is 1/2 max inhibition
+        self.na_sln1 = 3.0  # exponent dictating the slope/shape of activation by sln1
+        self.ni_sln1 = 3.0  # exponent dictating the slope/shape of inhibition by sln1
 
 
         # Bioelectric model variables-----------------------------------------------------------------------------------
@@ -139,6 +147,8 @@ class ModelParams(object):
         self.A_cell_o = 2 * np.pi * self.r_cell_o * self.L_cell_o # Undeformed cell surface area
         self.m_i_o = self.m_i_base + self.m_i_gly # Initial concentration of osmoyltes in the cell
         self.n_i_o = self.m_i_o * self.cell_vol_o  # Initial osmolyte moles in the cell
+        self.n_i_base = self.m_i_base*self.cell_vol_o # Initial moles of other osmolytes in the cell
+        self.n_i_gly = self.m_i_gly*self.cell_vol_o # Initial glycerol moles in the cell
 
         # Water channel calculated properties
         self.A_chan_o = np.pi * (1.0e-9) ** 2 # Maximum area of glyceroaquaporin Fsp1 water/glycerol channel

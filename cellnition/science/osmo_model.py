@@ -32,7 +32,6 @@ import sympy as sp
 from cellnition.science.model_params import ModelParams
 
 
-@beartype
 class OsmoticCell(object):
     '''
 
@@ -242,7 +241,7 @@ class OsmoticCell(object):
                            ):
         '''
         A dynamic simulation of a single cell's volume changes given a time series vector representing external
-        osmolyte concentrations (mo_vect).
+        osmolyte concentrations (mo_vect), for the case of no control strategy.
         This assumes a cylindrically-shaped cell.
         This osmotic flux model assumes that for the case of a plant cell, water can leave the cell freely in the case
         of a hypoosmotic environment, yet the cell wall pressurizes the cell so that water entry and volume change
@@ -322,3 +321,131 @@ class OsmoticCell(object):
             (t_vect_i_f, mo_vect_i_f, Po_vect_f, eh_vect_f, el_vect_f, r_vect_f, l_vect_f, vol_vect_f, dvol_vect_f))
 
         return self.osmo_data_free
+
+
+    def osmo_time_sim_bio1(self,
+                           t_vect_f: ndarray,
+                           mo_vect_f: ndarray,
+                           cell_vol_o_f,
+                           A_chan_o_f,
+                           N_chan_o_f,
+                           d_wall_f,
+                           r_cell_o_f,
+                           L_cell_o_f,
+                           Y_wall_f,
+                           nu_wall_f,
+                           del_t_f,
+                           samp_i_f: int,
+                           p: ModelParams,
+                           synth_gly: bool=True
+                           ):
+        '''
+        A dynamic simulation of a single cell's volume changes given a time series vector representing external
+        osmolyte concentrations (mo_vect), for the case of a biologically-relevant control strategy.
+        This assumes a cylindrically-shaped cell.
+        This osmotic flux model assumes that for the case of a plant cell, water can leave the cell freely in the case
+        of a hypoosmotic environment, yet the cell wall pressurizes the cell so that water entry and volume change
+        with hyperosmotic environment is more limited. For a cell without a wall, volume change is directly related
+        to transmembrane water flux and structural pressure is assumed to be negligible.
+
+        In this model the cell has a control strategy based on:
+        sensing circumferential strain loss leads to closure of Fsp1 glycerol/aquaporin receptors
+        sensing circumferential strain loss activates the SLN1 receptors
+        When strain is lost, phosphorylation of SLN1 is lost and the HOG-MAPK signalling pathway is activated.
+        HOG-MAPK increases the rate of glycerol synthesis and decreases the rate of glycerol efflux.
+        Increased intracellular glycerol leads to influx of water and restoration of cell volume and strain.
+
+        '''
+        t_vect_i_f = []  # sampled time vector points
+        mo_vect_i_f = []  # sampled env osmolyte concentration vector points
+        Po_vect_f = []  # osmotic pressure as a function of time
+        eh_vect_f = []  # circumferential strain as a function of time
+        el_vect_f = []  # axis strain as a function of time
+        r_vect_f = []  # radius of the cell with time
+        l_vect_f = []  # length of the cell with time
+        vol_vect_f = []  # cell volume as a function of time
+        dvol_vect_f = []  # cell volume change as a function of time
+        gly_vect_f = [] # intracellular glycerol concentration as a function of time
+        mi_vect_f = [] # intracellular concentrations of osmolytes
+
+        t_samps_f = t_vect_f[0::samp_i_f]
+
+        cell_vol_i = cell_vol_o_f * 1  # initialize the working cell volume
+
+        m_i = p.m_i_o # initialize the osmolyte concentration in the cell
+        m_i_gly = p.m_i_gly # initialize intracellular glycerol concentration
+
+        n_i = p.n_i_o # initialize osmolyte moles in the cell
+        # n_i_gly = p.n_i_gly # initialize the moles of glycerol in the cell
+
+        for ii, m_o in enumerate(mo_vect_f):
+
+            ti = t_vect_f[ii]
+
+            # Calculate osmotic pressure:
+            Po_f = self.osmo_p(m_o, m_i, p)
+
+            if p.plant_model is True:
+
+                # Calculate an osmotic volumetric flow rate:
+                dV_dt_f = self.osmo_vol_change(cell_vol_i, A_chan_o_f, N_chan_o_f, n_i, m_o, d_wall_f, p)
+
+                # If the water is entering the cell and the cell is fully inflated, use the volume change from pressure-limited scenario:
+                if dV_dt_f >= 0.0 and cell_vol_i >= p.cell_vol_o:
+                    eh, el, vol2 = self.stress_strain_from_osmo_p(Po_f, r_cell_o_f, L_cell_o_f, d_wall_f, Y_wall_f, nu_wall_f)
+
+                else:  # otherwise, if negative, then update using the timestep:
+                    vol2 = self.osmo_vol_update(cell_vol_i, del_t_f, A_chan_o_f, N_chan_o_f, n_i, m_o, d_wall_f, p)
+                    eh, el = self.strain_from_vol_change(vol2, p.cell_vol_o, nu_wall_f, r_cell_o_f, L_cell_o_f, d_wall_f, Y_wall_f)
+
+            else:
+                # Calculate an osmotic volumetric flow rate:
+                dV_dt_f = self.osmo_vol_change(cell_vol_i, A_chan_o_f, N_chan_o_f, n_i, m_o, d_wall_f, p)
+
+                vol2 = self.osmo_vol_update(cell_vol_i, del_t_f, A_chan_o_f, N_chan_o_f, n_i, m_o, d_wall_f, p)
+                eh, el = self.strain_from_vol_change(vol2, p.cell_vol_o, nu_wall_f, r_cell_o_f, L_cell_o_f, d_wall_f,
+                                                     Y_wall_f)
+
+            # update cell_vol_o:
+            cell_vol_i = vol2 * 1
+
+            # Control module-----------------------------------------------------------------------------------------
+            # Cell sensing of strain due to volume change and response by changing glycerol production and efflux.
+            # phosphorylation level of the Sln1 receptor:
+            sln1_resp = 1 / (1 + np.exp(-p.K_sln1 * (eh - p.eo_sln1)))
+            # When phosphorylated, sln1 will inhibit glycerol production and activate glycerol export:
+            act_sln1 = ((sln1_resp / p.ka_sln1) ** p.na_sln1) / (1 + (sln1_resp / p.ka_sln1) ** p.na_sln1)
+            inh_sln1 = 1 / (1 + (sln1_resp / p.ki_sln1) ** p.ni_sln1)
+
+            # synthesis of glycerol; update the glycerol concentration:
+            m_i_gly = del_t_f * (inh_sln1 * p.growth_gly_max - act_sln1 * p.decay_gly_max * m_i_gly) + m_i_gly
+            n_i_gly = m_i_gly * cell_vol_i  # convert to moles of glycerol
+
+            if synth_gly: # If glycerol is having an effect on the cell osmolytes
+                n_i = p.n_i_base + n_i_gly # update total moles of osmoyltes in the cell
+
+            # Update the concentration of osmolytes in the cell (which change with water flux and volume changes):
+            m_i = n_i / cell_vol_i
+
+            # Update the cell radius and length:
+            r_cell_f = (eh + 1) * r_cell_o_f
+            l_cell_f = (el + 1) * L_cell_o_f
+
+            if ti in t_samps_f:  # Then sample and record values
+                t_vect_i_f.append(ti * 1)
+                mo_vect_i_f.append(m_o * 1)
+                Po_vect_f.append(Po_f * 1)
+                eh_vect_f.append(eh * 1)
+                el_vect_f.append(el * 1)
+                r_vect_f.append(r_cell_f * 1)
+                l_vect_f.append(l_cell_f * 1)
+                vol_vect_f.append(vol2 * 1)
+                dvol_vect_f.append(dV_dt_f * 1)
+                gly_vect_f.append(m_i_gly*1)
+                mi_vect_f.append(m_i*1)
+
+        self.osmo_data_bio1 = np.column_stack(
+            (t_vect_i_f, mo_vect_i_f, Po_vect_f, eh_vect_f, el_vect_f, r_vect_f, l_vect_f, vol_vect_f, dvol_vect_f,
+             gly_vect_f, mi_vect_f))
+
+        return self.osmo_data_bio1
