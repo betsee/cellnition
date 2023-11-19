@@ -29,7 +29,7 @@ class ModelParams(object):
         # Osmoelectric model variables----------------------------------------------------------------------------------
         self.mu: float = 1.0e-3 # Dynamic viscosity of water Pa*s
 
-        self.plant_model: bool = True # Use model of plant cell wall or of a cell with plasma membrane only?
+        self.plant_model: bool = False # Use model of plant cell wall or of a cell with plasma membrane only?
 
         # Dimensions and geometrical aspects of cell
         self.r_cell_o: float = 10e-6 # undeformed cell radius
