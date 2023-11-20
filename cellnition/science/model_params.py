@@ -36,34 +36,38 @@ class ModelParams(object):
         self.L_cell_o: float = 10e-6 # undeformed cell length
 
         self.d_mem: float = 5.0e-9 # Cell membrane thickness
-        self.d_wall: float = 1.0e-6 # Cell wall thickness (plants or yeast)
+        self.d_wall: float = 100.0e-9 # Cell wall thickness (yeast)
+        self.d_plant: float = 1.0e-6 # Cell wall thickness (plants)
+
+        self.breaking_strain = 0.8 # Breaking strain for yeast cell wall
 
         # Stress-strain moduli
         self.Y_mem: float = 50e3  # Cell membrane Young's modulus (Pa)
-        self.nu_mem: float = 0.49  # Cell membrane Poisson ratio
-        self.Y_wall: float = 350e6  # Cell wall Young's modulus (Pa)
+        self.nu_mem: float = 0.45  # Cell membrane Poisson ratio
+        self.Y_wall: float = 110e6  # Cell wall Young's modulus of yeast (Pa)
+        self.Y_plant: float = 350e6  # Cell wall Young's modulus of a plant (Pa)
         self.nu_wall: float = 0.2  # Cell wall Poisson ratio
 
         # Initialization of osmolytes
         self.m_i_base: float = 375.0 # Base concentration of non-glycerol osmolytes
-        self.m_i_gly: float = 20.0 # Initial concentration of glycerol in the cell
+        self.m_i_gly: float = 50.0 # Initial concentration of glycerol in the cell
         self.m_o_base: float = 175.0 # Base concentration of osmoyltes in the env
 
         # Features of glycerol/water channels
         self.chan_cover_o: float = 0.002  # fraction of cell covered by water/glycerol Fsp1 channels; response time of H2O flux
 
         # Production and export of intracellular glycerol
-        self.chan_rate_gly: float = 5.0e-10  # Transport coefficient for glycerol/water channels (Fsp1) m^2 s
+        self.chan_rate_gly: float = 5.0e-11  # Transport coefficient for glycerol/water channels (Fsp1) m^2 s
         self.growth_gly_max: float = 0.5 # Maximum rate of glycerol production by cell (mol/(m^3 s))
 
         # Adaptive control parameters
         self.K_sln1 = 20.0 # Slope constant of the Sln1 strain-sensor
-        self.eo_sln1 = -0.2 # midpoint strain of the Sln1 strain-sensor
+        self.eo_sln1 = 0.02 # midpoint strain of the Sln1 strain-sensor; chosen so strain in isotonic is zero
 
         self.ka_sln1 = 0.5  # value of sln1 activation response that is 1/2 max activation
         self.ki_sln1 = 0.5  # value of sln1 inhibition response that is 1/2 max inhibition
-        self.na_sln1 = 3.0  # exponent dictating the slope/shape of activation by sln1
-        self.ni_sln1 = 3.0  # exponent dictating the slope/shape of inhibition by sln1
+        self.na_sln1 = 5.0  # exponent dictating the slope/shape of activation by sln1
+        self.ni_sln1 = 5.0  # exponent dictating the slope/shape of inhibition by sln1
 
 
         # Bioelectric model variables-----------------------------------------------------------------------------------
