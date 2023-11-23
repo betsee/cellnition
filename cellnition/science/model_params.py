@@ -43,6 +43,7 @@ class ModelParams(object):
 
         # Stress-strain moduli
         self.Y_mem: float = 50e3  # Cell membrane Young's modulus (Pa)
+        self.nu_f: float = 0.5 # General Poisson Ratio for simplified expressions
         self.nu_mem: float = 0.45  # Cell membrane Poisson ratio
         self.Y_wall: float = 110e6  # Cell wall Young's modulus of yeast (Pa)
         self.Y_plant: float = 350e6  # Cell wall Young's modulus of a plant (Pa)
@@ -54,20 +55,27 @@ class ModelParams(object):
         self.m_o_base: float = 175.0 # Base concentration of osmoyltes in the env
 
         # Features of glycerol/water channels
-        self.chan_cover_o: float = 0.002  # fraction of cell covered by water/glycerol Fsp1 channels; response time of H2O flux
+        self.N_chan_o = 0.12e6 # approximate number of water/glycerol channels expressed in membrane
+        # self.chan_cover_o: float = 0.002  # fraction of cell covered by water/glycerol Fsp1 channels; response time of H2O flux
 
         # Production and export of intracellular glycerol
-        self.chan_rate_gly: float = 5.0e-11  # Transport coefficient for glycerol/water channels (Fsp1) m^2 s
-        self.growth_gly_max: float = 0.5 # Maximum rate of glycerol production by cell (mol/(m^3 s))
+        # self.chan_rate_gly: float = 5.0e-11  # Transport coefficient for glycerol/water channels (Fsp1) m^2 s
+        self.r_gly_max: float = 0.5 # Maximum rate of glycerol production by cell (mol/(m^3 s))
+        self.d_gly_max: float = 0.003
 
         # Adaptive control parameters
-        self.K_sln1 = 20.0 # Slope constant of the Sln1 strain-sensor
-        self.eo_sln1 = 0.02 # midpoint strain of the Sln1 strain-sensor; chosen so strain in isotonic is zero
+        self.K_1: float = 15.0 # Slope constant of the Sln1 strain-sensor
+        self.epsilon_o_1: float = -0.05 # midpoint strain of the Sln1 strain-sensor; chosen so strain in isotonic is zero
+        self.b_1: float = 0.0 # minimum level of activation
 
-        self.ka_sln1 = 0.5  # value of sln1 activation response that is 1/2 max activation
-        self.ki_sln1 = 0.5  # value of sln1 inhibition response that is 1/2 max inhibition
-        self.na_sln1 = 5.0  # exponent dictating the slope/shape of activation by sln1
-        self.ni_sln1 = 5.0  # exponent dictating the slope/shape of inhibition by sln1
+        self.K_2: float = 15.0 # Slope constant of the Sln1 strain-sensor
+        self.epsilon_o_2: float = -0.05 # midpoint strain of the Sln1 strain-sensor; chosen so strain in isotonic is zero
+        self.b_2: float = 0.0 # minimum level of inhibition
+
+        # self.ka_sln1 = 0.5  # value of sln1 activation response that is 1/2 max activation
+        # self.ki_sln1 = 0.5  # value of sln1 inhibition response that is 1/2 max inhibition
+        # self.na_sln1 = 5.0  # exponent dictating the slope/shape of activation by sln1
+        # self.ni_sln1 = 5.0  # exponent dictating the slope/shape of inhibition by sln1
 
 
         # Bioelectric model variables-----------------------------------------------------------------------------------
@@ -147,19 +155,19 @@ class ModelParams(object):
         self.cmem = (self.e_o * self.e_mem) / self.d_mem  # membrane capacitance
         self.r_cell = self.r_cell_um*1.0e-6
 
-        self.cell_vol_o = self.r_cell_o * np.pi * 2 * self.L_cell_o # undeformed cell volume (assumes cylinder shape)
+        self.vol_cell_o = self.r_cell_o * np.pi * 2 * self.L_cell_o # undeformed cell volume (assumes cylinder shape)
         self.A_cell_o = 2 * np.pi * self.r_cell_o * self.L_cell_o # Undeformed cell surface area
         self.m_i_o = self.m_i_base + self.m_i_gly # Initial concentration of osmoyltes in the cell
-        self.n_i_o = self.m_i_o * self.cell_vol_o  # Initial osmolyte moles in the cell
-        self.n_i_base = self.m_i_base*self.cell_vol_o # Initial moles of other osmolytes in the cell
-        self.n_i_gly = self.m_i_gly*self.cell_vol_o # Initial glycerol moles in the cell
+        self.n_i_o = self.m_i_o * self.vol_cell_o  # Initial osmolyte moles in the cell
+        self.n_i_base = self.m_i_base*self.vol_cell_o # Initial moles of other osmolytes in the cell
+        self.n_i_gly = self.m_i_gly*self.vol_cell_o # Initial glycerol moles in the cell
 
         # Water channel calculated properties
         self.A_chan_o = np.pi * (1.0e-9) ** 2 # Maximum area of glyceroaquaporin Fsp1 water/glycerol channel
-        self.N_chan_o = self.chan_cover_o * (self.A_cell_o / self.A_chan_o) # Total number of water/glycerol channels
+
 
         # Maximum decay rate of glycerol via Fsp1 channel function (1/s):
-        self.decay_gly_max = (self.A_chan_o * self.N_chan_o) / self.chan_rate_gly
+        # self.decay_gly_max = (self.A_chan_o * self.N_chan_o) / self.chan_rate_gly
 
         # Electrodiffusion permittivity constants:
         self.PNa = self.base_pmem * self.base_PNa

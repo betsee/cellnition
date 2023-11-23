@@ -22,20 +22,11 @@ network or embodied analogue gaussian process, may be able to construct their ow
 in order to generate more effective (i.e. intelligent) responses.
 '''
 
-# TODO: save analytical model equations to the class
-# TODO: print out analytical model equations as LaTeX
-
 import numpy as np
 from numpy import ndarray
-import sympy as sp
 from cellnition.science.model_params import ModelParams
+from cellnition.science.analytic_model import AnalyticOsmoticModel
 
-# TODO: implement the case where the Poisson ratio is not 0.5, in volume change rate and volume update so we can have
-#  a complete osmotic model with as few approximations as possible.
-
-# TODO: vectorize all equations so that we can input arrays of variables and not have to go through loops...
-
-# TODO: calculate the steady-state volume for the case of nu less than 0.5......
 
 class OsmoticCell(object):
     '''
@@ -44,127 +35,11 @@ class OsmoticCell(object):
 
     def __init__(self):
         '''
+        Initialize the model by creating the sympy analytical system.
 
         '''
 
-        self.analytical_model() # Create the analytical model and any required numerical equations
-
-
-    def analytical_model(self):
-        '''
-        This method uses Sympy to construct the analytical equations defining the osmotic cell model.
-        These can be printed out in
-        '''
-
-        # Key Variables
-        # --------------
-        # Note the '_s' subscript indicates it is a symbolic, Sympy variable
-        print("Generating the analytical model.")
-
-        # Thermodynamic constants and parameters:
-        R_s, T_s, F_s, t_s = sp.symbols('R, T, F, t_s', real=True, positive=True)
-
-        # Dimensional parameters:
-        r_cell_o_s, vol_cell_o_s, d_mem_s, L_cell_o_s, A_mem_o_s = sp.symbols(
-            'r_cell_o, vol_cell_o, d_mem, L_cell_o, A_mem_o', real=True, positive=True)
-        r_cell_s, L_cell_s, A_mem_s = sp.symbols('r_cell, L_cell, A_mem', real=True, positive=True)
-
-        # Mechanical parameters:
-        P_cell_s, sigma_H_s, sigma_L_s, epsilon_H_s, epsilon_L_s, Y_s, nu_s = sp.symbols(
-            'P_cell, sigma_H, sigma_L, epsilon_H, epsilon_L, Y, nu', real=True)
-        d_H_s, d_L_s = sp.symbols('d_H_s, d_L_s', real=True)
-
-        # Osmotic and flow parameters:
-        m_i_s, m_o_s, n_i_s, mu_s = sp.symbols('m_i, m_o, n_i_s, mu_s', real=True, positive=True)
-        Pi_i_s, Pi_o_s, Pi_io_s, u_io_s, Q_io_s = sp.symbols('Pi_i, Pi_o, Pi_io, u_io, Q_io', real=True)
-
-        # Physiological parameters:
-        A_chan_s, N_chan_s = sp.symbols('A_chan, N_chan', real=True, positive=True)
-
-        # vol_cell_s = sp.symbols('vol_cell', cls=sp.Function)
-        vol_cell_s = sp.Function('vol_cell')(t_s)
-
-        # Key Equations:
-        # Situation 1: Volume change with transmembrane osmotic water flux
-
-        # Osmotic pressure difference across membrane:
-        Eq1_Pi_io_s = sp.Eq(Pi_io_s, (m_i_s - m_o_s) * R_s * T_s)
-
-        # Osmotic water flux across membrane via water channels:
-        Eq2_u_io_s = sp.Eq(u_io_s, (Pi_io_s * A_chan_s * N_chan_s) / (8 * mu_s * d_mem_s))
-
-        # Substitute in Eq1 to Eq2:
-        Eq3_u_io_s = sp.Eq(u_io_s, ((m_i_s - m_o_s) * R_s * T_s * A_chan_s * N_chan_s) / (8 * mu_s * d_mem_s))
-
-        # Expression for volumetric flow rate:
-        Eq4_Q_io_s = sp.Eq(sp.diff(vol_cell_s, t_s), u_io_s * A_chan_s * N_chan_s)
-
-        # Substitute in Eq3 for u_io to Eq4 to obtain volumetric flow rate in terms of core parameters:
-        Eq5_Q_io_s = sp.Eq(sp.diff(vol_cell_s, t_s),
-                           ((m_i_s - m_o_s) * R_s * T_s * A_chan_s ** 2 * N_chan_s ** 2) / (8 * mu_s * d_mem_s))
-
-        # Now we realize that while the concentration of osmolytes in the environment remains independent of osmotic water fluxes, that that in the cell changes:
-        Eq6_mi_s = sp.Eq(m_i_s, n_i_s / vol_cell_s)
-
-        # Finally, we substitute in Eq6 for m_i_s to Eq5 to obtain the master differential equation for the osmotic cell volume change expression:
-        Eq7_Q_io_s = sp.Eq(sp.diff(vol_cell_s, t_s),
-                           ((n_i_s / vol_cell_s - m_o_s) * R_s * T_s * A_chan_s ** 2 * N_chan_s ** 2) / (
-                                       8 * mu_s * d_mem_s)).simplify()
-
-        Eq8_vol_ss_s = sp.Eq(vol_cell_s, (m_i_s * vol_cell_o_s) / m_o_s)
-
-        # Given strain, solve for the stress:
-        EqA_epsilon_H = sp.Eq(epsilon_H_s, (1 / Y_s) * (sigma_H_s - nu_s * sigma_L_s))
-        EqB_epsilon_L = sp.Eq(epsilon_L_s, (1 / Y_s) * (sigma_L_s - nu_s * sigma_H_s))
-
-        solAB = sp.solve((EqA_epsilon_H, EqB_epsilon_L), (sigma_H_s, sigma_L_s))
-        solAB[sigma_L_s].simplify()
-
-        # Now taking a look at the infintessimal volume change and turgor pressure approach:
-
-        # Hoop stress equations in terms of osmotic pressure:
-
-        Eq9_sigma_H_s = sp.Eq(sigma_H_s, (Pi_io_s * r_cell_o_s) / d_mem_s)
-        Eq10_sigma_L_s = sp.Eq(sigma_L_s, (Pi_io_s * r_cell_o_s) / (2 * d_mem_s))
-
-        Eq11_sigma_H_s = sp.Eq(sigma_H_s, (((m_i_s - m_o_s) * R_s * T_s * r_cell_o_s) / d_mem_s))
-        Eq12_sigma_L_s = sp.Eq(sigma_L_s, (((m_i_s - m_o_s) * R_s * T_s * r_cell_o_s) / (2 * d_mem_s)))
-
-        # Hoop strain equation:
-        Eq13_epsilon_H_s = sp.Eq(epsilon_H_s, ((Pi_io_s * r_cell_o_s) / (d_mem_s * Y_s)) * (1 - (nu_s / 2)))
-        Eq14_epsilon_L_s = sp.Eq(epsilon_L_s, ((Pi_io_s * r_cell_o_s) / (d_mem_s * Y_s)) * ((1 / 2) - nu_s))
-
-        Eq15_epsilon_H_s = sp.Eq(epsilon_H_s,
-                                 (((m_i_s - m_o_s) * R_s * T_s * r_cell_o_s) / (d_mem_s * Y_s)) * (1 - (nu_s / 2)))
-        Eq16_epsilon_L_s = sp.Eq(epsilon_L_s,
-                                 (((m_i_s - m_o_s) * R_s * T_s * r_cell_o_s) / (d_mem_s * Y_s)) * ((1 / 2) - nu_s))
-
-        # Displacements in the circumferential ('H') and axis ('L') directions:
-        Eq17_d_H_s = sp.Eq(d_H_s,
-                           (((m_i_s - m_o_s) * R_s * T_s * r_cell_o_s ** 2) / (d_mem_s * Y_s)) * (1 - (nu_s / 2)))
-        Eq18_d_L_s = sp.Eq(d_L_s, (((m_i_s - m_o_s) * R_s * T_s * r_cell_o_s * L_cell_o_s) / (d_mem_s * Y_s)) * (
-                    (1 / 2) - nu_s))
-
-        # Finally, if we have a volume change what is the corresponding hoop strain and stress that is generated?
-
-        Eq19_vol_strain_s = sp.Eq(vol_cell_s,
-                                  2 * sp.pi * r_cell_o_s * L_cell_o_s * (1 + epsilon_H_s) * (1 + epsilon_L_s))
-
-
-
-        Eq20_vol_strain_s = sp.Eq(vol_cell_s,
-                                  2 * sp.pi * r_cell_o_s * L_cell_o_s * (
-                                              1 + ((Pi_io_s * r_cell_o_s) / (d_mem_s * Y_s)) * (1 -
-                                                                                                (nu_s / 2))) * (
-                                              1 + ((Pi_io_s * r_cell_o_s) / (d_mem_s * Y_s)) * ((1 / 2) - nu_s)))
-
-        sol_P = sp.solve(Eq20_vol_strain_s, Pi_io_s)  # Solve the vol_strain equation for the pressure
-
-        # self.pressure_from_volume = sp.lambdify([vol_cell_s, vol_cell_o_s, r_cell_o_s, L_cell_o_s, Y_s, nu_s, d_mem_s],
-        #                                         sol_P[1])  # Correct solution for pressure from vol change
-
-        # TODO: update this with the new pressure from volume equation solving strategy that we have, and update the
-        #  dVol/dt equations so that we have a full and complete model.
+        self.ana = AnalyticOsmoticModel() # This contains lambdifyied functions for numerical computing
 
     def osmo_p(self, m_o_f, m_i_f, p: ModelParams):
         '''
@@ -172,8 +47,21 @@ class OsmoticCell(object):
         '''
         return p.R * p.T * (m_i_f - m_o_f)
 
-    # Function that calculates the steady-state volume given initial concentration differences, indifferent to mechanical pressure:
-    def osmo_vol_ss(self, m_o_f, m_i_f, YY, dd, p: ModelParams):
+
+    def ind_p(self, vol_cell_f: ndarray|float, Y: float, d: float, p: ModelParams):
+        '''
+        Compute the induced pressure (i.e. Turgor pressure) induced by structural pushback against
+        transmembrane osmotic water influx.
+        '''
+
+        return self.ana.P_ind_f(vol_cell_f, p.vol_cell_o, p.r_cell_o, Y, d)
+
+    def osmo_vol_steady_state(self,
+                              m_o_f: ndarray|float,
+                              n_i_f: ndarray|float,
+                              Y: float,
+                              d: float,
+                              p: ModelParams):
         '''
         Calculate the steady-state volume of a cell with fixed internal and external ion concentrations.
         This function assumes that a cell that shrinks from a state where it is not under mechanical stress does
@@ -183,32 +71,31 @@ class OsmoticCell(object):
 
         '''
 
-        n_i = m_i_f*p.cell_vol_o
 
-        v_test = n_i / m_o_f
+        if type(m_o_f) is ndarray and type(n_i_f) is ndarray:
+            Vss_vect_R1 = self.ana.Vss_R1_f(m_o_f, n_i_f)
+            Vss_vect_R2 = self.ana.Vss_R2_f(m_o_f, n_i_f, p.R, p.T, d, Y, p.r_cell_o, p.vol_cell_o)
 
-        # If the steady-state volume is less than or equal to the non-deformed cell, use the function that
-        # describes the steady-state solution without mechanical constraints:
-        if (v_test / p.cell_vol_o) <= 1.0:
-            v_ss = n_i / m_o_f
+            ss_inds_R1 = (Vss_vect_R1 < p.vol_cell_o).nonzero()[0]
+            ss_inds_R2 = (Vss_vect_R2 >= p.vol_cell_o).nonzero()[0]
 
-        else: # otherwise, take mechanical constraints into account:
-            v_ss = (0.866025403784439 * np.sqrt(p.cell_vol_o) * np.sqrt(
-            0.1875 * p.R ** 2 * p.T ** 2 * m_o_f ** 2 * p.r_cell_o ** 2 * p.cell_vol_o -
-            0.5 * p.R * p.T * YY * dd * m_o_f * p.r_cell_o * p.cell_vol_o +
-            p.R * p.T * YY * dd * n_i * p.r_cell_o +
-            (1 / 3) * YY ** 2 * dd ** 2 * p.cell_vol_o) -
-                      0.125 * p.cell_vol_o * (3.0 * p.R * p.T * m_o_f * p.r_cell_o - 4 * YY * dd)) / (YY * dd)
+            Vss_vect = np.zeros(m_o_f.ravel().shape)
+            Vss_vect[ss_inds_R1] = Vss_vect_R1[ss_inds_R1]
+            Vss_vect[ss_inds_R2] = Vss_vect_R2[ss_inds_R2]
+
+            v_ss = Vss_vect
+
+        else:
+            Vss_R1 = self.ana.Vss_R1_f(m_o_f, n_i_f)
+            Vss_R2 = self.ana.Vss_R2_f(m_o_f, n_i_f, p.R, p.T, d, Y, p.r_cell_o, p.vol_cell_o)
+
+            if Vss_R1 < p.vol_cell_o:
+                v_ss = Vss_R1
+
+            else:
+                v_ss = Vss_R2
 
         return v_ss
-
-    def stress_from_strain(self, Y_f, eh_f, el_f, nu_f):
-        '''
-        Calculate hoop (H) and axial (L) stresses given corresponding strains.
-        '''
-        sh = -(Y_f * (eh_f + el_f * nu_f)) / (nu_f ** 2 - 1)
-        sl = -(Y_f * (el_f + eh_f * nu_f)) / (nu_f ** 2 - 1)
-        return sh, sl
 
     # Next, write a function that will take numerical parameters and provide an updated cell volume using Euler's method
     def osmo_vol_update(self, vol_o_f, del_t_f, A_chan_f, N_chan_f, n_i_f, m_o_f, d_mem_f, Y_mem, p: ModelParams):
@@ -217,101 +104,79 @@ class OsmoticCell(object):
         '''
 
         # Calculate the volume change for this situation:
-        dV_dt = self.osmo_vol_change(vol_o_f, A_chan_f, N_chan_f, n_i_f, m_o_f, d_mem_f, Y_mem, p)
+        dV_dt = self.osmo_vol_velocity(vol_o_f, A_chan_f, N_chan_f, n_i_f, m_o_f, d_mem_f, Y_mem, p)
 
         return vol_o_f + del_t_f*dV_dt
 
-    def osmo_vol_change(self, vol_o_f, A_chan_f, N_chan_f, n_i_f, m_o_f, d_mem_f, Y_mem, p: ModelParams):
+    def osmo_vol_velocity(self,
+                          vol_o_f: ndarray|float,
+                          n_i_f: ndarray|float,
+                          m_o_f: ndarray|float,
+                          d_mem_f: float,
+                          Y_mem_f: float,
+                          p: ModelParams):
         '''
-        Returns the osmotic water volumetric flux.
+        Returns the rate of volume change, which is equal to the transmembrane osmotic water volumetric flux.
         '''
 
-        dVol_dt_test = ((p.R * p.T) / (8 * d_mem_f * p.mu) * (A_chan_f ** 2) *
-                        (N_chan_f ** 2) * (n_i_f - m_o_f * vol_o_f)) / vol_o_f
+        if type(vol_o_f) is ndarray and type(n_i_f) is ndarray and type(m_o_f) is ndarray:
+            # Get indices for places in arrays where the volume specifies regime 1 or 2:
+            i_VV_R1 = (vol_o_f < p.vol_cell_o).nonzero()[0]  # Regime 1, topological changes
+            i_VV_R2 = (vol_o_f >= p.vol_cell_o).nonzero()[0]  # Regime 2, elastic stretch
 
-        # If the cell is in a regime to start stretching with further water intake, then account for mechanical stress:
-        if dVol_dt_test > 0.0 and vol_o_f >= p.cell_vol_o:
-            beta = ((A_chan_f**2)*(N_chan_f**2)) / (8 * d_mem_f * p.mu*p.r_cell_o*p.cell_vol_o)
-            dVol_dt = (beta/vol_o_f)*(p.R*p.T*p.r_cell_o*p.cell_vol_o*(n_i_f - m_o_f*vol_o_f) +
-                                      (4/3)*(Y_mem*d_mem_f*vol_o_f*(p.cell_vol_o - vol_o_f)))
+            # Define a new array that will store the dV_dt data:
+            dVdt_vect = np.zeros(vol_o_f.shape)
+
+            dVdt_vect[i_VV_R1] = self.ana.dVdt_R1_f(vol_o_f[i_VV_R1], m_o_f[i_VV_R1],
+                                                    n_i_f[i_VV_R1], p.A_chan_o,
+                                           p.N_chan_o, p.R, p.T, d_mem_f, p.mu)
+
+            dVdt_vect[i_VV_R2] = self.ana.dVdt_R2_f(vol_o_f[i_VV_R2], m_o_f[i_VV_R2],
+                                                    n_i_f[i_VV_R2], p.A_chan_o,
+                                                    p.N_chan_o, p.R, p.T, d_mem_f, p.mu,
+                                                    Y_mem_f, p.r_cell_o, p.vol_cell_o)
+
+            dVol_dt = dVdt_vect
 
         else:
-            dVol_dt = dVol_dt_test
+            if vol_o_f < p.vol_cell_o:
+                dVol_dt = self.ana.dVdt_R1_f(vol_o_f, m_o_f, n_i_f, p.A_chan_o,
+                                           p.N_chan_o, p.R, p.T, d_mem_f, p.mu)
+
+            else:
+                dVol_dt = self.ana.dVdt_R2_f(vol_o_f, m_o_f, n_i_f, p.A_chan_o,
+                                                    p.N_chan_o, p.R, p.T, d_mem_f, p.mu,
+                                                    Y_mem_f, p.r_cell_o, p.vol_cell_o)
 
         return dVol_dt
 
-    def osmo_vol_accel(self,
-                       vol_o_f,
-                       A_chan_f,
-                       N_chan_f,
-                       n_i_f,
-                       m_o_f,
-                       d_mem_f,
-                       Y_mem,
-                       dvol,
-                       dA_chan,
-                       dN_chan,
-                       dn_i,
-                       dm_o,
-                       p: ModelParams):
+    def glycerol_velocity(self, vol_i: ndarray|float, m_i_gly, p: ModelParams):
         '''
-        Computes the acceleration of the volume change, d2V/dt2.
-        This only applies for the nu = 0.5 case.
-        '''
-
-        # Rate of change of osmotic pressure:
-        dPosmo_dt = p.R*p.T*(dn_i*(1/vol_o_f) - (1/vol_o_f**2)*dvol*n_i_f - dm_o)
-
-        dbeta_dt = (1/(8*p.mu*d_mem_f))*(2*A_chan_f*dA_chan*N_chan_f**2 + 2*N_chan_f*dN_chan*A_chan_f**2)
-
-        dPind_dt = (4/3)*((Y_mem*d_mem_f)/(p.r_cell_o*p.cell_vol_o))*dvol
-
-        beta = (N_chan_f**2*A_chan_f**2)/(8*p.mu*d_mem_f)
-
-        Posmo = p.R*p.T*(n_i_f - m_o_f*vol_o_f)
-        Pind = (4/3)*((Y_mem*d_mem_f)/p.r_cell_o)*((vol_o_f - p.cell_vol_o)/p.cell_vol_o)
-
-        d2Vdt = dPosmo_dt*beta + dbeta_dt*Posmo - dPind_dt*beta - dbeta_dt*Pind
-
-        return d2Vdt
-
-
-    def pressure_from_volume(self, vol, d_wall, Y_wall, nu, p: ModelParams):
-        '''
-        Given a cell volume, wall/mem thickness, wall/mem Young's Modulus and the
-        Poisson ratio, this method solves for the "inducing pressure" that resulted in
-        the relative change in volume.
-
-        A warning that this solution cannot solve for the case nu = 0.5. In all cases,
-        nu < 0.5.
+        Computes the change in intracellular glycerol concentration as a function of time, based on
+        cell volume.
 
         '''
 
-        if nu < 0.5:
+        dm_gly_dt = self.ana.dmi_dt_f(vol_i,
+                                           p.K_1,
+                                           p.K_2,
+                                           p.b_1,
+                                           p.b_2,
+                                           p.d_gly_max,
+                                           p.epsilon_o_1,
+                                           p.epsilon_o_2,
+                                           m_i_gly,
+                                           p.r_gly_max,
+                                           p.vol_cell_o)
 
-            alpha = p.r_cell_o / (d_wall * Y_wall)
-
-            a = alpha ** 2 * (1 - (nu / 2)) * (1 / 2 - nu)
-            b = alpha * (3 / 2) * (1 - nu)
-            c = 1 - (vol/p.cell_vol_o)
-
-            # Only the solution with the positive root is correct:
-            Pind = (-b + np.sqrt(b ** 2 - 4 * a * c)) / (2 * a)
-
-        # NOTE: for the case where nu = 0.5 we solve:
-        else:
-            Pind = ((4*Y_wall*d_wall*(vol - p.cell_vol_o))/(3*p.r_cell_o*p.cell_vol_o))
-
-        return Pind
+        return dm_gly_dt
 
     def osmo_time_sim(self,
                       t_vect_f: ndarray,
-                      mo_vect_f: ndarray,
+                      mo_vect_f: ndarray|float,
                       cell_vol_o_f,
-                      A_chan_o_f,
-                      N_chan_o_f,
+                      n_i_base,
                       d_wall_f,
-                      r_cell_o_f,
                       Y_wall_f,
                       del_t_f,
                       samp_i_f: int,
@@ -348,49 +213,48 @@ class OsmoticCell(object):
         t_samps_f = t_vect_f[0::samp_i_f]
 
         cell_vol_i = cell_vol_o_f * 1  # initialize the working cell volume
-
-        m_i = p.m_i_o # initialize the osmolyte concentration in the cell
         m_i_gly = p.m_i_gly # initialize intracellular glycerol concentration
+        n_i = n_i_base + m_i_gly*cell_vol_i # initialize osmolyte moles in the cell
+        m_i = n_i/cell_vol_i # initialize the osmolyte concentration in the cell
 
-        n_i = p.n_i_o # initialize osmolyte moles in the cell
+        for ii, ti in enumerate(t_vect_f):
 
-        A_chan_o = A_chan_o_f # initialize the channel area
+            if type(mo_vect_f) is ndarray:
+                m_o = mo_vect_f[ii]
 
-        for ii, m_o in enumerate(mo_vect_f):
-
-            ti = t_vect_f[ii]
+            else:
+                m_o = mo_vect_f
 
             # Calculate osmotic pressure:
             Po_f = self.osmo_p(m_o, m_i, p)
 
             # Calculate an osmotic volumetric flow rate:
-            dV_dt = self.osmo_vol_change(cell_vol_i, A_chan_o, N_chan_o_f, n_i, m_o, d_wall_f, Y_wall_f, p)
-            vol2 = cell_vol_i + dV_dt * del_t_f
-            eh = (vol2/p.cell_vol_o) - 1 # Calculate the hoop strain
+            dV_dt = self.osmo_vol_velocity(cell_vol_i, n_i, m_o, d_wall_f, Y_wall_f, p)
 
             # update cell_vol_o:
-            cell_vol_i = vol2 * 1
+            cell_vol_i += dV_dt * del_t_f
+
+            eh = (cell_vol_i / p.vol_cell_o) - 1 # Calculate the hoop strain
 
             # Control module-----------------------------------------------------------------------------------------
             # Cell sensing of strain due to volume change and response by changing glycerol production and efflux.
             # phosphorylation level of the Sln1 receptor:
-            sln1_resp = 1 / (1 + np.exp(-p.K_sln1 * (eh - p.eo_sln1)))
-            # When phosphorylated, sln1 will inhibit glycerol production and activate glycerol export:
-            act_sln1 = ((sln1_resp / p.ka_sln1) ** p.na_sln1) / (1 + (sln1_resp / p.ka_sln1) ** p.na_sln1)
-            inh_sln1 = 1 / (1 + (sln1_resp / p.ki_sln1) ** p.ni_sln1)
 
-            # synthesis of glycerol; update the glycerol concentration:
-            m_i_gly = del_t_f * (inh_sln1 * p.growth_gly_max - act_sln1 * p.decay_gly_max * m_i_gly) + m_i_gly
-            n_i_gly = m_i_gly * cell_vol_i  # convert to moles of glycerol
+            # synthesis of glycerol:
+            dm_gly_dt = self.glycerol_velocity(cell_vol_i, m_i_gly, p)
+            # update the glycerol concentration:
+            m_i_gly += del_t_f * dm_gly_dt
+            # convert to moles of glycerol:
+            n_i_gly = m_i_gly * cell_vol_i
 
             if synth_gly: # If glycerol is having an effect on the cell osmolytes and channel area
-                n_i = p.n_i_base + n_i_gly # update total moles of osmoyltes in the cell
+                n_i = n_i_base + n_i_gly # update total moles of osmoyltes in the cell
 
             # Update the concentration of osmolytes in the cell (which change with water flux and volume changes):
             m_i = n_i / cell_vol_i
 
-            # Update the cell radius and length:
-            r_cell_f = (eh + 1) * r_cell_o_f
+            # Update the cell radius (in our model length doesn't change since eL = 0 with nu = 0.5):
+            r_cell_f = (eh + 1) * p.r_cell_o
 
             if ti in t_samps_f:  # Then sample and record values
                 t_vect_i_f.append(ti * 1)
@@ -398,14 +262,14 @@ class OsmoticCell(object):
                 Po_vect_f.append(Po_f * 1)
                 eh_vect_f.append(eh * 1)
                 r_vect_f.append(r_cell_f * 1)
-                vol_vect_f.append(vol2 * 1)
+                vol_vect_f.append(cell_vol_i * 1)
                 dvol_vect_f.append(dV_dt * 1)
                 gly_vect_f.append(m_i_gly*1)
                 mi_vect_f.append(m_i*1)
 
         self.osmo_data_bio1 = np.column_stack(
-            (t_vect_i_f, mo_vect_i_f, Po_vect_f, eh_vect_f, r_vect_f, vol_vect_f, dvol_vect_f,
-             gly_vect_f, mi_vect_f))
+            (t_vect_i_f, mo_vect_i_f,  mi_vect_f, eh_vect_f, r_vect_f, vol_vect_f, dvol_vect_f,
+             gly_vect_f))
 
         return self.osmo_data_bio1
 
@@ -414,11 +278,8 @@ class OsmoticCell(object):
                         vol_vect_f: ndarray,
                         ni_vect_f: ndarray,
                         mi_gly: float,
-                        A_chan_o_f,
-                        N_chan_o_f,
-                        d_wall_f,
-                        Y_wall_f,
-                        del_t_f,
+                        d_wall_f: float,
+                        Y_wall_f: float,
                         p: ModelParams,
                         synth_gly: bool=True
                         ):
@@ -442,70 +303,42 @@ class OsmoticCell(object):
         '''
 
         dvol_vect_f = []  # Instantaneous rate of cell volume change
-        d2vol_vect_f = []  # Instantaneous rate of rate of cell volume change (acceleration)
         dni_vect_f = [] # Instantaneous rate of change of intracellular molarity
-        dgly_vect_f = [] # Instantaneous rate of glycerol concentration change as a function of time
 
         Po_vect_f = [] # osmotic pressure
-        eh_vect_f = [] # circumferential strain
 
-        for mo_i, vol_i, ni_i in zip(mo_vect_f, vol_vect_f, ni_vect_f):
+        m_i = ni_vect_f/vol_vect_f
+        # Calculate osmotic pressure:
+        Po_f = self.osmo_p(mo_vect_f, m_i, p)
 
-            m_i = ni_i/vol_i
-            # Calculate osmotic pressure:
-            Po_f = self.osmo_p(mo_i, m_i, p)
+        # Calculate an osmotic volumetric flow rate:
+        dV_dt = self.osmo_vol_velocity(vol_vect_f, ni_vect_f, mo_vect_f, d_wall_f, Y_wall_f, p)
 
-            # Calculate an osmotic volumetric flow rate:
-            dV_dt = self.osmo_vol_change(vol_i, A_chan_o_f, N_chan_o_f, ni_i, mo_i, d_wall_f, Y_wall_f, p)
-            vol2 = vol_i + dV_dt*del_t_f
-            eh = (vol2/p.cell_vol_o) - 1 # Calculate the hoop strain
+        # Control module-----------------------------------------------------------------------------------------
+        # Cell sensing of strain due to volume change and response by changing glycerol production and efflux.
+        # phosphorylation level of the Sln1 receptor:
 
-            # Control module-----------------------------------------------------------------------------------------
-            # Cell sensing of strain due to volume change and response by changing glycerol production and efflux.
-            # phosphorylation level of the Sln1 receptor:
-            sln1_resp = 1 / (1 + np.exp(-p.K_sln1 * (eh - p.eo_sln1)))
-            # When phosphorylated, sln1 will inhibit glycerol production and activate glycerol export:
-            act_sln1 = ((sln1_resp / p.ka_sln1) ** p.na_sln1) / (1 + (sln1_resp / p.ka_sln1) ** p.na_sln1)
-            inh_sln1 = 1 / (1 + (sln1_resp / p.ki_sln1) ** p.ni_sln1)
+        # synthesis of glycerol; update the glycerol concentration:
+        dm_gly_dt = self.glycerol_velocity(vol_vect_f, mi_gly, p)
 
-            # synthesis of glycerol; update the glycerol concentration:
-            dm_gly_dt = (inh_sln1 * p.growth_gly_max - act_sln1 * p.decay_gly_max * mi_gly)
+        if synth_gly: # If glycerol is having an effect on the cell osmolytes
+            # convert to moles of glycerol, since base molarity is assumed constant the rate of change of
+            # intracellular moles is equal to the rate of change of moles intracellular glycerol
+            dn_dt = dm_gly_dt * vol_vect_f
 
-            if synth_gly: # If glycerol is having an effect on the cell osmolytes
-                # convert to moles of glycerol, since base molarity is assumed constant the rate of change of
-                # intracellular moles is equal to the rate of change of moles intracellular glycerol
-                dn_dt = dm_gly_dt * vol_i
+        else:
+            dn_dt = 0.0 # otherwise, if no adaptive response, no change to intracellular molarity
 
-            else:
-                dn_dt = 0.0 # otherwise, if no adaptive response, no change to intracellular molarity
-
-            d2Vol_dt2 = self.osmo_vol_accel(vol_i,
-                           A_chan_o_f,
-                           N_chan_o_f,
-                           ni_i,
-                           mo_i,
-                           d_wall_f,
-                           Y_wall_f,
-                           dV_dt,
-                           0.0,
-                           0.0,
-                           dn_dt,
-                           0.0,
-                           p)
-
-            # Store calculated values:
-            Po_vect_f.append(Po_f * 1)
-            eh_vect_f.append(eh * 1)
-
-            dvol_vect_f.append(dV_dt * 1)
-            dni_vect_f.append(dn_dt*1)
-            dgly_vect_f.append(dm_gly_dt*1)
-
-            d2vol_vect_f.append(d2Vol_dt2*1)
+        # Store calculated values:
+        Po_vect_f.append(Po_f * 1)
+        dvol_vect_f.append(dV_dt * 1)
+        dni_vect_f.append(dn_dt*1)
 
         # Pack data:
-        self.state_space_data_bio1 = np.column_stack(
-            (Po_vect_f, eh_vect_f, dvol_vect_f,
-             dni_vect_f, dgly_vect_f, d2vol_vect_f))
+        # self.state_space_data_bio1 = np.column_stack(
+        #     (dvol_vect_f, dni_vect_f, Po_vect_f))
+        dvol_vect_f = np.asarray(dvol_vect_f)
+        dni_vect_f = np.asarray(dni_vect_f)
+        Po_vect_f = np.asarray(Po_vect_f)
 
-        return self.state_space_data_bio1
+        return dvol_vect_f, dni_vect_f, Po_vect_f
