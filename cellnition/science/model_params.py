@@ -50,7 +50,7 @@ class ModelParams(object):
         self.nu_wall: float = 0.2  # Cell wall Poisson ratio
 
         # Initialization of osmolytes
-        self.m_i_base: float = 375.0 # Base concentration of non-glycerol osmolytes
+        self.m_i_base: float = 230.0 # Base concentration of non-glycerol osmolytes
         self.m_i_gly: float = 50.0 # Initial concentration of glycerol in the cell
         self.m_o_base: float = 175.0 # Base concentration of osmoyltes in the env
 

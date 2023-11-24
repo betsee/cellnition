@@ -189,10 +189,12 @@ dependencies = [
 
     # Web stack.
     "streamlit >=1.19.0",
+    "trame >=3.3.0",
 
-    #FIXME: Uncomment as needed, please.
-    # # 3D stack.
-    # "pyvista >=0.30.0",
+    # 3D stack. Dismantled, this is:
+    # * pyvista 0.42.0 first introduced support for "trame", an increasingly
+    #   popular third-party package for web-centric 3D visualization.
+    "pyvista >=0.42.0",
 
     # # Graph stack.
     # "streamlit-agraph >= 0.0.45",
