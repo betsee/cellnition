@@ -12,8 +12,8 @@ from numpy import ndarray
 import networkx as nx
 import sympy as sp
 from cellnition.science.enumerations import EdgeType
+import pyvista as pv
 
-# FIXME We need to choose edge funcs differently -- allow user more choice
 class GeneNetworkModel(object):
     '''
 
@@ -150,7 +150,7 @@ class GeneNetworkModel(object):
     def build_analytical_model(self,
                                prob_acti: float=0.5,
                                edge_types: list|ndarray|None=None,
-                               add_interactions: bool=True):
+                               add_interactions: bool=False):
         '''
 
         '''
@@ -195,7 +195,12 @@ class GeneNetworkModel(object):
 
         for ni, fval_set in enumerate(efunc_vect):
             if add_interactions:
-                dcdt_vect_s.append(r_max_s[ni] * np.sum(fval_set) - c_s[ni] * d_max_s[ni])
+                if len(fval_set) == 0:
+                    normf = 1
+                else:
+                    normf = sp.Rational(1, len(fval_set))
+
+                dcdt_vect_s.append(r_max_s[ni] * np.sum(fval_set)*normf - c_s[ni] * d_max_s[ni])
             else:
                 dcdt_vect_s.append(r_max_s[ni] * np.prod(fval_set) - c_s[ni] * d_max_s[ni])
 
@@ -224,3 +229,126 @@ class GeneNetworkModel(object):
 
         '''
         return 1 / (1 + (cc / kk) ** nn)
+
+
+    def plot_3d_streamlines(self,
+                            c0: ndarray,
+                            c1: ndarray,
+                            c2: ndarray,
+                            dc0: ndarray,
+                            dc1: ndarray,
+                            dc2: ndarray,
+                            point_data: ndarray|None = None,
+                            axis_labels: list|tuple|ndarray|None=None,
+                            n_points: int=100,
+                            source_radius: float=0.5,
+                            source_center: tuple[float, float, float]=(0.5, 0.5, 0.5),
+                            tube_radius: float=0.003,
+                            lighting: bool = False,
+                            cmap: str = 'magma'
+                            ):
+        '''
+
+        '''
+
+        pvgrid = pv.RectilinearGrid(c0, c1, c2)  # Create a structured grid for our space
+
+        if point_data is not None:
+            pvgrid.point_data["Magnitude"] = point_data.ravel()
+
+        if axis_labels is not None:
+            labels = dict(xtitle=axis_labels[0], ytitle=axis_labels[1], ztitle=axis_labels[2])
+        else:
+            labels = dict(xtitle='c0', ytitle='c1', ztitle='c2')
+
+        vects_control = np.vstack((dc0.T.ravel(), dc1.T.ravel(), dc2.T.ravel())).T
+
+        # vects_control = np.vstack((np.zeros(dndt_vect.shape), np.zeros(dndt_vect.shape), dVdt_vect/p.vol_cell_o)).T
+        pvgrid["vectors"] = vects_control * 0.1
+        pvgrid.set_active_vectors("vectors")
+
+        streamlines, src = pvgrid.streamlines(vectors="vectors",
+                                              return_source=True,
+                                              n_points=n_points,
+                                              source_radius=source_radius,
+                                              source_center=source_center
+                                              )
+
+        pl = pv.Plotter()
+        pl.add_mesh(streamlines.tube(radius=tube_radius), lighting=lighting, cmap=cmap)
+        pl.remove_scalar_bar("vectors")
+        pl.show_grid(**labels)
+
+        return pl
+
+    def brute_force_phase_space(self,
+                                edge_types: list|ndarray|None=None,
+                                Nc: int=15,
+                                cmin: float=0.0,
+                                cmax: float=0.0,
+                                Ki: float=0.5,
+                                ni:float=10.0,
+                                ri:float=1.0,
+                                di:float=1.0,
+                                zer_thresh: float=0.01,
+                                prob_acti: float=0.5,
+                                additive_interactions: bool=False):
+        '''
+
+        '''
+
+        # Build an analytical model based on the edge types and other supplied info:
+        self.build_analytical_model(prob_acti=prob_acti, edge_types=edge_types, add_interactions=additive_interactions)
+
+        # Create linear set of concentrations over the desired range
+        # for each node of the network:
+        c_lin_set = []
+        for i in range(self.N_nodes):
+            c_lin_set.append(np.linspace(cmin, cmax, Nc))
+
+        # Create a set of matrices specifying the concentation grid for each
+        # node of the network:
+        C_M_SET = np.meshgrid(*c_lin_set, indexing='ij')
+
+        M_shape = C_M_SET[0].shape
+
+        # Create linearized arrays for each concentration, stacked into one column per node:
+        c_vect_set = np.asarray([cM.ravel() for cM in C_M_SET]).T
+
+        # Create parameter vectors as the same parameters for all edges and nodes in the network:
+        K_vect = []
+        n_vect = []
+        for ei in range(self.N_edges):
+            K_vect.append(Ki)
+            n_vect.append(ni)
+
+        r_vect = []
+        d_vect = []
+        for ni in range(self.N_nodes):
+            r_vect.append(ri)
+            d_vect.append(di)
+
+        dcdt_M = np.zeros(c_vect_set.shape)
+
+        for i, c_vecti in enumerate(c_vect_set):
+            dcdt_i = self.dcdt_vect_f(c_vecti, r_vect, d_vect, K_vect, n_vect).flatten()
+            dcdt_M[i] = dcdt_i * 1
+
+        dcdt_M_set = []
+        for dci in dcdt_M.T:
+            dcdt_M_set.append(dci.reshape(M_shape))
+
+        self.c_lin_set = c_lin_set
+        self.C_M_SET = C_M_SET
+        self.M_shape = M_shape
+
+        self.K_vect = K_vect
+        self.n_vect = n_vect
+        self.r_vect = r_vect
+        self.d_vect = d_vect
+
+        self.dcdt_M_set = np.asarray(dcdt_M_set)
+        self.dcdt_dmag = np.sqrt(np.sum(self.dcdt_M_set ** 2, axis=0))
+        self.dcdt_zeros = ((self.dcdt_dmag / self.dcdt_dmag.max()) < zer_thresh).nonzero()
+
+        return self.dcdt_zeros, self.dcdt_M_set, self.dcdt_dmag, self.c_lin_set
