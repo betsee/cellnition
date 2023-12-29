@@ -208,7 +208,7 @@ class OsmoticCell(object):
         vol_vect_f = []  # cell volume as a function of time
         dvol_vect_f = []  # cell volume change as a function of time
         gly_vect_f = [] # intracellular glycerol concentration as a function of time
-        mi_vect_f = [] # intracellular concentrations of osmolytes
+        ni_vect_f = [] # intracellular concentrations of osmolytes
 
         t_samps_f = t_vect_f[0::samp_i_f]
 
@@ -265,10 +265,10 @@ class OsmoticCell(object):
                 vol_vect_f.append(cell_vol_i * 1)
                 dvol_vect_f.append(dV_dt * 1)
                 gly_vect_f.append(m_i_gly*1)
-                mi_vect_f.append(m_i*1)
+                ni_vect_f.append(n_i*1)
 
         self.osmo_data_bio1 = np.column_stack(
-            (t_vect_i_f, mo_vect_i_f,  mi_vect_f, eh_vect_f, r_vect_f, vol_vect_f, dvol_vect_f,
+            (t_vect_i_f, mo_vect_i_f,  ni_vect_f, eh_vect_f, r_vect_f, vol_vect_f, dvol_vect_f,
              gly_vect_f))
 
         return self.osmo_data_bio1
@@ -333,6 +333,79 @@ class OsmoticCell(object):
         Po_vect_f.append(Po_f * 1)
         dvol_vect_f.append(dV_dt * 1)
         dni_vect_f.append(dn_dt*1)
+
+        # Pack data:
+        # self.state_space_data_bio1 = np.column_stack(
+        #     (dvol_vect_f, dni_vect_f, Po_vect_f))
+        dvol_vect_f = np.asarray(dvol_vect_f)
+        dni_vect_f = np.asarray(dni_vect_f)
+        Po_vect_f = np.asarray(Po_vect_f)
+
+        return dvol_vect_f, dni_vect_f, Po_vect_f
+
+
+    def state_space_slice_gen(self,
+                              mo_vect_f: ndarray,
+                              vol_vect_f: ndarray,
+                              ni_f: float,
+                              mi_gly: float,
+                              d_wall_f: float,
+                              Y_wall_f: float,
+                              p: ModelParams,
+                              synth_gly: bool=True
+                              ):
+        '''
+        A dynamic simulation of a single cell's volume changes given a time series vector representing external
+        osmolyte concentrations (mo_vect), for the case of a biologically-relevant control strategy.
+        This assumes a cylindrically-shaped cell. The model further assumes Poisson's ratio for the material is nu=0.5,
+        in order to create solvable analytic equations as axial strain goes to zero in that case.
+        This osmotic flux model assumes that for the case of a plant cell, water can leave the cell freely in the case
+        of a hypoosmotic environment, yet the cell wall pressurizes the cell so that water entry and volume change
+        with hyperosmotic environment is more limited. For a cell without a wall, volume change is directly related
+        to transmembrane water flux and structural pressure is assumed to be negligible.
+
+        In this model the cell has a control strategy based on:
+        sensing circumferential strain loss leads to closure of Fsp1 glycerol/aquaporin receptors
+        sensing circumferential strain loss activates the SLN1 receptors
+        When strain is lost, phosphorylation of SLN1 is lost and the HOG-MAPK signalling pathway is activated.
+        HOG-MAPK increases the rate of glycerol synthesis and decreases the rate of glycerol efflux.
+        Increased intracellular glycerol leads to influx of water and restoration of cell volume and strain.
+
+        '''
+
+        dvol_vect_f = []  # Instantaneous rate of cell volume change
+        dni_vect_f = [] # Instantaneous rate of change of intracellular molarity
+
+        Po_vect_f = [] # osmotic pressure
+
+        for vol_i_f, mo_i_f in zip(vol_vect_f.ravel(), mo_vect_f.ravel()):
+
+            m_i = ni_f / vol_i_f
+            # Calculate osmotic pressure:
+            Po_f = self.osmo_p(mo_i_f, m_i, p)
+
+            # Calculate an osmotic volumetric flow rate:
+            dV_dt = self.osmo_vol_velocity(vol_i_f, ni_f, mo_i_f, d_wall_f, Y_wall_f, p)
+
+            # Control module-----------------------------------------------------------------------------------------
+            # Cell sensing of strain due to volume change and response by changing glycerol production and efflux.
+            # phosphorylation level of the Sln1 receptor:
+
+            # synthesis of glycerol; update the glycerol concentration:
+            dm_gly_dt = self.glycerol_velocity(vol_i_f, mi_gly, p)
+
+            if synth_gly: # If glycerol is having an effect on the cell osmolytes
+                # convert to moles of glycerol, since base molarity is assumed constant the rate of change of
+                # intracellular moles is equal to the rate of change of moles intracellular glycerol
+                dn_dt = dm_gly_dt * vol_i_f
+
+            else:
+                dn_dt = 0.0 # otherwise, if no adaptive response, no change to intracellular molarity
+
+            # Store calculated values:
+            Po_vect_f.append(Po_f * 1)
+            dvol_vect_f.append(dV_dt * 1)
+            dni_vect_f.append(dn_dt*1)
 
         # Pack data:
         # self.state_space_data_bio1 = np.column_stack(
