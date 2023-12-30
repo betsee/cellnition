@@ -135,6 +135,21 @@ class GeneNetworkModel(object):
 
         self.paths_matrix = np.asarray(paths_matrix)
 
+    def get_edge_types(self, p_acti: float=0.5):
+        '''
+        Automatically generate a conse
+        rved edge-type vector for use in
+        model building.
+        '''
+
+        p_inhi = 1.0 - p_acti
+
+        edge_types_o = [EdgeType.A, EdgeType.I]
+        edge_prob = [p_acti, p_inhi]
+        edge_types = np.random.choice(edge_types_o, self.N_edges, edge_prob)
+
+        return edge_types
+
     def edges_from_path(self, path_nodes: list|ndarray):
         '''
 
@@ -156,12 +171,7 @@ class GeneNetworkModel(object):
         '''
 
         if edge_types is None:
-            prob_inhi = 1.0 - prob_acti
-
-            # edge_types = [self.f_acti_s, self.f_inhi_s]
-            edge_types_o = [EdgeType.A, EdgeType.I]
-            edge_prob = [prob_acti, prob_inhi]
-            self.edge_types = np.random.choice(edge_types_o, self.N_edges, edge_prob)
+            self.edge_types = self.get_edge_types(p_acti=prob_acti)
 
         else:
             self.edge_types = edge_types
@@ -210,12 +220,36 @@ class GeneNetworkModel(object):
         # Create a Jacobian for the system
         self.jac_s = self.dcdt_vect_s.jacobian(sp.Matrix(self.c_vect_s)).applyfunc(sp.simplify)
 
+        # The Hessian is a more complex tensor:
+        self.hess_s = sp.Array(
+            [[[self.dcdt_vect_s[i].diff(dcj).diff(dci) for dcj in self.c_vect_s]
+              for dci in self.c_vect_s] for i in range(self.N_nodes)])
+
+        # Optimization function for solving the problem:
+        self.opti_s = (self.dcdt_vect_s.T*self.dcdt_vect_s)[0]
+
+        self.opti_jac_s = sp.Array([self.opti_s.diff(ci) for ci in self.c_vect_s])
+
+        self.opti_hess_s = sp.Matrix(self.opti_jac_s).jacobian(self.c_vect_s)
+
         # Lambdify the two outputs so they can be used to study the network numerically:
         self.dcdt_vect_f = sp.lambdify([self.c_vect_s, self.r_vect_s,
                                         self.d_vect_s, self.K_vect_s, self.n_vect_s], self.dcdt_vect_s)
 
         self.jac_f = sp.lambdify([self.c_vect_s, self.r_vect_s,
                                   self.d_vect_s, self.K_vect_s, self.n_vect_s], self.jac_s)
+
+        self.hess_f = sp.lambdify([self.c_vect_s, self.r_vect_s,
+                                  self.d_vect_s, self.K_vect_s, self.n_vect_s], self.hess_s)
+
+        self.opti_f = sp.lambdify([self.c_vect_s, self.r_vect_s,
+                                  self.d_vect_s, self.K_vect_s, self.n_vect_s], self.opti_s)
+
+        self.opti_jac_f = sp.lambdify([self.c_vect_s, self.r_vect_s,
+                                  self.d_vect_s, self.K_vect_s, self.n_vect_s], self.opti_jac_s)
+
+        self.opti_hess_f = sp.lambdify([self.c_vect_s, self.r_vect_s,
+                                  self.d_vect_s, self.K_vect_s, self.n_vect_s], self.opti_hess_s)
 
 
     def f_acti_s(self, cc, kk, nn):
@@ -285,11 +319,11 @@ class GeneNetworkModel(object):
                                 edge_types: list|ndarray|None=None,
                                 Nc: int=15,
                                 cmin: float=0.0,
-                                cmax: float=0.0,
-                                Ki: float=0.5,
-                                ni:float=10.0,
-                                ri:float=1.0,
-                                di:float=1.0,
+                                cmax: float=1.0,
+                                Ki: float|list=0.5,
+                                ni:float|list=10.0,
+                                ri:float|list=1.0,
+                                di:float|list=1.0,
                                 zer_thresh: float=0.01,
                                 prob_acti: float=0.5,
                                 additive_interactions: bool=False):
@@ -316,17 +350,34 @@ class GeneNetworkModel(object):
         c_vect_set = np.asarray([cM.ravel() for cM in C_M_SET]).T
 
         # Create parameter vectors as the same parameters for all edges and nodes in the network:
-        K_vect = []
-        n_vect = []
-        for ei in range(self.N_edges):
-            K_vect.append(Ki)
-            n_vect.append(ni)
+        if type(Ki) is not list:
+            K_vect = []
+            for ei in range(self.N_edges):
+                K_vect.append(Ki)
 
-        r_vect = []
-        d_vect = []
-        for ni in range(self.N_nodes):
-            r_vect.append(ri)
-            d_vect.append(di)
+        else:
+            K_vect = Ki
+
+        if type(ni) is not list:
+            n_vect = []
+            for ei in range(self.N_edges):
+                n_vect.append(ni)
+        else:
+            n_vect = ni
+
+        if type(ri) is not list:
+            r_vect = []
+            for ni in range(self.N_nodes):
+                r_vect.append(ri)
+        else:
+            r_vect = ri
+
+        if type(di) is not list:
+            d_vect = []
+            for ni in range(self.N_nodes):
+                d_vect.append(di)
+        else:
+            d_vect = di
 
         dcdt_M = np.zeros(c_vect_set.shape)
 
@@ -351,4 +402,4 @@ class GeneNetworkModel(object):
         self.dcdt_dmag = np.sqrt(np.sum(self.dcdt_M_set ** 2, axis=0))
         self.dcdt_zeros = ((self.dcdt_dmag / self.dcdt_dmag.max()) < zer_thresh).nonzero()
 
-        return self.dcdt_zeros, self.dcdt_M_set, self.dcdt_dmag, self.c_lin_set
+        return self.dcdt_zeros, self.dcdt_M_set, self.dcdt_dmag, self.c_lin_set, self.C_M_SET
