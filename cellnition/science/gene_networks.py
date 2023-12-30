@@ -146,7 +146,7 @@ class GeneNetworkModel(object):
 
         edge_types_o = [EdgeType.A, EdgeType.I]
         edge_prob = [p_acti, p_inhi]
-        edge_types = np.random.choice(edge_types_o, self.N_edges, edge_prob)
+        edge_types = np.random.choice(edge_types_o, self.N_edges, p=edge_prob)
 
         return edge_types
 
@@ -278,6 +278,7 @@ class GeneNetworkModel(object):
                             source_radius: float=0.5,
                             source_center: tuple[float, float, float]=(0.5, 0.5, 0.5),
                             tube_radius: float=0.003,
+                            arrow_scale: float=1.0,
                             lighting: bool = False,
                             cmap: str = 'magma'
                             ):
@@ -308,9 +309,13 @@ class GeneNetworkModel(object):
                                               source_center=source_center
                                               )
 
+        arrows = streamlines.glyph(orient="vectors", factor=arrow_scale)
+
         pl = pv.Plotter()
         pl.add_mesh(streamlines.tube(radius=tube_radius), lighting=lighting, cmap=cmap)
+        pl.add_mesh(arrows, cmap=cmap)
         pl.remove_scalar_bar("vectors")
+        pl.remove_scalar_bar("GlyphScale")
         pl.show_grid(**labels)
 
         return pl
