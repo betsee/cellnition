@@ -9,6 +9,8 @@ This module
 
 import numpy as np
 from numpy import ndarray
+import matplotlib.pyplot as plt
+from scipy.optimize import minimize
 import networkx as nx
 import sympy as sp
 from cellnition.science.enumerations import EdgeType
@@ -175,6 +177,13 @@ class GeneNetworkModel(object):
 
         else:
             self.edge_types = edge_types
+
+        # assign the edge types to the graph in case we decide to save the network:
+        edge_attr_dict = {}
+        for ei, et in zip(self.edges_list, edge_types):
+            edge_attr_dict[ei] = {"edge_type": et.value}
+
+        nx.set_edge_attributes(self.GG, edge_attr_dict)
 
         self.edge_funcs = []
         for et in self.edge_types:
@@ -408,3 +417,190 @@ class GeneNetworkModel(object):
         self.dcdt_zeros = ((self.dcdt_dmag / self.dcdt_dmag.max()) < zer_thresh).nonzero()
 
         return self.dcdt_zeros, self.dcdt_M_set, self.dcdt_dmag, self.c_lin_set, self.C_M_SET
+
+
+    def save_network(self, filename):
+        '''
+        Write a network, including edge types, from a saved file.
+
+        '''
+        nx.write_gml(self.GG, filename)
+
+    def read_network(self, filename):
+        '''
+        Read a network, including edge types, from a saved file.
+
+        '''
+        self.GG = nx.read_gml(filename, label=None)
+        self.nodes_list = sorted(self.GG.nodes())
+        self.N_nodes = len(self.nodes_list)
+
+        self.edges_list = []
+        self.edge_types = []
+
+        # get data stored on edge type key:
+        edge_data = nx.get_edge_attributes(self.GG, "edge_type")
+
+        for ei, et in edge_data.items():
+            # append the edge to the list:
+            self.edges_list.append(ei)
+
+            if et == 'Activator':
+                self.edge_types.append(EdgeType.A)
+            elif et == 'Inhibitor':
+                self.edge_types.append(EdgeType.I)
+            else:
+                raise Exception("Edge type not found.")
+
+        self.N_edges = len(self.edges_list)
+
+        # Calculate key characteristics of the graph:
+        self._characterize_graph()
+
+
+    def optimized_phase_space_search(self,
+                                     Ns: int=2,
+                                     cmin: float=0.0,
+                                     cmax: float=1.0,
+                                     Ki: float | list = 0.5,
+                                     ni: float | list = 10.0,
+                                     ri: float | list = 1.0,
+                                     di: float | list = 1.0,
+                                     c_bounds: list|None = None,
+                                     zer_thresh: float=0.001):
+        '''
+
+        '''
+
+        c_test_lin_set = []
+        for i in range(self.N_nodes):
+            c_test_lin_set.append(np.linspace(cmin, cmax, Ns))
+
+        # Create a set of matrices specifying the concentation grid for each
+        # node of the network:
+        C_test_M_SET = np.meshgrid(*c_test_lin_set, indexing='ij')
+
+        # Create linearized arrays for each concentration, stacked into one column per node:
+        c_test_set = np.asarray([cM.ravel() for cM in C_test_M_SET]).T
+
+        if type(Ki) != list:
+            K_vect = (Ki * np.ones(self.N_edges)).tolist()
+        else:
+            K_vect = Ki
+
+        if type(ni) != list:
+            n_vect = (ni * np.ones(self.N_edges)).tolist()
+        else:
+            n_vect = ni
+
+        if type(ri) != list:
+            r_vect = (ri*np.ones(self.N_nodes)).tolist()
+        else:
+            r_vect = ri
+
+        if type(di) != list:
+            d_vect = (di*np.ones(self.N_nodes)).tolist()
+        else:
+            d_vect = di
+
+        if c_bounds is None:
+            c_bounds = [(cmin, cmax) for i in range(self.N_nodes)]
+
+        mins_found = set()
+
+        for c_vecti in c_test_set:
+
+            sol0 = minimize(self.opti_f,
+                            c_vecti,
+                            args=(r_vect, d_vect, K_vect, n_vect),
+                            method='Powell',
+                            hessp=None,
+                            bounds=c_bounds,
+                            tol=None,
+                            callback=None,
+                            options=None)
+
+            if sol0.fun < zer_thresh:
+                mins_found.add(tuple(np.round(sol0.x, 1)))
+
+        self.mins_found = mins_found
+
+        return mins_found
+
+    def stability_estimate(self,
+                           mins_found: set|list,
+                           r_vect: list,
+                           d_vect: list,
+                           K_vect: list,
+                           n_vect: list):
+        '''
+
+        '''
+
+        eps = 1.0e-25 # we need a small value to add to avoid dividing by zero in some Jacobians
+        for cminso in mins_found:
+
+            print(f'min vals: {cminso}')
+
+            cmins = np.asarray(cminso) + eps # add the small amount here, before calculating the jacobian
+
+            print(f'dcdt at min: {self.dcdt_vect_f(cmins, r_vect, d_vect, K_vect, n_vect).flatten()}')
+
+            jac = self.jac_f(cmins, r_vect, d_vect, K_vect, n_vect)
+
+           # get the eigenvalues of the jacobian at this equillibrium point:
+            eig_valso, eig_vects = np.linalg.eig(jac)
+
+            # round the eigenvalues so we don't have issue with small imaginary components
+            eig_vals = np.round(np.real(eig_valso), 1) + np.round(np.imag(eig_valso), 1)*1j
+
+            print(f'Jacobian eigs: {eig_vals}')
+
+            # get the indices of eigenvalues that have only real components:
+            real_eig_inds = (np.imag(eig_vals) == 0.0).nonzero()[0]
+            # print(real_eig_inds)
+
+            # If all eigenvalues are real and they're all negative:
+            if len(real_eig_inds) == len(eig_vals) and np.all(np.real(eig_vals) <= 0.0):
+                print('Stable Attractor')
+
+            # If all eigenvalues are real and they're all positive:
+            elif len(real_eig_inds) == len(eig_vals) and np.all(np.real(eig_vals) > 0.0):
+                print('Stable Repellor')
+
+            # If there are no real eigenvalues we only know its a limit cycle but can't say
+            # anything certain about stability:
+            elif len(real_eig_inds) == 0 and np.all(np.real(eig_vals) <= 0.0):
+                print('Stable Limit cycle')
+
+            # If there are no real eigenvalues and a mix of real component sign, we only know its a limit cycle but can't say
+            # anything certain about stability:
+            elif len(real_eig_inds) == 0 and np.any(np.real(eig_vals) > 0.0):
+                print('Limit cycle')
+
+            elif np.all(np.real(eig_vals[real_eig_inds]) <= 0.0):
+                print('Stable Limit Cycle')
+
+            elif np.any(np.real(eig_vals[real_eig_inds] > 0.0)):
+                print('Saddle Point')
+            else:
+                print('Undetermined Stability Status')
+
+            print('----')
+
+
+    def plot_degree_distributions(self):
+        '''
+
+        '''
+        fig, ax = plt.subplots(1, 2, figsize=(10, 4), sharey=True)
+        ax[0].bar(self.in_bins, self.in_degree_counts)
+        ax[0].set_xlabel('Node degree')
+        ax[0].set_ylabel('Counts')
+        ax[0].set_title('In-Degree Distribution')
+        ax[1].bar(self.out_bins, self.out_degree_counts)
+        ax[1].set_xlabel('Node degree')
+        # ax[1].set_ylabel('Counts')
+        ax[1].set_title('Out-Degree Distribution')
+
+        return fig, ax

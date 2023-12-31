@@ -13,3 +13,10 @@ from enum import Enum
 class EdgeType(Enum):
     A = 'Activator'
     I = 'Inhibitor'
+    N = 'Normal'
+
+class NodeType(Enum):
+    gene = 'Gene Product'
+    process = 'Process'
+    sensor = 'Sensor'
+    effector = 'Effector'
