@@ -14,7 +14,12 @@ from scipy.optimize import minimize
 import networkx as nx
 import sympy as sp
 from cellnition.science.enumerations import EdgeType
+import pygraphviz as pgv
 import pyvista as pv
+
+# TODO: Color the master hub(s) and/or a leaf and/or sensor and/or process nodes in different colours
+# TODO: Allow process to be added to the network (node with different physics)
+# TODO: Plot a path through a graph
 
 class GeneNetworkModel(object):
     '''
@@ -419,14 +424,14 @@ class GeneNetworkModel(object):
         return self.dcdt_zeros, self.dcdt_M_set, self.dcdt_dmag, self.c_lin_set, self.C_M_SET
 
 
-    def save_network(self, filename):
+    def save_network(self, filename: str):
         '''
         Write a network, including edge types, from a saved file.
 
         '''
         nx.write_gml(self.GG, filename)
 
-    def read_network(self, filename):
+    def read_network(self, filename: str):
         '''
         Read a network, including edge types, from a saved file.
 
@@ -456,6 +461,44 @@ class GeneNetworkModel(object):
 
         # Calculate key characteristics of the graph:
         self._characterize_graph()
+
+    def save_network_image(self, save_filename: str, use_dot_layout: bool=False):
+        '''
+        Uses pygraphviz to create a nice plot of the network model.
+
+        '''
+        G_plt = pgv.AGraph(strict=False,
+                           splines=True,
+                           directed=True,
+                           randkdir='TB',
+                           nodesep=0.1,
+                           ranksep=0.3,
+                           dpi=300)
+
+        for ni in self.nodes_list:
+            G_plt.add_node(ni,
+                           style='filled',
+                           fillcolor='LightCyan',
+                           color='Black',
+                           shape='ellipse',
+                           fontcolor='Black',
+                           # fontname=net_font_name,
+                           fontsize=12)
+
+        for (ei, ej), etype in zip(self.edges_list, self.edge_types):
+            if etype is EdgeType.A:
+                G_plt.add_edge(ei, ej, arrowhead='dot', color='blue', penwidth=2.0)
+            elif etype is EdgeType.I:
+                G_plt.add_edge(ei, ej, arrowhead='tee', color='red', penwidth=2.0)
+            else:
+                G_plt.add_edge(ei, ej, arrowhead='normal', color='black', penwidth=2.0)
+
+        if use_dot_layout:
+            G_plt.layout(prog="dot")
+        else:
+            G_plt.layout()
+
+        G_plt.draw(save_filename)
 
 
     def optimized_phase_space_search(self,
