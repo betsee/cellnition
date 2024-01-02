@@ -248,6 +248,13 @@ class GeneNetworkModel(object):
 
         self.set_edge_types(self.edge_types)
 
+        # Now that indices are set, give nodes a type attribute:
+        node_types = [NodeType.gene for i in self.nodes_list]  # Set all nodes to the gene type
+
+        # Set node types to the graph:
+        self.node_types = node_types
+        self.set_node_types(node_types)
+
         c_s = sp.IndexedBase('c')
         K_s = sp.IndexedBase('K')
         n_s = sp.IndexedBase('n')
@@ -374,6 +381,7 @@ class GeneNetworkModel(object):
         node_types[self._process_i] = NodeType.process  # Set the process node
 
         # Set node types to the graph:
+        self.node_types = node_types
         self.set_node_types(node_types)
 
         # Build the basic edge functions:
@@ -595,7 +603,12 @@ class GeneNetworkModel(object):
         # for each node of the network:
         c_lin_set = []
         for i in range(self.N_nodes):
-            c_lin_set.append(np.linspace(cmin, cmax, Nc))
+            if self._include_process and i == self._process_i:
+                c_lin_set.append(np.linspace(self.epsilon_min, self.epsilon_max, Nc))
+            else:
+                c_lin_set.append(np.linspace(cmin, cmax, Nc))
+
+
 
         # Create a set of matrices specifying the concentation grid for each
         # node of the network:
@@ -799,13 +812,11 @@ class GeneNetworkModel(object):
 
         c_test_lin_set = []
         for i in range(self.N_nodes):
-            if self._include_process is False:
-                c_test_lin_set.append(np.linspace(cmin, cmax, Ns))
+            if self._include_process is True and i == self._process_i:
+                c_test_lin_set.append(np.linspace(self.epsilon_min, self.epsilon_max, Ns))
             else:
-                if i != self._process_i:
-                    c_test_lin_set.append(np.linspace(cmin, cmax, Ns))
-                else:
-                    c_test_lin_set.append(np.linspace(self.V_min, cmax, Ns))
+                c_test_lin_set.append(np.linspace(cmin, cmax, Ns))
+
 
         # Create a set of matrices specifying the concentation grid for each
         # node of the network:
@@ -843,7 +854,7 @@ class GeneNetworkModel(object):
             function_args = (r_vect, d_vect, K_vect, n_vect)
         else:
             function_args = (r_vect, d_vect, K_vect, n_vect, self.process_params_f)
-            c_bounds[self._process_i] = (self.V_min, cmax)
+            c_bounds[self._process_i] = (self.epsilon_min, self.epsilon_max)
 
         mins_found = set()
 
@@ -1044,7 +1055,9 @@ class GeneNetworkModel(object):
         self.nc_f = 1000.0 * self.Vc_f  # osmolyte moles in the cell (near max)
         self.mc_f = 1000.0  # osmolyte concentration in the environment (near max)
         self.Ac_f = 0.12e6 * np.pi * 1.0e-9 ** 2  # normalizing total water channel area (near max)
-        self.V_min = 0.2 # minimum volume that can be achieved
+
+        self.epsilon_min = -0.8 # minimum strain that can be achieved
+        self.epsilon_max = 2.0 # maximum strain that can be achieved
 
         # symbolic parameters for the dV/dt process (these must be augmented onto the GRN parameters
         # when lambdifying):
