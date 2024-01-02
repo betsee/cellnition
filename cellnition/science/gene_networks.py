@@ -144,7 +144,6 @@ class GeneNetworkModel(object):
         self.graph_cycles = sorted(nx.simple_cycles(self.GG))
         self.N_cycles = len(self.graph_cycles)
 
-
     def get_paths_matrix(self):
 
         # Matrix showing the number of paths from starting node to end node:
@@ -289,8 +288,8 @@ class GeneNetworkModel(object):
 
 
     def build_analytical_model_with_process(self,
-                                            root_i: int|None = None,
-                                            effector_i: int|None = None,
+                                            control_edges_dict: dict|None = None,
+                                            control_node_dict: dict | None = None,
                                             prob_acti: float=0.5,
                                             edge_types: list|ndarray|None=None,
                                             add_interactions: bool=True):
@@ -306,50 +305,76 @@ class GeneNetworkModel(object):
 
         self.set_edge_types(edge_types)
 
-        # Set indices of root and effector nodes:
-        if root_i is None: # If no node is specified, set it to the highest degree node
+        # FIXME: we ultimately want to add more than one of each node type to the network (i.e. more
+        # than one effector, or multiple processes and sensors, etc)
+
+        if control_node_dict is None: # default behaviour
+            # Set indices of root and effector nodes to the highest and lowest degree nodes:
             self._root_i = self.nodes_by_out_degree[0]
-        else:
-            self._root_i = root_i
-
-        if effector_i is None: # If no node is specified, set it to the lowest degree node
             self._effector_i = self.nodes_by_out_degree[-1]
+            # add sensor and process nodes to the network as new nodes:
+            self._sensor_i = self.N_nodes
+            self._process_i = 1 + self.N_nodes
+
+            if control_edges_dict is None: # By default assign activator edge types
+                ps_edge = EdgeType.A.value
+                sr_edge = EdgeType.A.value
+
+            else: # allow user to specify
+                ps_edge = control_edges_dict['process-sensor'].value
+                sr_edge = control_edges_dict['sensor-root'].value
+
+            # Connect the new nodes to the network with new edges
+            self.GG.add_edge(self._process_i, self._sensor_i,
+                             edge_type=ps_edge)
+
+            self.GG.add_edge(self._sensor_i, self._root_i,
+                             edge_type=sr_edge)
+
+            # By default the effector-process edge type must be neutral as the
+            # process specifies the interaction of the effector on it:
+            self.GG.add_edge(self._effector_i, self._process_i,
+                             edge_type=EdgeType.N.value)
+
+            # update the graph nodes and node properties:
+            self.N_nodes = self.N_nodes + 2  # We added the sensor and process nodes to the graph
+            self.nodes_list = np.arange(self.N_nodes)  # We make a new nodes list
+
+            # Harvest data from edge attributes for edge property re-assignment:
+            self.read_edge_info_from_graph()
+
+            # Indices of key new edges:
+            self.ei_process_sensor = self.edges_list.index((self._process_i, self._sensor_i))
+            self.ei_sensor_root = self.edges_list.index((self._sensor_i, self._root_i))
+
+            # Re-calculate key characteristics of the graph after adding in new nodes and edges:
+            self.characterize_graph()
+
         else:
-            self._effector_i = effector_i
+            self._root_i = control_node_dict['root']
+            self._effector_i = control_node_dict['effector']
+            self._sensor_i = control_node_dict['sensor']
+            self._process_i = control_node_dict['process']
 
-        # add sensor and process nodes to the network and connect them with new edges:
-        self._sensor_i = self.N_nodes
-        self._process_i = 1 + self.N_nodes
+            # Indices of key new edges:
+            self.ei_process_sensor = self.edges_list.index((self._process_i, self._sensor_i))
+            self.ei_effector_process = self.edges_list.index((self._effector_i, self._process_i))
 
-        # Add new nodes and edges to the network:
-        process_sensor_edge_type = EdgeType.A
-        sensor_root_edge_type = EdgeType.A
-        effector_process_edge_type = EdgeType.N  # This needs to be a neutral edge as the process assigns the type of interaction
+            # Override the edge-type for the control loop effector-process:
+            self.edge_types[self.ei_effector_process] = EdgeType.N # This is always neutral
 
-        self.GG.add_edge(self._process_i, self._sensor_i, edge_type=process_sensor_edge_type.value)
-        self.GG.add_edge(self._sensor_i, self._root_i, edge_type=sensor_root_edge_type.value)
-        self.GG.add_edge(self._effector_i, self._process_i, edge_type=effector_process_edge_type.value)
+            # Update the edge types on the graph edges:
+            self.set_edge_types(self.edge_types)
 
-        # update the graph nodes and node properties:
-        self.N_nodes = self.N_nodes + 2  # We added the sensor and process nodes to the graph
-        self.nodes_list = np.arange(self.N_nodes)  # We make a new nodes list
-
-        # Give nodes a type:
-        node_types_sf0 = [NodeType.gene for i in self.nodes_list]  # Set all nodes to the gene type
-        node_types_sf0[self._root_i] = NodeType.root  # Set the most connected node to the root hub
-        node_types_sf0[self._effector_i] = NodeType.effector  # Set the least out-connected node to the effector
-        node_types_sf0[self._sensor_i] = NodeType.sensor  # Set the sensor node
-        node_types_sf0[self._process_i] = NodeType.process  # Set the process node
+        # Now that indices are set, give nodes a type attribute:
+        node_types = [NodeType.gene for i in self.nodes_list]  # Set all nodes to the gene type
+        node_types[self._root_i] = NodeType.root  # Set the most connected node to the root hub
+        node_types[self._effector_i] = NodeType.effector  # Set the least out-connected node to the effector
+        node_types[self._sensor_i] = NodeType.sensor  # Set the sensor node
+        node_types[self._process_i] = NodeType.process  # Set the process node
 
         # Set node types to the graph:
-        self.set_node_types(node_types_sf0)
-
-        # Harvest data from edge attributes for edge property re-assignment:
-        self.read_edge_info_from_graph()
-
-        # Indices of key new edges:
-        self.ei_process_sensor = self.edges_list.index((self._process_i, self._sensor_i))
-        self.ei_sensor_root = self.edges_list.index((self._sensor_i, self._root_i))
+        self.set_node_types(node_types)
 
         # Build the basic edge functions:
         self.edge_funcs = []
@@ -388,9 +413,9 @@ class GeneNetworkModel(object):
         # Create the time-change vector with the process node math applied:
         dcdt_vect_s = []
 
-        for ni, (fval_set, ntype) in enumerate(zip(efunc_vect, node_types_sf0)):
+        for ni, (fval_set, ntype) in enumerate(zip(efunc_vect, node_types)):
             if ntype is NodeType.process:  # if we're dealing with the phys/chem process node...
-                dcdt_vect_s.append(self.dVdt_s)  # ...append the osmotic volume change equation.
+                dcdt_vect_s.append(self.dEdt_s)  # ...append the osmotic strain rate equation.
 
             else:  # if it's any other kind of node insert the conventional GRN node dynamics
                 if add_interactions:
@@ -972,10 +997,10 @@ class GeneNetworkModel(object):
 
         # Defining analytic equations for an osmotic cell volume change process:
         A_s, R_s, T_s, n_s, m_s, V_s, Vc_s, dm_s, mu_s, Y_s, r_s = sp.symbols('A, R, T, n, m, V, V_c, d_m, mu, Y, r',
-                                                                              real=True, positive=True)
+                                                                              real=True)
         # Normalized parameters:
-        Ap_s, mp_s, Ac_s, nc_s, mc_s = sp.symbols('A_p, m_p, A_c, n_c, m_c', real=True,
-                                                              positive=True)
+        Ap_s, mp_s, Ac_s, nc_s, mc_s, epsilon_s = sp.symbols('A_p, m_p, A_c, n_c, m_c, epsilon', real=True)
+
         dVdt_0_s = A_s ** 2 * R_s * T_s * (n_s - m_s * V_s) / (8 * dm_s * mu_s * V_s)
         dVdt_1_s = (A_s ** 2 / (8 * dm_s * mu_s)) * (
                     R_s * T_s * ((n_s / V_s) - m_s) - sp.Rational(4, 3) * ((Y_s * dm_s * (V_s - Vc_s) / (r_s * Vc_s))))
@@ -993,14 +1018,20 @@ class GeneNetworkModel(object):
         dVpdt_1_s = (dVdt_1_s.subs(
             [(V_s, Vp_s * Vc_s), (A_s, Ap_s * Ac_s), (n_s, nc_s * np_s), (m_s, mc_s * mp_s)]) / Vc_s).simplify()
 
-        # Piecewise function that defines this normalized-parameter osmotic cell volume change problem:
-        self.dVdt_s = sp.Piecewise((dVpdt_0_s, Vp_s < 1.0), (dVpdt_1_s, True))
+        # Strain rates (which are the input into the sensor node) are:
+        dEdt_0_s = dVpdt_0_s - 1
+        dEdt_1_s = dVpdt_1_s - 1
+
+        # Piecewise function that defines this normalized-parameter osmotic cell volume change problem
+        # as a strain rate:
+        self.dEdt_s = sp.Piecewise((dEdt_0_s, Vp_s < 1.0), (dEdt_1_s, True))
 
         # Transform this into a numerical function:
-        self.dVdt_f = sp.lambdify([Vp_s, np_s, mp_s, Ap_s, Vc_s, nc_s, mc_s, Ac_s, R_s, T_s, Y_s, dm_s, mu_s, r_s],
-                             dVpdt_0_s)
+        self.dEdt_f = sp.lambdify([Vp_s, np_s, mp_s, Ap_s, Vc_s, nc_s, mc_s, Ac_s, R_s, T_s, Y_s, dm_s, mu_s, r_s],
+                                  dVpdt_0_s)
 
-        # Go ahead and initialize some parameters for this process function:
+        # Go ahead and initialize some parameters for this process function: # FIXME these need to be
+        # made easier to input, vary and change:
         self.m_f = 0.5  # Normalized environmental osmolyte concentration
         self.A_f = 1.0  # Normalized water/glycerol channel area
         self.R_f = 8.3145  # Ideal Gas constant
@@ -1036,7 +1067,7 @@ class GeneNetworkModel(object):
                                 self.r_f)
 
         # evaluate the function as:
-        # self.dVdt_f(self.V_f,
+        # self.dEdt_f(self.V_f,
         #             self.n_f,
         #             self.m_f,
         #             self.A_f,
