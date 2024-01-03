@@ -8,9 +8,13 @@ def plot_network(nodes_list: list|ndarray,
                  edges_type: list|ndarray,
                  path_plot_edges: list|ndarray|None = None,
                  dpi: int|float=300,
-                 save_path: str|None=None):
+                 save_path: str|None=None,
+                 layout: str='circo'):
     '''
 
+    layout options:
+    "fdp"
+    'neato'
     '''
 
     G = pgv.AGraph(strict=False,
@@ -42,6 +46,13 @@ def plot_network(nodes_list: list|ndarray,
     'outline_color': 'Black'
     }
 
+    node_dict_path = {
+    'node_font_color': 'Black',
+    'node_color': 'PaleTurquoise',
+    'node_shape': 'ellipse',
+    'outline_color': 'Black'
+    }
+
     node_dict_sensor = {
     'node_font_color' : 'Black',
     'node_color' : 'LemonChiffon',
@@ -58,7 +69,7 @@ def plot_network(nodes_list: list|ndarray,
 
     node_dict_effector = {
     'node_font_color' : 'Black',
-    'node_color' : 'PaleTurquoise',
+    'node_color' : 'Turquoise',
     'node_shape' : 'ellipse',
     'outline_color': 'Black'
     }
@@ -74,7 +85,8 @@ def plot_network(nodes_list: list|ndarray,
                       NodeType.sensor.value: node_dict_sensor,
                       NodeType.process.value: node_dict_process,
                       NodeType.effector.value: node_dict_effector,
-                      NodeType.root.value: node_dict_root}
+                      NodeType.root.value: node_dict_root,
+                      NodeType.path.value: node_dict_path}
 
     for ni, nt in zip(nodes_list, nodes_type):
 
@@ -104,7 +116,7 @@ def plot_network(nodes_list: list|ndarray,
         else:
             raise Exception('Edge type not found.')
 
-    G.layout() # default to neato
+    G.layout(prog=layout) # default to neato
 
     if save_path is not None:
         G.draw(save_path)

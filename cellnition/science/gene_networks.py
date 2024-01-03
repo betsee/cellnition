@@ -373,8 +373,20 @@ class GeneNetworkModel(object):
             # Update the edge types on the graph edges:
             self.set_edge_types(self.edge_types)
 
+        # See if there are paths connecting the hub and effector node:
+        try:
+            self.root_effector_paths = sorted(nx.shortest_simple_paths(self.GG, self._root_i, self._effector_i), reverse=True)
+        except:
+            self.root_effector_paths = []
+
         # Now that indices are set, give nodes a type attribute:
         node_types = [NodeType.gene for i in self.nodes_list]  # Set all nodes to the gene type
+
+        # Add a type tag to any nodes on the path between root hub and effector:
+        for path_i in self.root_effector_paths:
+            for ni in path_i:
+                node_types[ni] = NodeType.path
+
         node_types[self._root_i] = NodeType.root  # Set the most connected node to the root hub
         node_types[self._effector_i] = NodeType.effector  # Set the least out-connected node to the effector
         node_types[self._sensor_i] = NodeType.sensor  # Set the sensor node
@@ -411,12 +423,12 @@ class GeneNetworkModel(object):
         self.c_vect_s = [c_s[i] for i in self.nodes_list]
 
         # Create the analytic equations governing the process:
-        self.set_analytic_process(c_s[self._sensor_i], c_s[self._process_i])
+        self.set_analytic_process(self.c_vect_s[self._effector_i], self.c_vect_s[self._process_i])
 
         # Create the edge-function collections at each node for the GRN interactions:
         efunc_vect = [[] for i in self.nodes_list]
         for ei, ((i, j), fun_type) in enumerate(zip(self.edges_list, self.edge_funcs)):
-            efunc_vect[j].append(fun_type(c_s[i], K_s[ei], n_s[ei]))
+            efunc_vect[j].append(fun_type(self.c_vect_s[i], self.K_vect_s[ei], self.n_vect_s[ei]))
 
         # Create the time-change vector with the process node math applied:
         dcdt_vect_s = []
@@ -432,9 +444,9 @@ class GeneNetworkModel(object):
                     else:
                         normf = sp.Rational(1, len(fval_set))
 
-                    dcdt_vect_s.append(r_max_s[ni] * np.sum(fval_set) * normf - c_s[ni] * d_max_s[ni])
+                    dcdt_vect_s.append(self.r_vect_s[ni] * np.sum(fval_set) * normf - self.c_vect_s[ni] * self.d_vect_s[ni])
                 else:
-                    dcdt_vect_s.append(r_max_s[ni] * np.prod(fval_set) - c_s[ni] * d_max_s[ni])
+                    dcdt_vect_s.append(self.r_vect_s[ni] * np.prod(fval_set) - self.c_vect_s[ni] * self.d_vect_s[ni])
 
         # analytical rate of change of concentration vector for the network:
         self.dcdt_vect_s = sp.Matrix(dcdt_vect_s)
@@ -604,7 +616,7 @@ class GeneNetworkModel(object):
         c_lin_set = []
         for i in range(self.N_nodes):
             if self._include_process and i == self._process_i:
-                c_lin_set.append(np.linspace(self.epsilon_min, self.epsilon_max, Nc))
+                c_lin_set.append(np.linspace(self.Vp_min, self.Vp_max, Nc))
             else:
                 c_lin_set.append(np.linspace(cmin, cmax, Nc))
 
@@ -728,6 +740,8 @@ class GeneNetworkModel(object):
                 self.node_types.append(NodeType.effector)
             elif nt == 'Root Hub':
                 self.node_types.append(NodeType.root)
+            elif nt == 'Path':
+                self.node_types.append(NodeType.path)
             else:
                 raise Exception("Node type not found.")
 
@@ -813,7 +827,7 @@ class GeneNetworkModel(object):
         c_test_lin_set = []
         for i in range(self.N_nodes):
             if self._include_process is True and i == self._process_i:
-                c_test_lin_set.append(np.linspace(self.epsilon_min, self.epsilon_max, Ns))
+                c_test_lin_set.append(np.linspace(self.Vp_min, self.Vp_max, Ns))
             else:
                 c_test_lin_set.append(np.linspace(cmin, cmax, Ns))
 
@@ -854,7 +868,7 @@ class GeneNetworkModel(object):
             function_args = (r_vect, d_vect, K_vect, n_vect)
         else:
             function_args = (r_vect, d_vect, K_vect, n_vect, self.process_params_f)
-            c_bounds[self._process_i] = (self.epsilon_min, self.epsilon_max)
+            c_bounds[self._process_i] = (self.Vp_min, self.Vp_max)
 
         mins_found = set()
 
@@ -998,52 +1012,54 @@ class GeneNetworkModel(object):
         return fig, ax
 
 
-    def set_analytic_process(self, c_sensor: Symbol|Indexed, c_process: Symbol|Indexed):
+    def set_analytic_process(self, c_effector: Symbol|Indexed, c_process: Symbol|Indexed):
         '''
-        cs : Symbol
+
+        c_effector : Symbol
             Symbolic concentration from a node in the GRN network that represents the moles of
             osmolyte inside the cell.
 
         '''
+        # FIXME: Something here is seriously wrong
 
         # Defining analytic equations for an osmotic cell volume change process:
-        A_s, R_s, T_s, n_s, m_s, V_s, Vc_s, dm_s, mu_s, Y_s, r_s = sp.symbols('A, R, T, n, m, V, V_c, d_m, mu, Y, r',
+        A_s, R_s, T_s, ni_s, m_s, V_s, Vc_s, dm_s, mu_s, Y_s, r_s = sp.symbols('A, R, T, ni, m, V, V_c, d_m, mu, Y, r',
                                                                               real=True)
         # Normalized parameters:
         Ap_s, mp_s, Ac_s, nc_s, mc_s, epsilon_s = sp.symbols('A_p, m_p, A_c, n_c, m_c, epsilon', real=True)
 
-        dVdt_0_s = A_s ** 2 * R_s * T_s * (n_s - m_s * V_s) / (8 * dm_s * mu_s * V_s)
+        dVdt_0_s = A_s ** 2 * R_s * T_s * (ni_s - m_s * V_s) / (8 * dm_s * mu_s * V_s)
         dVdt_1_s = (A_s ** 2 / (8 * dm_s * mu_s)) * (
-                    R_s * T_s * ((n_s / V_s) - m_s) - sp.Rational(4, 3) * ((Y_s * dm_s * (V_s - Vc_s) / (r_s * Vc_s))))
+                    R_s * T_s * ((ni_s / V_s) - m_s) - sp.Rational(4, 3) * ((Y_s * dm_s * (V_s - Vc_s) / (r_s * Vc_s))))
 
         # the normalized moles inside the cell is taken to be equal to an effector concentration
         # from the GRN and the normalized volume will be asigned to the c_process variable:
-        np_s = c_sensor
-        Vp_s = c_process
+        # np_s = c_effector
+        # Vp_s = c_process
 
         # Rate of change of Vp with respect to time for Vp < 1.0 is:
         dVpdt_0_s = (dVdt_0_s.subs(
-            [(V_s, Vp_s * Vc_s), (A_s, Ap_s * Ac_s), (n_s, nc_s * np_s), (m_s, mc_s * mp_s)]) / Vc_s).simplify()
+            [(V_s, c_process * Vc_s), (A_s, Ap_s * Ac_s), (ni_s, nc_s * c_effector), (m_s, mc_s * mp_s)]) / Vc_s).simplify()
 
         # Rate of change of Vp with respect to time for Vp >= 1.0
         dVpdt_1_s = (dVdt_1_s.subs(
-            [(V_s, Vp_s * Vc_s), (A_s, Ap_s * Ac_s), (n_s, nc_s * np_s), (m_s, mc_s * mp_s)]) / Vc_s).simplify()
+            [(V_s, c_process * Vc_s), (A_s, Ap_s * Ac_s), (ni_s, nc_s * c_effector), (m_s, mc_s * mp_s)]) / Vc_s).simplify()
 
-        # Strain rates (which are the input into the sensor node) are:
-        dEdt_0_s = dVpdt_0_s - 1
-        dEdt_1_s = dVpdt_1_s - 1
+        # Volume change rates (which are the input into the sensor node) are:
+        dEdt_0_s = dVpdt_0_s
+        dEdt_1_s = dVpdt_1_s
 
         # Piecewise function that defines this normalized-parameter osmotic cell volume change problem
         # as a strain rate:
-        self.dEdt_s = sp.Piecewise((dEdt_0_s, Vp_s < 1.0), (dEdt_1_s, True))
+        self.dEdt_s = sp.Piecewise((dEdt_0_s, c_process < 1.0), (dEdt_1_s, True))
 
         # Transform this into a numerical function:
-        self.dEdt_f = sp.lambdify([Vp_s, np_s, mp_s, Ap_s, Vc_s, nc_s, mc_s, Ac_s, R_s, T_s, Y_s, dm_s, mu_s, r_s],
-                                  dVpdt_0_s)
+        # self.dEdt_f = sp.lambdify([c_process, c_effector, mp_s, Ap_s, Vc_s, nc_s, mc_s, Ac_s, R_s, T_s, Y_s, dm_s, mu_s, r_s],
+        #                           dVpdt_0_s)
 
         # Go ahead and initialize some parameters for this process function: # FIXME these need to be
         # made easier to input, vary and change:
-        self.m_f = 0.5  # Normalized environmental osmolyte concentration
+        self.m_f = 0.8  # Normalized environmental osmolyte concentration (high)
         self.A_f = 1.0  # Normalized water/glycerol channel area
         self.R_f = 8.3145  # Ideal Gas constant
         self.T_f = 310.0  # System temperature in K
@@ -1056,12 +1072,14 @@ class GeneNetworkModel(object):
         self.mc_f = 1000.0  # osmolyte concentration in the environment (near max)
         self.Ac_f = 0.12e6 * np.pi * 1.0e-9 ** 2  # normalizing total water channel area (near max)
 
-        self.epsilon_min = -0.8 # minimum strain that can be achieved
-        self.epsilon_max = 2.0 # maximum strain that can be achieved
+        self.Vp_min = 0.2 # minimum relative volume that can be achieved
+        self.Vp_max = 2.0 # maximum relative volume that can be achieved
 
         # symbolic parameters for the dV/dt process (these must be augmented onto the GRN parameters
         # when lambdifying):
         self.process_params_s = (mp_s, Ap_s, Vc_s, nc_s, mc_s, Ac_s, R_s, T_s, Y_s, dm_s, mu_s, r_s)
+
+        self.dEdt_f = sp.lambdify([c_process, c_effector, self.process_params_s], self.dEdt_s)
 
         # Numeric parameters for the dV/dt process (these must be augmented onto the GRN parameters
         # when using numerical network equations):
@@ -1094,3 +1112,37 @@ class GeneNetworkModel(object):
         #             self.dm_f,
         #             self.mu_f,
         #             self.r_f)
+
+
+    def set_node_type_path(self,
+                           root_i: int|None = None,
+                           effector_i: int|None=None):
+        '''
+
+        '''
+
+        # Set indices of root and effector nodes to the highest and lowest degree nodes when none are specified:
+        if root_i is None:
+            root_i = self.nodes_by_out_degree[0]
+
+        if effector_i is None:
+            effector_i = self.nodes_by_out_degree[-1]
+
+        # See if there are paths connecting the hub and effector node:
+        try:
+            paths_i = sorted(nx.shortest_simple_paths(self.GG, root_i, effector_i), reverse=True)
+        except:
+            paths_i = []
+
+        node_types = [NodeType.gene for i in self.nodes_list]  # Set all nodes to the gene type
+        # Add any nodes on the path:
+        for path_i in paths_i:
+            for ni in path_i:
+                node_types[ni] = NodeType.path
+        # Add the path endpoint node highlights:
+        node_types[root_i] = NodeType.root
+        node_types[effector_i] = NodeType.effector
+
+        # Set node types to the graph:
+        self.node_types = node_types
+        self.set_node_types(node_types)

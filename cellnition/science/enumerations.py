@@ -21,6 +21,7 @@ class NodeType(Enum):
     sensor = 'Sensor'
     effector = 'Effector'
     root = 'Root Hub'
+    path = 'Path'
 
 class GraphType(Enum):
     scale_free = 'Scale Free'
