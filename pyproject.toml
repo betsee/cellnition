@@ -189,7 +189,10 @@ dependencies = [
 
     # Web stack.
     "streamlit >=1.19.0",
-    "trame >=3.3.0",
+
+    #FIXME: Before enabling "trame", note that we'll need to add "trame" to our
+    #mandatory conda-based dependencies as well, please.
+    # "trame >=3.3.0",
 
     # 3D stack. Dismantled, this is:
     # * pyvista 0.42.0 first introduced support for "trame", an increasingly
