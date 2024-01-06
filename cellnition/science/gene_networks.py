@@ -120,10 +120,11 @@ class GeneNetworkModel(object):
 
         '''
         # Degree analysis:
-        self.in_degree_sequence = np.asarray(sorted((d for n, d in self.GG.in_degree()), reverse=True))
+        self.node_based_in_degree_sequence = [di for ni, di in self.GG.in_degree(self.nodes_list)] # aligns with node order
+        self.in_degree_sequence = np.asarray(sorted((d for n, d in self.GG.in_degree(self.nodes_list)), reverse=True))
         self.in_dmax = self.in_degree_sequence.max()
 
-        self.out_degree_sequence = np.asarray(sorted((d for n, d in self.GG.out_degree()), reverse=True))
+        self.out_degree_sequence = np.asarray(sorted((d for n, d in self.GG.out_degree(self.nodes_list)), reverse=True))
         self.out_dmax = self.out_degree_sequence.max()
 
         self.in_bins, self.in_degree_counts = np.unique(self.in_degree_sequence, return_counts=True)
@@ -284,6 +285,12 @@ class GeneNetworkModel(object):
                 dcdt_vect_s.append(r_max_s[ni] * np.sum(fval_set)*normf - c_s[ni] * d_max_s[ni])
             else:
                 dcdt_vect_s.append(r_max_s[ni] * np.prod(fval_set) - c_s[ni] * d_max_s[ni])
+
+        # The last thing we need to do is add on a rate term for those nodes that have no inputs,
+        # as they're otherwise ignored in the construction:
+        for ni, di in enumerate(self.node_based_in_degree_sequence):
+            if di == 0 and add_interactions is True:
+                dcdt_vect_s[ni] += self.r_vect_s[ni]
 
         # analytical rate of change of concentration vector for the network:
         self.dcdt_vect_s = sp.Matrix(dcdt_vect_s)
@@ -448,6 +455,13 @@ class GeneNetworkModel(object):
                 else:
                     dcdt_vect_s.append(self.r_vect_s[ni] * np.prod(fval_set) - self.c_vect_s[ni] * self.d_vect_s[ni])
 
+
+        # The last thing we need to do is add on a rate term for those nodes that have no inputs,
+        # as they're otherwise ignored in the construction:
+        for ni, di in enumerate(self.node_based_in_degree_sequence):
+            if di == 0 and add_interactions is True:
+                dcdt_vect_s[ni] += self.r_vect_s[ni]
+
         # analytical rate of change of concentration vector for the network:
         self.dcdt_vect_s = sp.Matrix(dcdt_vect_s)
 
@@ -504,6 +518,112 @@ class GeneNetworkModel(object):
 
         self.opti_hess_f = sp.lambdify(lambda_params, self.opti_hess_s)
 
+
+    def reduce_model_dimensions(self, fast_method: bool=False):
+        '''
+
+        '''
+        # FIXME: We need to do this for the case where there's a process
+
+        if fast_method:
+            # Fast method: remove nodes with high in-degree counts and solve for the remaining nodes in order
+            # to reduce dimensions. Substitute in solutions to the omitted nodes and solve only on the reduced
+            # equation set. Plug and play to get the full solutions.
+            c_for_solve = []
+            c_master_i = []
+            for ni, di in enumerate(self.node_based_in_degree_sequence):
+                if di < 2:
+                    c_for_solve.append(self.c_vect_s[ni])
+                else:
+                    c_master_i.append(ni)
+
+            try:
+                sol_cset = sp.solve(self.dcdt_vect_s, c_for_solve, dict=True)
+
+            except:
+                sol_cset = []
+
+            # collect the master equations:
+            master_eq_list = []
+
+            if len(sol_cset):
+                sol_cset = sol_cset[0]
+                c_vect_reduced = []
+                for ii in c_master_i:
+                    ci_solve_eq = self.dcdt_vect_s[ii].subs([(k, v) for k, v in sol_cset.items()])
+                    master_eq_list.append(ci_solve_eq)
+                    c_vect_reduced.append(self.c_vect_s[ii])
+
+            else:
+                c_vect_reduced = []
+                master_eq_list = []
+
+        else: # More reliable method that can reduce dimensions more fully, however is a lot slower!
+
+            # Solve the nonlinear system as best as possible:
+            sol_csetoo = sp.nonlinsolve(self.dcdt_vect_s, self.c_vect_s)
+
+            # Clean up the sympy container for the solutions:
+            sol_cseto = list(list(sol_csetoo)[0])
+
+            c_master_i = []  # the indices of concentrations involved in the master equations
+            sol_cset = {} # A dictionary of auxillary solutions (plug and play)
+            for i, c_eq in enumerate(sol_cseto):
+                if c_eq in self.c_vect_s: # If it's a non-solution for the term, append it as a non-reduced conc.
+                    c_master_i.append(self.c_vect_s.index(c_eq))
+                else: # Otherwise append the plug-and-play solution set:
+                    sol_cset[self.c_vect_s[i]] = c_eq
+
+            master_eq_list = [] # master equations to be numerically optimized (reduced dimension network equations)
+            c_vect_reduced = [] # concentrations involved in the master equations
+
+            for ii in c_master_i:
+                # substitute in the expressions in terms of master concentrations to form the master equations:
+                ci_solve_eq = self.dcdt_vect_s[ii].subs([(k, v) for k, v in sol_cset.items()])
+                master_eq_list.append(ci_solve_eq)
+                c_vect_reduced.append(self.c_vect_s[ii])
+
+        # Results:
+        # New equation list to be numerically optimized (should be significantly reduced dimensions):
+        self.master_eq_list_s = sp.Matrix(master_eq_list)
+        # This is the concentration vector that contains the reduced equation concentration variables:
+        self.c_vect_reduced_s = c_vect_reduced
+        self.c_master_i = c_master_i # indices of concentrations that are being numerically optimized
+        self.c_remainder_i = np.setdiff1d(self.nodes_list, self.c_master_i)
+        self.c_vect_remainder_s = np.asarray(self.c_vect_s)[self.c_remainder_i].tolist()
+        # This is the dictionary of remaining concentrations that are in terms of the reduced concentrations,
+        # such that when the master equation set is solved, the results are plugged into the equations in this
+        # dictionary to obtain solutions for the whole network
+        self.sol_cset_s = sol_cset
+
+        # Now we can go through and make our optimization equations for this highly simplified model:
+        # Optimization function for solving the problem:
+        self.opti_reduced_s = (self.master_eq_list_s.T * self.master_eq_list_s)[0]
+
+        self.opti_reduced_jac_s = sp.Array([self.opti_s.diff(ci) for ci in self.c_vect_reduced_s])
+
+        self.opti_reduced_hess_s = sp.Matrix(self.opti_jac_s).jacobian(self.c_vect_reduced_s)
+
+        # THIS IS NOT QUITE IT. In the reduced problem, we want the first set of arguments to be the 'c_vect_reduced"
+        # parameters, as these are what get optimized. So we need to split c_vect_s into the cs that are being optimized
+        # versus the plug-and-play c's.
+
+        # And, numerical versions of the problem:
+        lambda_params_o = [self.c_vect_reduced_s,
+                         self.r_vect_s,
+                         self.d_vect_s,
+                         self.K_vect_s,
+                         self.n_vect_s]
+
+        self.opti_reduced_f = sp.lambdify(lambda_params_o, self.opti_reduced_s)
+
+        self.opti_reduced_jac_f = sp.lambdify(lambda_params_o, self.opti_reduced_jac_s)
+
+        self.opti_reduced_hess_f = sp.lambdify(lambda_params_o, self.opti_reduced_hess_s)
+
+        self.sol_cset_f = {}
+        for ci, eqci in self.sol_cset_s.items():
+            self.sol_cset_f[ci.indices[0]] = sp.lambdify(lambda_params_o, eqci)
 
     def f_acti_s(self, cc, kk, nn):
         '''
