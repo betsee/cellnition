@@ -46,33 +46,38 @@ class GeneNetworkModel(object):
         # a graph:
 
         if edges is None:
-            self.generate_special_network(beta=beta,
-                                          gamma=gamma,
-                                          graph_type=graph_type,
-                                          delta_in=delta,
-                                          delta_out=delta,
-                                          p_edge=p_edge)
+            self.generate_network(beta=beta,
+                                  gamma=gamma,
+                                  graph_type=graph_type,
+                                  delta_in=delta,
+                                  delta_out=delta,
+                                  p_edge=p_edge)
+
+            self.edges_index = self.edges_list
+            self.nodes_index = self.nodes_list
 
         else:
             self.edges_list = edges
             self.GG = nx.DiGraph(self.edges_list)
             self.N_edges = len(self.edges_list)
-            # self.nodes_list = sorted(self.GG.nodes())
-            self.nodes_list = np.arange(self.N_nodes)
+            self.nodes_list = sorted(self.GG.nodes())
+
+            self._make_node_edge_indices()
 
         # Calculate key characteristics of the graph
         self.characterize_graph()
 
+        # Indicate that model is full dimensions:
+        self._reduced_dims = False
 
-
-    def generate_special_network(self,
-                                 beta: float=0.15,
-                                 gamma: float=0.8,
-                                 delta_in: float=0.0,
-                                 delta_out: float=0.0,
-                                 p_edge: float=0.5,
-                                 graph_type: GraphType = GraphType.scale_free
-                                 ):
+    def generate_network(self,
+                         beta: float=0.15,
+                         gamma: float=0.8,
+                         delta_in: float=0.0,
+                         delta_out: float=0.0,
+                         p_edge: float=0.5,
+                         graph_type: GraphType = GraphType.scale_free
+                         ):
         '''
 
         '''
@@ -111,8 +116,8 @@ class GeneNetworkModel(object):
         # As the scale_free_graph function can return duplicate edges, get rid of these
         # by re-defining the graph with the unique edges only:
         GG = nx.DiGraph(self.edges_list)
-        # self.nodes_list = sorted(GG.nodes())
-        self.nodes_list = np.arange(self.N_nodes)
+
+        self.nodes_list = np.arange(self.N_nodes).tolist()
         self.GG = GG
 
     def characterize_graph(self):
@@ -120,23 +125,30 @@ class GeneNetworkModel(object):
 
         '''
         # Degree analysis:
-        self.node_based_in_degree_sequence = [di for ni, di in self.GG.in_degree(self.nodes_list)] # aligns with node order
-        self.in_degree_sequence = np.asarray(sorted((d for n, d in self.GG.in_degree(self.nodes_list)), reverse=True))
-        self.in_dmax = self.in_degree_sequence.max()
+        self.in_degree_sequence = [di for ni, di in
+                                   self.GG.in_degree(self.nodes_list)] # aligns with node order
 
-        self.out_degree_sequence = np.asarray(sorted((d for n, d in self.GG.out_degree(self.nodes_list)), reverse=True))
-        self.out_dmax = self.out_degree_sequence.max()
+        self.in_dmax = np.max(self.in_degree_sequence)
 
-        self.in_bins, self.in_degree_counts = np.unique(self.in_degree_sequence, return_counts=True)
-        self.out_bins, self.out_degree_counts = np.unique(self.out_degree_sequence, return_counts=True)
+
+        self.out_degree_sequence = [di for ni, di in
+                                    self.GG.out_degree(self.nodes_list)]  # aligns with node order
+
+        # The outward flow of interaction at each node of the graph:
+        self.node_divergence = np.asarray(self.out_degree_sequence) - np.asarray(self.in_degree_sequence)
+
+        self.out_dmax = np.max(self.out_degree_sequence)
+        self.in_dmax = np.max(self.in_degree_sequence)
+
+        self.in_bins, self.in_degree_counts = np.unique(self.in_degree_sequence,
+                                                        return_counts=True)
+        self.out_bins, self.out_degree_counts = np.unique(self.out_degree_sequence,
+                                                          return_counts=True)
 
         # Nodes sorted by number of out-degree edges:
-        self.nodes_by_out_degree = [ni for ni, di
-                                    in sorted(self.GG.out_degree, key=lambda x: x[1], reverse=True)]
+        self.nodes_by_out_degree = np.flip(np.argsort(self.out_degree_sequence))
 
-        self.nodes_by_in_degree = [ni for ni, di
-                                    in sorted(self.GG.in_degree, key=lambda x: x[1], reverse=True)]
-
+        self.nodes_by_in_degree = np.flip(np.argsort(self.in_degree_sequence))
 
         self.root_hub = self.nodes_by_out_degree[0]
         self.leaf_hub = self.nodes_by_out_degree[-1]
@@ -151,9 +163,9 @@ class GeneNetworkModel(object):
         # What we want to show is that the nodes with the highest degree have the most connectivity to nodes in the network:
         # mn_i = 10 # index of the master node, organized according to nodes_by_out_degree
         paths_matrix = []
-        for mn_i in range(len(self.nodes_list)):
+        for mn_i in range(len(self.nodes_index)):
             number_paths_to_i = []
-            for i in range(len(self.nodes_list)):
+            for i in range(len(self.nodes_index)):
                 # print(f'paths between {mn_i} and {i}')
                 try:
                     paths_i = sorted(nx.shortest_simple_paths(self.GG,
@@ -216,7 +228,7 @@ class GeneNetworkModel(object):
         self.node_types = node_types
         # Set node type as graph node attribute:
         node_attr_dict = {}
-        for ni, nt in zip(self.nodes_list, node_types):
+        for ni, nt in zip(self.nodes_index, node_types):
             node_attr_dict[ni] = {"node_type": nt.value}
 
         nx.set_node_attributes(self.GG, node_attr_dict)
@@ -250,7 +262,7 @@ class GeneNetworkModel(object):
         self.set_edge_types(self.edge_types)
 
         # Now that indices are set, give nodes a type attribute:
-        node_types = [NodeType.gene for i in self.nodes_list]  # Set all nodes to the gene type
+        node_types = [NodeType.gene for i in self.nodes_index]  # Set all nodes to the gene type
 
         # Set node types to the graph:
         self.node_types = node_types
@@ -265,11 +277,11 @@ class GeneNetworkModel(object):
         # These are needed for lambdification of analytical models:
         self.K_vect_s = [K_s[i] for i in range(self.N_edges)]
         self.n_vect_s = [n_s[i] for i in range(self.N_edges)]
-        self.r_vect_s = [r_max_s[i] for i in self.nodes_list]
-        self.d_vect_s = [d_max_s[i] for i in self.nodes_list]
-        self.c_vect_s = [c_s[i] for i in self.nodes_list]
+        self.r_vect_s = [r_max_s[i] for i in self.nodes_index]
+        self.d_vect_s = [d_max_s[i] for i in self.nodes_index]
+        self.c_vect_s = [c_s[i] for i in self.nodes_index]
 
-        efunc_vect = [[] for i in self.nodes_list]
+        efunc_vect = [[] for i in self.nodes_index]
         for ei, ((i, j), fun_type) in enumerate(zip(self.edges_list, self.edge_funcs)):
             efunc_vect[j].append(fun_type(c_s[i], K_s[ei], n_s[ei]))
 
@@ -277,18 +289,18 @@ class GeneNetworkModel(object):
 
         for ni, fval_set in enumerate(efunc_vect):
             if add_interactions:
-                if len(fval_set) == 0:
-                    normf = 1
-                else:
-                    normf = sp.Rational(1, len(fval_set))
+                # if len(fval_set) == 0:
+                #     normf = 1
+                # else:
+                #     normf = sp.Rational(1, len(fval_set))
 
-                dcdt_vect_s.append(r_max_s[ni] * np.sum(fval_set)*normf - c_s[ni] * d_max_s[ni])
+                dcdt_vect_s.append(r_max_s[ni] * np.sum(fval_set) - c_s[ni] * d_max_s[ni])
             else:
                 dcdt_vect_s.append(r_max_s[ni] * np.prod(fval_set) - c_s[ni] * d_max_s[ni])
 
         # The last thing we need to do is add on a rate term for those nodes that have no inputs,
         # as they're otherwise ignored in the construction:
-        for ni, di in enumerate(self.node_based_in_degree_sequence):
+        for ni, di in enumerate(self.in_degree_sequence):
             if di == 0 and add_interactions is True:
                 dcdt_vect_s[ni] += self.r_vect_s[ni]
 
@@ -352,7 +364,7 @@ class GeneNetworkModel(object):
 
             # update the graph nodes and node properties:
             self.N_nodes = self.N_nodes + 2  # We added the sensor and process nodes to the graph
-            self.nodes_list = np.arange(self.N_nodes)  # We make a new nodes list
+            self.nodes_index = np.arange(self.N_nodes)  # We make a new nodes list
 
             # Harvest data from edge attributes for edge property re-assignment:
             self.read_edge_info_from_graph()
@@ -387,7 +399,7 @@ class GeneNetworkModel(object):
             self.root_effector_paths = []
 
         # Now that indices are set, give nodes a type attribute:
-        node_types = [NodeType.gene for i in self.nodes_list]  # Set all nodes to the gene type
+        node_types = [NodeType.gene for i in self.nodes_index]  # Set all nodes to the gene type
 
         # Add a type tag to any nodes on the path between root hub and effector:
         for path_i in self.root_effector_paths:
@@ -425,15 +437,15 @@ class GeneNetworkModel(object):
         # # These are needed for lambdification of analytical models:
         self.K_vect_s = [K_s[i] for i in range(self.N_edges)]
         self.n_vect_s = [n_s[i] for i in range(self.N_edges)]
-        self.r_vect_s = [r_max_s[i] for i in self.nodes_list]
-        self.d_vect_s = [d_max_s[i] for i in self.nodes_list]
-        self.c_vect_s = [c_s[i] for i in self.nodes_list]
+        self.r_vect_s = [r_max_s[i] for i in self.nodes_index]
+        self.d_vect_s = [d_max_s[i] for i in self.nodes_index]
+        self.c_vect_s = [c_s[i] for i in self.nodes_index]
 
         # Create the analytic equations governing the process:
         self.set_analytic_process(self.c_vect_s[self._effector_i], self.c_vect_s[self._process_i])
 
         # Create the edge-function collections at each node for the GRN interactions:
-        efunc_vect = [[] for i in self.nodes_list]
+        efunc_vect = [[] for i in self.nodes_index]
         for ei, ((i, j), fun_type) in enumerate(zip(self.edges_list, self.edge_funcs)):
             efunc_vect[j].append(fun_type(self.c_vect_s[i], self.K_vect_s[ei], self.n_vect_s[ei]))
 
@@ -458,7 +470,7 @@ class GeneNetworkModel(object):
 
         # The last thing we need to do is add on a rate term for those nodes that have no inputs,
         # as they're otherwise ignored in the construction:
-        for ni, di in enumerate(self.node_based_in_degree_sequence):
+        for ni, di in enumerate(self.in_degree_sequence):
             if di == 0 and add_interactions is True:
                 dcdt_vect_s[ni] += self.r_vect_s[ni]
 
@@ -469,6 +481,23 @@ class GeneNetworkModel(object):
         # Generate the optimization "energy" function as well as jacobians and hessians for the system:
         self._generate_optimization_functions()
 
+
+    def _make_node_edge_indices(self):
+        '''
+
+        '''
+        # For this case the user may provide string names for
+        # nodes, so we need to make numerical node and edge listings:
+        self.nodes_index = []
+        for ni, nn in enumerate(self.nodes_list):
+            self.nodes_index.append(ni)
+
+        self.edges_index = []
+        for ei, (nni, nnj) in enumerate(self.edges_list):
+            ni = self.nodes_list.index(nni)
+            nj = self.nodes_list.index(nnj)
+            self.edges_index.append((ni, nj))
+        # self.nodes_list = np.arange(self.N_nodes)
 
     def _generate_optimization_functions(self):
         '''
@@ -518,87 +547,70 @@ class GeneNetworkModel(object):
 
         self.opti_hess_f = sp.lambdify(lambda_params, self.opti_hess_s)
 
-
-    def reduce_model_dimensions(self, fast_method: bool=False):
+    def reduce_model_dimensions(self):
         '''
 
         '''
         # FIXME: We need to do this for the case where there's a process
 
-        if fast_method:
-            # Fast method: remove nodes with high in-degree counts and solve for the remaining nodes in order
-            # to reduce dimensions. Substitute in solutions to the omitted nodes and solve only on the reduced
-            # equation set. Plug and play to get the full solutions.
-            c_for_solve = []
-            c_master_i = []
-            for ni, di in enumerate(self.node_based_in_degree_sequence):
-                if di < 2:
-                    c_for_solve.append(self.c_vect_s[ni])
-                else:
-                    c_master_i.append(ni)
+        # Solve the nonlinear system as best as possible:
+        sol_csetoo = sp.nonlinsolve(self.dcdt_vect_s, self.c_vect_s)
 
-            try:
-                sol_cset = sp.solve(self.dcdt_vect_s, c_for_solve, dict=True)
+        # Clean up the sympy container for the solutions:
+        sol_cseto = list(list(sol_csetoo)[0])
 
-            except:
-                sol_cset = []
+        c_master_i = []  # the indices of concentrations involved in the master equations
+        sol_cset = {} # A dictionary of auxillary solutions (plug and play)
+        for i, c_eq in enumerate(sol_cseto):
+            if c_eq in self.c_vect_s: # If it's a non-solution for the term, append it as a non-reduced conc.
+                c_master_i.append(self.c_vect_s.index(c_eq))
+            else: # Otherwise append the plug-and-play solution set:
+                sol_cset[self.c_vect_s[i]] = c_eq
 
-            # collect the master equations:
-            master_eq_list = []
+        master_eq_list = [] # master equations to be numerically optimized (reduced dimension network equations)
+        c_vect_reduced = [] # concentrations involved in the master equations
 
-            if len(sol_cset):
-                sol_cset = sol_cset[0]
-                c_vect_reduced = []
-                for ii in c_master_i:
-                    ci_solve_eq = self.dcdt_vect_s[ii].subs([(k, v) for k, v in sol_cset.items()])
-                    master_eq_list.append(ci_solve_eq)
-                    c_vect_reduced.append(self.c_vect_s[ii])
-
-            else:
-                c_vect_reduced = []
-                master_eq_list = []
-
-        else: # More reliable method that can reduce dimensions more fully, however is a lot slower!
-
-            # Solve the nonlinear system as best as possible:
-            sol_csetoo = sp.nonlinsolve(self.dcdt_vect_s, self.c_vect_s)
-
-            # Clean up the sympy container for the solutions:
-            sol_cseto = list(list(sol_csetoo)[0])
-
-            c_master_i = []  # the indices of concentrations involved in the master equations
-            sol_cset = {} # A dictionary of auxillary solutions (plug and play)
-            for i, c_eq in enumerate(sol_cseto):
-                if c_eq in self.c_vect_s: # If it's a non-solution for the term, append it as a non-reduced conc.
-                    c_master_i.append(self.c_vect_s.index(c_eq))
-                else: # Otherwise append the plug-and-play solution set:
-                    sol_cset[self.c_vect_s[i]] = c_eq
-
-            master_eq_list = [] # master equations to be numerically optimized (reduced dimension network equations)
-            c_vect_reduced = [] # concentrations involved in the master equations
-
-            for ii in c_master_i:
-                # substitute in the expressions in terms of master concentrations to form the master equations:
-                ci_solve_eq = self.dcdt_vect_s[ii].subs([(k, v) for k, v in sol_cset.items()])
-                master_eq_list.append(ci_solve_eq)
-                c_vect_reduced.append(self.c_vect_s[ii])
+        for ii in c_master_i:
+            # substitute in the expressions in terms of master concentrations to form the master equations:
+            ci_solve_eq = self.dcdt_vect_s[ii].subs([(k, v) for k, v in sol_cset.items()])
+            master_eq_list.append(ci_solve_eq)
+            c_vect_reduced.append(self.c_vect_s[ii])
 
         # Results:
-        # New equation list to be numerically optimized (should be significantly reduced dimensions):
-        self.master_eq_list_s = sp.Matrix(master_eq_list)
-        # This is the concentration vector that contains the reduced equation concentration variables:
-        self.c_vect_reduced_s = c_vect_reduced
-        self.c_master_i = c_master_i # indices of concentrations that are being numerically optimized
-        self.c_remainder_i = np.setdiff1d(self.nodes_list, self.c_master_i)
-        self.c_vect_remainder_s = np.asarray(self.c_vect_s)[self.c_remainder_i].tolist()
-        # This is the dictionary of remaining concentrations that are in terms of the reduced concentrations,
-        # such that when the master equation set is solved, the results are plugged into the equations in this
-        # dictionary to obtain solutions for the whole network
-        self.sol_cset_s = sol_cset
+        if len(master_eq_list) == 0:
+            self._reduced_dims = False
+            print("Unable to reduce equations!")
+            # New equation list to be numerically optimized (should be significantly reduced dimensions):
+            self.dcdt_reduced_vect_s = self.dcdt_vect_s
+            # This is the concentration vector that contains the reduced equation concentration variables:
+            self.c_vect_reduced_s = self.c_vect_s
+            self.c_master_i = None  # indices of concentrations that are being numerically optimized
+            self.c_remainder_i = None
+            self.c_vect_remainder_s = None
+            # This is the dictionary of remaining concentrations that are in terms of the reduced concentrations,
+            # such that when the master equation set is solved, the results are plugged into the equations in this
+            # dictionary to obtain solutions for the whole network
+            self.sol_cset_s = None
 
+        else:
+            self._reduced_dims = True
+
+            # New equation list to be numerically optimized (should be significantly reduced dimensions):
+            self.dcdt_reduced_vect_s = sp.Matrix(master_eq_list)
+            # This is the concentration vector that contains the reduced equation concentration variables:
+            self.c_vect_reduced_s = c_vect_reduced
+            self.c_master_i = c_master_i # indices of concentrations that are being numerically optimized
+            self.c_remainder_i = np.setdiff1d(self.nodes_index, self.c_master_i)
+            self.c_vect_remainder_s = np.asarray(self.c_vect_s)[self.c_remainder_i].tolist()
+            # This is the dictionary of remaining concentrations that are in terms of the reduced concentrations,
+            # such that when the master equation set is solved, the results are plugged into the equations in this
+            # dictionary to obtain solutions for the whole network
+            self.sol_cset_s = sol_cset
+
+        # FIXME: this should just go through to the method that constructs these:
         # Now we can go through and make our optimization equations for this highly simplified model:
         # Optimization function for solving the problem:
-        self.opti_reduced_s = (self.master_eq_list_s.T * self.master_eq_list_s)[0]
+        self.opti_reduced_s = (self.dcdt_reduced_vect_s.T * self.dcdt_reduced_vect_s)[0]
 
         self.opti_reduced_jac_s = sp.Array([self.opti_s.diff(ci) for ci in self.c_vect_reduced_s])
 
@@ -614,6 +626,8 @@ class GeneNetworkModel(object):
                          self.d_vect_s,
                          self.K_vect_s,
                          self.n_vect_s]
+
+        self.dcdt_reduced_vect_f = sp.lambdify(lambda_params_o, self.dcdt_reduced_vect_s)
 
         self.opti_reduced_f = sp.lambdify(lambda_params_o, self.opti_reduced_s)
 
@@ -643,7 +657,6 @@ class GeneNetworkModel(object):
         there is neither an activation nor inhibition response.
         '''
         return 1
-
 
     def plot_3d_streamlines(self,
                             c0: ndarray,
@@ -701,46 +714,38 @@ class GeneNetworkModel(object):
         return pl
 
     def brute_force_phase_space(self,
-                                edge_types: list|ndarray|None=None,
-                                Nc: int=15,
+                                N_pts: int=15,
                                 cmin: float=0.0,
-                                cmax: float=1.0,
+                                cmax: float|list=1.0,
                                 Ki: float|list=0.5,
                                 ni:float|list=10.0,
                                 ri:float|list=1.0,
                                 di:float|list=1.0,
                                 zer_thresh: float=0.01,
-                                prob_acti: float=0.5,
-                                additive_interactions: bool=False,
-                                include_process: bool = False
                                 ):
         '''
 
         '''
 
-        if include_process is False:
-            # Build an analytical model based on the edge types and other supplied info:
-            self.build_analytical_model(prob_acti=prob_acti,
-                                        edge_types=edge_types,
-                                        add_interactions=additive_interactions)
-
-        else:
-            # Build an analytical model with the osmotic process included in the
-            # heterogeneous network model:
-            self.build_analytical_model_with_process(prob_acti=prob_acti,
-                                                     edge_types=edge_types,
-                                                     add_interactions=additive_interactions)
+        # Create parameter vectors for the model:
+        self.create_parameter_vects(Ki, ni, ri, di)
 
         # Create linear set of concentrations over the desired range
         # for each node of the network:
         c_lin_set = []
-        for i in range(self.N_nodes):
-            if self._include_process and i == self._process_i:
-                c_lin_set.append(np.linspace(self.Vp_min, self.Vp_max, Nc))
-            else:
-                c_lin_set.append(np.linspace(cmin, cmax, Nc))
+        if type(cmax) is list: # Allow for different maxima along each axis of the space:
+            for i, cmi in zip(range(self.N_nodes), cmax):
+                if self._include_process and i == self._process_i:
+                    c_lin_set.append(np.linspace(self.Vp_min, self.Vp_max, N_pts))
+                else:
+                    c_lin_set.append(np.linspace(cmin, cmi, N_pts))
 
-
+        else:
+            for i in range(self.N_nodes):
+                if self._include_process and i == self._process_i:
+                    c_lin_set.append(np.linspace(self.Vp_min, self.Vp_max, N_pts))
+                else:
+                    c_lin_set.append(np.linspace(cmin, cmax, N_pts))
 
         # Create a set of matrices specifying the concentation grid for each
         # node of the network:
@@ -751,6 +756,46 @@ class GeneNetworkModel(object):
         # Create linearized arrays for each concentration, stacked into one column per node:
         c_vect_set = np.asarray([cM.ravel() for cM in C_M_SET]).T
 
+        dcdt_M = np.zeros(c_vect_set.shape)
+
+        for i, c_vecti in enumerate(c_vect_set):
+            if self._include_process is False:
+                dcdt_i = self.dcdt_vect_f(c_vecti,
+                                          self.r_vect,
+                                          self.d_vect,
+                                          self.K_vect,
+                                          self.n_vect).flatten()
+            else:
+                dcdt_i = self.dcdt_vect_f(c_vecti,
+                                          self.r_vect,
+                                          self.d_vect,
+                                          self.K_vect,
+                                          self.n_vect,
+                                          self.process_params_f).flatten()
+            dcdt_M[i] = dcdt_i * 1
+
+        dcdt_M_set = []
+        for dci in dcdt_M.T:
+            dcdt_M_set.append(dci.reshape(M_shape))
+
+        self.c_lin_set = c_lin_set
+        self.C_M_SET = C_M_SET
+        self.M_shape = M_shape
+
+        self.dcdt_M_set = np.asarray(dcdt_M_set)
+        self.dcdt_dmag = np.sqrt(np.sum(self.dcdt_M_set ** 2, axis=0))
+        self.dcdt_zeros = ((self.dcdt_dmag / self.dcdt_dmag.max()) < zer_thresh).nonzero()
+
+        return self.dcdt_zeros, self.dcdt_M_set, self.dcdt_dmag, self.c_lin_set, self.C_M_SET
+
+    def create_parameter_vects(self, Ki: float|list=0.5,
+                                ni:float|list=10.0,
+                                ri:float|list=1.0,
+                                di:float|list=1.0
+                                ):
+        '''
+
+        '''
         # Create parameter vectors as the same parameters for all edges and nodes in the network:
         if type(Ki) is not list:
             K_vect = []
@@ -781,38 +826,10 @@ class GeneNetworkModel(object):
         else:
             d_vect = di
 
-        dcdt_M = np.zeros(c_vect_set.shape)
-
-        for i, c_vecti in enumerate(c_vect_set):
-            if self._include_process is False:
-                dcdt_i = self.dcdt_vect_f(c_vecti, r_vect, d_vect, K_vect, n_vect).flatten()
-            else:
-                dcdt_i = self.dcdt_vect_f(c_vecti,
-                                          r_vect,
-                                          d_vect,
-                                          K_vect,
-                                          n_vect,
-                                          self.process_params_f).flatten()
-            dcdt_M[i] = dcdt_i * 1
-
-        dcdt_M_set = []
-        for dci in dcdt_M.T:
-            dcdt_M_set.append(dci.reshape(M_shape))
-
-        self.c_lin_set = c_lin_set
-        self.C_M_SET = C_M_SET
-        self.M_shape = M_shape
-
         self.K_vect = K_vect
         self.n_vect = n_vect
         self.r_vect = r_vect
         self.d_vect = d_vect
-
-        self.dcdt_M_set = np.asarray(dcdt_M_set)
-        self.dcdt_dmag = np.sqrt(np.sum(self.dcdt_M_set ** 2, axis=0))
-        self.dcdt_zeros = ((self.dcdt_dmag / self.dcdt_dmag.max()) < zer_thresh).nonzero()
-
-        return self.dcdt_zeros, self.dcdt_M_set, self.dcdt_dmag, self.c_lin_set, self.C_M_SET
 
     def read_edge_info_from_graph(self):
         '''
@@ -886,6 +903,9 @@ class GeneNetworkModel(object):
 
         self.N_edges = len(self.edges_list)
 
+        # Create numerical indices for the network:
+        self._make_node_edge_indices()
+
         # Calculate key characteristics of the graph:
         self.characterize_graph()
 
@@ -931,7 +951,7 @@ class GeneNetworkModel(object):
     def optimized_phase_space_search(self,
                                      Ns: int=2,
                                      cmin: float=0.0,
-                                     cmax: float=1.0,
+                                     cmax: float|list=1.0,
                                      Ki: float | list = 0.5,
                                      ni: float | list = 10.0,
                                      ri: float | list = 1.0,
@@ -945,11 +965,20 @@ class GeneNetworkModel(object):
         '''
 
         c_test_lin_set = []
-        for i in range(self.N_nodes):
-            if self._include_process is True and i == self._process_i:
-                c_test_lin_set.append(np.linspace(self.Vp_min, self.Vp_max, Ns))
-            else:
-                c_test_lin_set.append(np.linspace(cmin, cmax, Ns))
+
+        if type(cmax) is list: # allow for different max along each axis of the search space:
+            for i, cmi in zip(range(self.N_nodes), cmax):
+                if self._include_process is True and i == self._process_i:
+                    c_test_lin_set.append(np.linspace(self.Vp_min, self.Vp_max, Ns))
+                else:
+                    c_test_lin_set.append(np.linspace(cmin, cmi, Ns))
+
+        else:
+            for i in range(self.N_nodes):
+                if self._include_process is True and i == self._process_i:
+                    c_test_lin_set.append(np.linspace(self.Vp_min, self.Vp_max, Ns))
+                else:
+                    c_test_lin_set.append(np.linspace(cmin, cmax, Ns))
 
 
         # Create a set of matrices specifying the concentation grid for each
@@ -961,33 +990,16 @@ class GeneNetworkModel(object):
 
         # print(f"Estimated compute time: {(c_test_set.shape[0]*0.0123)/60} minutes")
 
-        if type(Ki) != list:
-            K_vect = (Ki * np.ones(self.N_edges)).tolist()
-        else:
-            K_vect = Ki
-
-        if type(ni) != list:
-            n_vect = (ni * np.ones(self.N_edges)).tolist()
-        else:
-            n_vect = ni
-
-        if type(ri) != list:
-            r_vect = (ri*np.ones(self.N_nodes)).tolist()
-        else:
-            r_vect = ri
-
-        if type(di) != list:
-            d_vect = (di*np.ones(self.N_nodes)).tolist()
-        else:
-            d_vect = di
+        # Create parameter vectors for the model:
+        self.create_parameter_vects(Ki, ni, ri, di)
 
         if c_bounds is None:
             c_bounds = [(cmin, cmax) for i in range(self.N_nodes)]
 
         if self._include_process is False:
-            function_args = (r_vect, d_vect, K_vect, n_vect)
+            function_args = (self.r_vect, self.d_vect, self.K_vect, self.n_vect)
         else:
-            function_args = (r_vect, d_vect, K_vect, n_vect, self.process_params_f)
+            function_args = (self.r_vect, self.d_vect, self.K_vect, self.n_vect, self.process_params_f)
             c_bounds[self._process_i] = (self.Vp_min, self.Vp_max)
 
         mins_found = set()
@@ -1010,18 +1022,23 @@ class GeneNetworkModel(object):
 
             else: # just check to see if the conc vector is a solution
                 if self._include_process is False:
-                    fun_val = self.opti_f(c_vecti, r_vect, d_vect, K_vect, n_vect)
+                    fun_val = self.opti_f(c_vecti,
+                                          self.r_vect,
+                                          self.d_vect,
+                                          self.K_vect,
+                                          self.n_vect)
                 else:
-                    fun_val = self.opti_f(c_vecti, r_vect, d_vect, K_vect, n_vect, self.process_params_f)
+                    fun_val = self.opti_f(c_vecti,
+                                          self.r_vect,
+                                          self.d_vect,
+                                          self.K_vect,
+                                          self.n_vect,
+                                          self.process_params_f)
 
                 if fun_val < zer_thresh:
                     mins_found.add(tuple(c_vecti))
 
         self.mins_found = mins_found
-        self.r_vect = r_vect
-        self.d_vect = d_vect
-        self.K_vect = K_vect
-        self.n_vect = n_vect
 
         return mins_found
 
@@ -1254,7 +1271,7 @@ class GeneNetworkModel(object):
         except:
             paths_i = []
 
-        node_types = [NodeType.gene for i in self.nodes_list]  # Set all nodes to the gene type
+        node_types = [NodeType.gene for i in self.nodes_index]  # Set all nodes to the gene type
         # Add any nodes on the path:
         for path_i in paths_i:
             for ni in path_i:
