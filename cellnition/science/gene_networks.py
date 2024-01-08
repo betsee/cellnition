@@ -1018,9 +1018,9 @@ class GeneNetworkModel(object):
                                      ri: float | list = 1.0,
                                      di: float | list = 1.0,
                                      c_bounds: list|None = None,
-                                     zer_thresh: float=0.001, # Increase the tolerance
-                                     tol:float = 1.0e-9,
-                                     round_sol: int=2 # decimals to round solutions to to prevent duplicates
+                                     tol:float = 1.0e-15,
+                                     round_sol: int=15, # decimals to round solutions to prevent duplicates
+                                     method: str='Powell'
                                      ):
         '''
 
@@ -1051,21 +1051,25 @@ class GeneNetworkModel(object):
             # Otherwise, we need to go through the whole optimization:
             if self._reduced_dims:
                 N_nodes = len(self.c_vect_reduced_s)
+                c_vect_s = self.c_vect_reduced_s
             else:
                 N_nodes = self.N_nodes
+                c_vect_s = self.c_vect_s
 
             c_test_lin_set = []
 
             if type(cmax) is list: # allow for different max along each axis of the search space:
-                for i, cmi in zip(range(N_nodes), cmax):
-                    if self._reduced_dims is False and self._include_process is True and i == self._process_i:
+                for ci, cmi in zip(c_vect_s, cmax):
+                    i = c_vect_s.index(ci)
+                    if self._include_process is True and i == self._process_i:
                         c_test_lin_set.append(np.linspace(self.Vp_min, self.Vp_max, Ns))
                     else:
                         c_test_lin_set.append(np.linspace(cmin, cmi, Ns))
 
             else:
-                for i in range(N_nodes):
-                    if self._reduced_dims is False and self._include_process is True and i == self._process_i:
+                for ci in c_vect_s:
+                    i = c_vect_s.index(ci)
+                    if self._include_process is True and i == self._process_i:
                         c_test_lin_set.append(np.linspace(self.Vp_min, self.Vp_max, Ns))
                     else:
                         c_test_lin_set.append(np.linspace(cmin, cmax, Ns))
@@ -1085,24 +1089,35 @@ class GeneNetworkModel(object):
                 else:
                     c_bounds = [(cmin, cmax) for i in range(N_nodes)]
 
-            # FIXME: this is another potential problem spot for reduced dims with the process:
-            if self._reduced_dims is False and self._include_process:
-                c_bounds[self._process_i] = (self.Vp_min, self.Vp_max)
+                if self._include_process:
+                    if self._reduced_dims is False:
+                        c_bounds[self._process_i] = (self.Vp_min, self.Vp_max)
+                    else:
+                        if self.c_vect_s[self._process_i] in self.c_vect_reduced_s:
+                            i = self.c_vect_reduced_s.index(self.c_vect_s[self._process_i])
+                            c_bounds[i] = (self.Vp_min, self.Vp_max)
 
             for c_vecti in c_test_set:
+                if method == 'Powell':
+                    jac = None
+                    hess = None
+                else:
+                    jac = self.opti_jac_f
+                    hess = self.opti_hess_f
 
                 sol0 = minimize(self.opti_f,
                                 c_vecti,
                                 args=function_args,
-                                method='Powell',
-                                hessp=None,
+                                method=method,
+                                jac=jac,
+                                hess=hess,
                                 bounds=c_bounds,
                                 tol=tol,
                                 callback=None,
                                 options=None)
 
-                if sol0.fun < zer_thresh: # FIXME: instead of zero threshhold increase tolerance of optimization
-                    mins_found.append(sol0.x)
+                # if sol0.fun < zer_thresh: # FIXME: instead of zero threshhold increase tolerance of optimization
+                mins_found.append(sol0.x)
 
             if self._reduced_dims is False:
                 self.mins_found = mins_found
@@ -1121,7 +1136,7 @@ class GeneNetworkModel(object):
                     # flatten the list and add it to the new set:
                     full_mins_found.append(mins_foundo)
 
-                # Redefine the mins_found set for the full concentations
+                # Redefine the mins_found set for the full concentrations
                 mins_found = full_mins_found
 
         # ensure the list is unique:
