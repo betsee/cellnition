@@ -506,7 +506,7 @@ class GeneNetworkModel(object):
 
         '''
 
-        if self._reduced_dims:
+        if self._reduced_dims and self._solved_analytically is False:
             dcdt_vect_s = self.dcdt_vect_reduced_s
             c_vect_s = self.c_vect_reduced_s
 
@@ -570,7 +570,8 @@ class GeneNetworkModel(object):
         self.opti_hess_f = sp.lambdify(lambda_params_r, self.opti_hess_s)
 
         # For case of reduced dims, we need two additional attributes lambdified:
-        if self._reduced_dims: # If dims are reduced we also need to lambdify the remaining concentration sets
+        # If dims are reduced we also need to lambdify the remaining concentration sets
+        if self._reduced_dims and self._solved_analytically is False:
             self.dcdt_vect_reduced_f = sp.lambdify(lambda_params_r, self.dcdt_vect_reduced_s)
 
             self.sol_cset_f = {}
@@ -655,10 +656,6 @@ class GeneNetworkModel(object):
                 # dictionary to obtain solutions for the whole network:
                 self.sol_cset_s = sol_cset
 
-                # Generate the optimization "energy" function as well as jacobians and hessians for the system.
-                # self.sol_cset_s is lambdified in the following method:
-                self._generate_optimization_functions()
-
             else:
                 # Set most reduced system attributes to None:
                 self.dcdt_vect_reduced_s = None
@@ -689,6 +686,10 @@ class GeneNetworkModel(object):
                 self.sol_cset_f = {}
                 for ci, eqci in self.sol_cset_s.items():
                     self.sol_cset_f[ci.indices[0]] = sp.lambdify(lambda_params_r, eqci)
+
+            # Generate the optimization "energy" function as well as jacobians and hessians for the system.
+            # self.sol_cset_s is lambdified in the following method:
+            self._generate_optimization_functions()
 
     def f_acti_s(self, cc, kk, nn):
         '''
@@ -783,8 +784,10 @@ class GeneNetworkModel(object):
 
         if self._reduced_dims and self._solved_analytically is False:
             N_nodes = len(self.c_vect_reduced_s)
+            dcdt_vect_f = self.dcdt_vect_reduced_f
         else:
             N_nodes = self.N_nodes
+            dcdt_vect_f = self.dcdt_vect_f
 
         # Create linear set of concentrations over the desired range
         # for each node of the network:
@@ -816,13 +819,13 @@ class GeneNetworkModel(object):
 
         for i, c_vecti in enumerate(c_vect_set):
             if self._include_process is False:
-                dcdt_i = self.dcdt_vect_f(c_vecti,
+                dcdt_i = dcdt_vect_f(c_vecti,
                                           self.r_vect,
                                           self.d_vect,
                                           self.K_vect,
                                           self.n_vect).flatten()
             else:
-                dcdt_i = self.dcdt_vect_f(c_vecti,
+                dcdt_i = dcdt_vect_f(c_vecti,
                                           self.r_vect,
                                           self.d_vect,
                                           self.K_vect,
@@ -1016,6 +1019,8 @@ class GeneNetworkModel(object):
                                      di: float | list = 1.0,
                                      c_bounds: list|None = None,
                                      zer_thresh: float=0.001, # Increase the tolerance
+                                     tol:float = 1.0e-9,
+                                     round_sol: int=2 # decimals to round solutions to to prevent duplicates
                                      ):
         '''
 
@@ -1031,17 +1036,16 @@ class GeneNetworkModel(object):
             function_args = (self.r_vect, self.d_vect, self.K_vect, self.n_vect, self.process_params_f)
 
         # Initialize the equillibrium point solutions to be a set:
-        mins_found = set()
+        mins_found = []
 
         # If it's already been solved analytically, we can simply plug in the variables to obtain the solution
         # at the minimum rate:
         if self._solved_analytically:
             mins_foundo = [[] for i in range(self.N_nodes)]
-            for cns, eq in self.sol_cset_f.items():
-                ii = cns.indices[0]
-                mins_foundo[ii] = eq(function_args)
+            for ii, eqi in self.sol_cset_f.items():
+                mins_foundo[ii] = eqi(*function_args)
 
-            mins_found.add([m[0] for m in mins_foundo]) # flatten the list and add to the set
+            mins_found.append(mins_foundo)
 
         else: # if we don't have an explicit solution:
             # Otherwise, we need to go through the whole optimization:
@@ -1093,33 +1097,36 @@ class GeneNetworkModel(object):
                                 method='Powell',
                                 hessp=None,
                                 bounds=c_bounds,
-                                tol=None,
+                                tol=tol,
                                 callback=None,
                                 options=None)
 
                 if sol0.fun < zer_thresh: # FIXME: instead of zero threshhold increase tolerance of optimization
-                    mins_found.add(tuple(np.round(sol0.x, 1))) # FIXME: Probably want to stop rounding
+                    mins_found.append(sol0.x)
 
             if self._reduced_dims is False:
                 self.mins_found = mins_found
 
             else: # we need to piece together the full solution as the minimum will only be a subset of all
                 # concentrations
-                full_mins_found = set()
+                full_mins_found = []
                 for mins_foundi in list(mins_found): # for each set of unique minima found
                     mins_foundo = [[] for i in range(self.N_nodes)]
                     for cmi, mi in zip(self.c_master_i, mins_foundi):
-                        for cns, eqi in self.sol_cset_f.items():
-                            ii = cns.indices[0]
-                            mins_foundo[ii] = eqi(mins_foundi, function_args) # compute the sol for this conc.
+                        for ii, eqi in self.sol_cset_f.items():
+                            mins_foundo[ii] = eqi(mins_foundi, *function_args) # compute the sol for this conc.
                         # also add-in the minima for the master concentrations to the full list
                         mins_foundo[cmi] = mi
                     # We've redefined the mins list so it now includes the full set of concentrations;
                     # flatten the list and add it to the new set:
-                    full_mins_found.add([m[0] for m in mins_foundo])
+                    full_mins_found.append(mins_foundo)
 
                 # Redefine the mins_found set for the full concentations
                 mins_found = full_mins_found
+
+        # ensure the list is unique:
+        mins_found = np.round(mins_found, round_sol)
+        mins_found = np.unique(mins_found, axis=0).tolist()
 
         return mins_found
 
