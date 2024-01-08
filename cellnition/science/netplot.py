@@ -1,11 +1,16 @@
 import pygraphviz as pgv
+import numpy as np
 from numpy import ndarray
+from matplotlib import colormaps
+from matplotlib import colors
 from cellnition.science.enumerations import EdgeType, GraphType, NodeType
 
 def plot_network(nodes_list: list|ndarray,
                  edge_list: list|ndarray,
                  nodes_type: list|ndarray,
                  edges_type: list|ndarray,
+                 node_vals: list|ndarray|None = None,
+                 val_cmap: str|None = None,
                  path_plot_edges: list|ndarray|None = None,
                  dpi: int|float=300,
                  save_path: str|None=None,
@@ -31,13 +36,19 @@ def plot_network(nodes_list: list|ndarray,
     net_layout = 'TB'
     edge_width = 2.0
 
-    # graph_type = 'digraph'
-    # concentrate = False
-    # nodesep = 0.1
-    # ranksep = 0.3
-    # splines = True
-    # strict = False
-    # rankdir = net_layout
+    if node_vals is not None:
+        vmin = np.min(node_vals)
+        vmax = np.max(node_vals)
+        if val_cmap is None:
+            cmap = colormaps['Greys'] # default colormap
+        else:
+            cmap = colormaps[val_cmap]
+
+        norm = colors.Normalize(vmin=vmin, vmax=vmax)
+
+    else:
+        cmap = None
+        norm = None
 
     node_dict_gene = {
     'node_font_color': 'Black',
@@ -88,16 +99,30 @@ def plot_network(nodes_list: list|ndarray,
                       NodeType.root.value: node_dict_root,
                       NodeType.path.value: node_dict_path}
 
-    for ni, nt in zip(nodes_list, nodes_type):
+    for ni, (nn, nt) in enumerate(zip(nodes_list, nodes_type)):
 
         nde_dict = node_plot_dict[nt.value]
 
-        G.add_node(ni,
+        if node_vals is None:
+            nde_color = nde_dict['node_color']
+            nde_outline = nde_dict['outline_color']
+            nde_font_color = nde_dict['node_font_color']
+
+        else:
+            nde_color = colors.rgb2hex(cmap(norm(node_vals[ni])))
+            nde_outline = 'Black'
+
+            if norm(node_vals[ni]) <= 0.6:
+                nde_font_color = 'Black'
+            else:
+                nde_font_color = 'White'
+
+        G.add_node(nn,
                    style='filled',
-                   fillcolor=nde_dict['node_color'],
-                   color=nde_dict['outline_color'],
+                   fillcolor=nde_color,
+                   color=nde_outline,
                    shape=nde_dict['node_shape'],
-                   fontcolor=nde_dict['node_font_color'],
+                   fontcolor=nde_font_color,
                    fontname=net_font_name,
                    fontsize=node_font_size,
                    )
