@@ -20,8 +20,10 @@ from cellnition.science.stability import Solution
 import pygraphviz as pgv
 import pyvista as pv
 
-# TODO: Color the master hub(s) and/or a leaf and/or sensor and/or process nodes in different colours
-# TODO: Allow process to be added to the network (node with different physics)
+# TODO: Time simulations
+# TODO: Parameter scaling module: scale K and d by 's' and apply rate scaling 'v'
+# TODO: Optimization with substitution-based constraints, optimizing for parameters
+# TODO: Allow multiple process to be added to the network (node with different physics)
 # TODO: Plot a path through a graph
 
 class GeneNetworkModel(object):
@@ -255,6 +257,8 @@ class GeneNetworkModel(object):
 
         '''
 
+        self._reduced_dims = False # always build models in full dimensions
+
         if edge_types is None:
             self.edge_types = self.get_edge_types(p_acti=prob_acti)
 
@@ -324,6 +328,8 @@ class GeneNetworkModel(object):
         '''
 
         '''
+
+        self._reduced_dims = False  # always build models in full dimensions
 
         if edge_types is None:
             self.edge_types = self.get_edge_types(p_acti=prob_acti)
@@ -582,7 +588,6 @@ class GeneNetworkModel(object):
         '''
 
         '''
-        # FIXME: We need to do this for the case where there's a process
 
         # Solve the nonlinear system as best as possible:
 
@@ -945,7 +950,7 @@ class GeneNetworkModel(object):
 
     def save_network(self, filename: str):
         '''
-        Write a network, including edge types, from a saved file.
+        Write a network, including edge types, to a saved file.
 
         '''
         nx.write_gml(self.GG, filename)
@@ -1116,7 +1121,6 @@ class GeneNetworkModel(object):
                                 callback=None,
                                 options=None)
 
-                # if sol0.fun < zer_thresh: # FIXME: instead of zero threshhold increase tolerance of optimization
                 mins_found.append(sol0.x)
 
             if self._reduced_dims is False:
@@ -1260,7 +1264,6 @@ class GeneNetworkModel(object):
             osmolyte inside the cell.
 
         '''
-        # FIXME: Something here is seriously wrong
 
         # Defining analytic equations for an osmotic cell volume change process:
         A_s, R_s, T_s, ni_s, m_s, V_s, Vc_s, dm_s, mu_s, Y_s, r_s = sp.symbols('A, R, T, ni, m, V, V_c, d_m, mu, Y, r',
@@ -1336,23 +1339,6 @@ class GeneNetworkModel(object):
                                 self.dm_f,
                                 self.mu_f,
                                 self.r_f)
-
-        # evaluate the function as:
-        # self.dEdt_f(self.V_f,
-        #             self.n_f,
-        #             self.m_f,
-        #             self.A_f,
-        #             self.Vc_f,
-        #             self.nc_f,
-        #             self.mc_f,
-        #             self.Ac_f,
-        #             self.R_f,
-        #             self.T_f,
-        #             self.Y_f,
-        #             self.dm_f,
-        #             self.mu_f,
-        #             self.r_f)
-
 
     def set_node_type_path(self,
                            root_i: int|None = None,
