@@ -288,7 +288,7 @@ class GeneNetworkModel(object):
         self.c_vect_s = [c_s[i] for i in self.nodes_index]
 
         efunc_vect = [[] for i in self.nodes_index]
-        for ei, ((i, j), fun_type) in enumerate(zip(self.edges_list, self.edge_funcs)):
+        for ei, ((i, j), fun_type) in enumerate(zip(self.edges_index, self.edge_funcs)):
             efunc_vect[j].append(fun_type(c_s[i], K_s[ei], n_s[ei]))
 
         dcdt_vect_s = []
@@ -378,8 +378,8 @@ class GeneNetworkModel(object):
             self.read_edge_info_from_graph()
 
             # Indices of key new edges:
-            self.ei_process_sensor = self.edges_list.index((self._process_i, self._sensor_i))
-            self.ei_sensor_root = self.edges_list.index((self._sensor_i, self._root_i))
+            self.ei_process_sensor = self.edges_index.index((self._process_i, self._sensor_i))
+            self.ei_sensor_root = self.edges_index.index((self._sensor_i, self._root_i))
 
             # Re-calculate key characteristics of the graph after adding in new nodes and edges:
             self.characterize_graph()
@@ -391,8 +391,8 @@ class GeneNetworkModel(object):
             self._process_i = control_node_dict['process']
 
             # Indices of key new edges:
-            self.ei_process_sensor = self.edges_list.index((self._process_i, self._sensor_i))
-            self.ei_effector_process = self.edges_list.index((self._effector_i, self._process_i))
+            self.ei_process_sensor = self.edges_index.index((self._process_i, self._sensor_i))
+            self.ei_effector_process = self.edges_index.index((self._effector_i, self._process_i))
 
             # Override the edge-type for the control loop effector-process:
             self.edge_types[self.ei_effector_process] = EdgeType.N # This is always neutral
@@ -454,7 +454,7 @@ class GeneNetworkModel(object):
 
         # Create the edge-function collections at each node for the GRN interactions:
         efunc_vect = [[] for i in self.nodes_index]
-        for ei, ((i, j), fun_type) in enumerate(zip(self.edges_list, self.edge_funcs)):
+        for ei, ((i, j), fun_type) in enumerate(zip(self.edges_index, self.edge_funcs)):
             efunc_vect[j].append(fun_type(self.c_vect_s[i], self.K_vect_s[ei], self.n_vect_s[ei]))
 
         # Create the time-change vector with the process node math applied:
@@ -602,38 +602,37 @@ class GeneNetworkModel(object):
 
         try:
             sol_csetoo = sp.nonlinsolve(self.dcdt_vect_s, self.c_vect_s)
+            # Clean up the sympy container for the solutions:
+            sol_cseto = list(list(sol_csetoo)[0])
+
+            if len(sol_cseto):
+
+                c_master_i = []  # the indices of concentrations involved in the master equations (the reduced dims)
+                sol_cset = {}  # A dictionary of auxillary solutions (plug and play)
+                for i, c_eq in enumerate(sol_cseto):
+                    if c_eq in self.c_vect_s:  # If it's a non-solution for the term, append it as a non-reduced conc.
+                        c_master_i.append(self.c_vect_s.index(c_eq))
+                    else:  # Otherwise append the plug-and-play solution set:
+                        sol_cset[self.c_vect_s[i]] = c_eq
+
+                master_eq_list = []  # master equations to be numerically optimized (reduced dimension network equations)
+                c_vect_reduced = []  # concentrations involved in the master equations
+
+                if len(c_master_i):
+                    for ii in c_master_i:
+                        # substitute in the expressions in terms of master concentrations to form the master equations:
+                        ci_solve_eq = self.dcdt_vect_s[ii].subs([(k, v) for k, v in sol_cset.items()])
+                        master_eq_list.append(ci_solve_eq)
+                        c_vect_reduced.append(self.c_vect_s[ii])
+
+                else:  # if there's nothing in c_master_i but there are solutions in sol_cseto, then it's been fully solved:
+                    print("The system has been fully solved by analytical methods!")
+                    self._solved_analytically = True
+
+            else:
+                nosol = True
 
         except:
-            nosol = True
-
-        # Clean up the sympy container for the solutions:
-        sol_cseto = list(list(sol_csetoo)[0])
-
-        if len(sol_cseto):
-
-            c_master_i = []  # the indices of concentrations involved in the master equations (the reduced dims)
-            sol_cset = {} # A dictionary of auxillary solutions (plug and play)
-            for i, c_eq in enumerate(sol_cseto):
-                if c_eq in self.c_vect_s: # If it's a non-solution for the term, append it as a non-reduced conc.
-                    c_master_i.append(self.c_vect_s.index(c_eq))
-                else: # Otherwise append the plug-and-play solution set:
-                    sol_cset[self.c_vect_s[i]] = c_eq
-
-            master_eq_list = [] # master equations to be numerically optimized (reduced dimension network equations)
-            c_vect_reduced = [] # concentrations involved in the master equations
-
-            if len(c_master_i):
-                for ii in c_master_i:
-                    # substitute in the expressions in terms of master concentrations to form the master equations:
-                    ci_solve_eq = self.dcdt_vect_s[ii].subs([(k, v) for k, v in sol_cset.items()])
-                    master_eq_list.append(ci_solve_eq)
-                    c_vect_reduced.append(self.c_vect_s[ii])
-
-            else: # if there's nothing in c_master_i but there are solutions in sol_cseto, then it's been fully solved:
-                print("The system has been fully solved by analytical methods!")
-                self._solved_analytically = True
-
-        else:
             nosol = True
 
         # Results:
@@ -1028,7 +1027,7 @@ class GeneNetworkModel(object):
                                      cmin: float=0.0,
                                      cmax: float|list=1.0,
                                      Ki: float | list = 0.5,
-                                     ni: float | list = 10.0,
+                                     ni: float | list = 3.0,
                                      ri: float | list = 1.0,
                                      di: float | list = 1.0,
                                      c_bounds: list|None = None,
@@ -1140,8 +1139,15 @@ class GeneNetworkModel(object):
                 else:
                     sol_root = fsolve(dcdt_funk, c_vecti, args=function_args, xtol=tol)
                 # # FIXME: We have to be careful with this as the process might be able to assume a negative value!
-                    if (np.all(np.asarray(sol_root) >= 0.0)):
-                        mins_found.append(sol_root)
+                    if self._include_process is False: # If we're not using the process, constrain all concs to be above zero
+                        if (np.all(np.asarray(sol_root) >= 0.0)):
+                            mins_found.append(sol_root)
+                    else:
+                        # get the nodes that must be constrained above zero:
+                        conc_nodes = np.setdiff1d(self.nodes_index, self._process_i)
+                        # Then, only the nodes that are gene products must be above zero
+                        if (np.all(np.asarray(sol_root)[conc_nodes] >= 0.0)):
+                            mins_found.append(sol_root)
 
             if self._reduced_dims is False:
                 self.mins_found = mins_found
@@ -1392,3 +1398,56 @@ class GeneNetworkModel(object):
         # Set node types to the graph:
         self.node_types = node_types
         self.set_node_types(node_types)
+
+    def multistability_search(self,
+                              N_multi: int,
+                              tol: float=1.0e-3,
+                              N_iter:int =100,
+                              verbose: bool=True,
+                              N_space: int=3,
+                              round_sol: int=3,
+                              Ki: float | list = 0.5,
+                              ni: float | list = 3.0,
+                              di: float | list = 1.0,
+                              search_tol: float = 1.0e-15
+                              ):
+        '''
+        By randomly generating sets of edge interaction (i.e. activator or inhibitor), find
+        as many unique multistable systems as possible for a given base network.
+
+        This does not redefine any default 'edge_types' that have been assigned to the network.
+
+        '''
+        multisols = []
+        multisol_edges = []
+
+        for i in range(N_iter):
+            edge_types = self.get_edge_types(p_acti=0.5)
+            self.build_analytical_model(edge_types=edge_types, add_interactions=True)
+            sols_0 = self.optimized_phase_space_search(Ns=N_space,
+                                                   cmax=1.0*np.max(self.in_degree_sequence),
+                                                   round_sol=round_sol,
+                                                   Ki = Ki,
+                                                   di = di,
+                                                   ni = ni,
+                                                   tol=search_tol,
+                                                   method="Root"
+                                                  )
+            if len(sols_0) >= N_multi:
+                sol_char_0 = self.stability_estimate(sols_0)
+                tri_char = 0
+                min_val = 0.0
+                for sol_dic in sol_char_0:
+                    for k, v in sol_dic.items():
+                        if k == 'Stability Characteristic' and v != 'Saddle Point':
+                            min_val += np.sum(sol_dic['Change at Minima']**2)
+                            tri_char += 1
+                if tri_char >= N_multi and min_val < tol*N_multi:
+                    edge_types_l = edge_types.tolist()
+                    if edge_types_l not in multisol_edges: # If we don't already have this combo:
+                        if verbose:
+                            print(f'Found solution with {tri_char} states on iteration {i}')
+                        multisols.append([sols_0, edge_types, sol_char_0])
+                        multisol_edges.append(edge_types_l)
+
+        return multisols
