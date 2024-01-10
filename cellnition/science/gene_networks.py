@@ -10,7 +10,7 @@ This module
 import numpy as np
 from numpy import ndarray
 import matplotlib.pyplot as plt
-from scipy.optimize import minimize
+from scipy.optimize import minimize, fsolve
 import networkx as nx
 import sympy as sp
 from sympy.core.symbol import Symbol
@@ -552,7 +552,7 @@ class GeneNetworkModel(object):
                              self.n_vect_s]
 
         # Create a Jacobian for the whole system
-        self.jac_s = self.dcdt_vect_s.jacobian(sp.Matrix(self.c_vect_s)).applyfunc(sp.simplify)
+        self.jac_s = self.dcdt_vect_s.jacobian(sp.Matrix(self.c_vect_s))
 
         # The Hessian is a more complex tensor for the whole system:
         self.hess_s = sp.Array(
@@ -566,7 +566,8 @@ class GeneNetworkModel(object):
 
         # Lambdify the two outputs so they can be used to study the network numerically:
         # On the whole system:
-        self.dcdt_vect_f = sp.lambdify(lambda_params, self.dcdt_vect_s)
+        flatten_f = np.asarray([fs for fs in self.dcdt_vect_s])
+        self.dcdt_vect_f = sp.lambdify(lambda_params, flatten_f)
         self.jac_f = sp.lambdify(lambda_params, self.jac_s)
         self.hess_f = sp.lambdify(lambda_params, self.hess_s)
 
@@ -578,7 +579,13 @@ class GeneNetworkModel(object):
         # For case of reduced dims, we need two additional attributes lambdified:
         # If dims are reduced we also need to lambdify the remaining concentration sets
         if self._reduced_dims and self._solved_analytically is False:
-            self.dcdt_vect_reduced_f = sp.lambdify(lambda_params_r, self.dcdt_vect_reduced_s)
+            # This is now the same thing as opti-f:
+            flatten_fr = np.asarray([fs for fs in self.dcdt_vect_reduced_s])
+            self.dcdt_vect_reduced_f = sp.lambdify(lambda_params_r, flatten_fr)
+
+            # Create a reduced Jacobian:
+            self.jac_reduced_s = self.dcdt_vect_reduced_s.jacobian(sp.Matrix(self.c_vect_reduced_s))
+            self.jac_reduced_f = sp.lambdify(lambda_params_r, self.jac_reduced_s)
 
             self.sol_cset_f = {}
             for ci, eqci in self.sol_cset_s.items():
@@ -602,7 +609,7 @@ class GeneNetworkModel(object):
         # Clean up the sympy container for the solutions:
         sol_cseto = list(list(sol_csetoo)[0])
 
-        if len(sol_cseto): # FIXME: this might need to be sol_csetoo instead
+        if len(sol_cseto):
 
             c_master_i = []  # the indices of concentrations involved in the master equations (the reduced dims)
             sol_cset = {} # A dictionary of auxillary solutions (plug and play)
@@ -649,12 +656,14 @@ class GeneNetworkModel(object):
 
             if self._solved_analytically is False:
                 # New equation list to be numerically optimized (should be significantly reduced dimensions):
+                # Note: this vector is no longer the change rate vector; its now solving for concentrations
+                # where the original rate change vector is zero:
                 self.dcdt_vect_reduced_s = sp.Matrix(master_eq_list)
                 # This is the concentration vector that contains the reduced equation concentration variables:
                 self.c_vect_reduced_s = c_vect_reduced
                 self.c_master_i = c_master_i # indices of concentrations that are being numerically optimized
-                self.c_remainder_i = np.setdiff1d(self.nodes_index, self.c_master_i)
-                self.c_vect_remainder_s = np.asarray(self.c_vect_s)[self.c_remainder_i].tolist()
+                self.c_remainder_i = np.setdiff1d(self.nodes_index, self.c_master_i) # remaining conc indices
+                self.c_vect_remainder_s = np.asarray(self.c_vect_s)[self.c_remainder_i].tolist() # remaining concs
 
                 # This is the dictionary of remaining concentrations that are in terms of the reduced concentrations,
                 # such that when the master equation set is solved, the results are plugged into the equations in this
@@ -828,14 +837,14 @@ class GeneNetworkModel(object):
                                           self.r_vect,
                                           self.d_vect,
                                           self.K_vect,
-                                          self.n_vect).flatten()
+                                          self.n_vect)
             else:
                 dcdt_i = dcdt_vect_f(c_vecti,
                                           self.r_vect,
                                           self.d_vect,
                                           self.K_vect,
                                           self.n_vect,
-                                          self.process_params_f).flatten()
+                                          self.process_params_f)
             dcdt_M[i] = dcdt_i * 1
 
         dcdt_M_set = []
@@ -1024,8 +1033,8 @@ class GeneNetworkModel(object):
                                      di: float | list = 1.0,
                                      c_bounds: list|None = None,
                                      tol:float = 1.0e-15,
-                                     round_sol: int=15, # decimals to round solutions to prevent duplicates
-                                     method: str='Powell'
+                                     round_sol: int=6, # decimals to round solutions to prevent duplicates
+                                     method: str='Root' # Solve by finding the roots of the dc/dt equation
                                      ):
         '''
 
@@ -1057,9 +1066,13 @@ class GeneNetworkModel(object):
             if self._reduced_dims:
                 N_nodes = len(self.c_vect_reduced_s)
                 c_vect_s = self.c_vect_reduced_s
+                dcdt_funk = self.dcdt_vect_reduced_f
+                jac_funk = self.jac_reduced_f
             else:
                 N_nodes = self.N_nodes
                 c_vect_s = self.c_vect_s
+                dcdt_funk = self.dcdt_vect_f
+                jac_funk = self.jac_f
 
             c_test_lin_set = []
 
@@ -1103,25 +1116,32 @@ class GeneNetworkModel(object):
                             c_bounds[i] = (self.Vp_min, self.Vp_max)
 
             for c_vecti in c_test_set:
-                if method == 'Powell':
-                    jac = None
-                    hess = None
+                if method == 'Powell' or method == 'trust-constr':
+                    if method == 'Powell':
+                        jac = None
+                        hess = None
+                    else:
+                        jac = self.opti_jac_f
+                        hess = self.opti_hess_f
+
+                    sol0 = minimize(self.opti_f,
+                                    c_vecti,
+                                    args=function_args,
+                                    method=method,
+                                    jac=jac,
+                                    hess=hess,
+                                    bounds=c_bounds,
+                                    tol=tol,
+                                    callback=None,
+                                    options=None)
+
+                    mins_found.append(sol0.x)
+
                 else:
-                    jac = self.opti_jac_f
-                    hess = self.opti_hess_f
-
-                sol0 = minimize(self.opti_f,
-                                c_vecti,
-                                args=function_args,
-                                method=method,
-                                jac=jac,
-                                hess=hess,
-                                bounds=c_bounds,
-                                tol=tol,
-                                callback=None,
-                                options=None)
-
-                mins_found.append(sol0.x)
+                    sol_root = fsolve(dcdt_funk, c_vecti, args=function_args, xtol=tol)
+                # # FIXME: We have to be careful with this as the process might be able to assume a negative value!
+                    if (np.all(np.asarray(sol_root) >= 0.0)):
+                        mins_found.append(sol_root)
 
             if self._reduced_dims is False:
                 self.mins_found = mins_found
@@ -1176,9 +1196,9 @@ class GeneNetworkModel(object):
                 func_args = (cmins, self.r_vect, self.d_vect, self.K_vect, self.n_vect,
                              self.process_params_f)
 
-            # print(f'dcdt at min: {self.dcdt_vect_f(cmins, r_vect, d_vect, K_vect, n_vect).flatten()}')
+            # print(f'dcdt at min: {self.dcdt_vect_f(cmins, r_vect, d_vect, K_vect, n_vect)}')
 
-            solution_dict['Change at Minima'] = self.dcdt_vect_f(*func_args).flatten()
+            solution_dict['Change at Minima'] = self.dcdt_vect_f(*func_args)
 
             jac = self.jac_f(*func_args)
 
