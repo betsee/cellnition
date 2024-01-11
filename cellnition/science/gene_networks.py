@@ -63,6 +63,7 @@ class GeneNetworkModel(object):
             self.GG = nx.DiGraph(self.edges_list)
             self.N_edges = len(self.edges_list)
             self.nodes_list = sorted(self.GG.nodes())
+            self.N_nodes = len(self.nodes_list) # re-assign the node number in case specification was wrong
 
             self._make_node_edge_indices()
 
@@ -203,7 +204,7 @@ class GeneNetworkModel(object):
 
         return edge_types
 
-    def set_edge_types(self, edge_types: list|ndarray):
+    def set_edge_types(self, edge_types: list|ndarray, add_interactions: bool):
         '''
         Assign edge_types to the graph and create an edge function list.
         '''
@@ -217,13 +218,30 @@ class GeneNetworkModel(object):
         nx.set_edge_attributes(self.GG, edge_attr_dict)
 
         self.edge_funcs = []
+        self.add_edge_interaction_bools = []
+        self.growth_interaction_bools = []
+
         for et in self.edge_types:
             if et is EdgeType.A:
                 self.edge_funcs.append(self.f_acti_s)
+                self.add_edge_interaction_bools.append(add_interactions)
+                self.growth_interaction_bools.append(True) # interact with growth component of reaction
             elif et is EdgeType.I:
                 self.edge_funcs.append(self.f_inhi_s)
+                self.add_edge_interaction_bools.append(add_interactions)
+                self.growth_interaction_bools.append(True)  # interact with growth component of reaction
             elif et is EdgeType.N:
                 self.edge_funcs.append(self.f_neut_s)
+                self.add_edge_interaction_bools.append(False)
+                self.growth_interaction_bools.append(True)  # interact with growth component of reaction
+            elif et is EdgeType.As: # else if it's As for a sensor activation interaction, then:
+                self.edge_funcs.append(self.f_inhi_s) # inhibit
+                self.add_edge_interaction_bools.append(False) # multiply
+                self.growth_interaction_bools.append(False)  # interact with decay component of reaction
+            else:
+                self.edge_funcs.append(self.f_inhi_s) # inhibit
+                self.add_edge_interaction_bools.append(False) # multiply
+                self.growth_interaction_bools.append(True)  # interact with growth component of reaction
 
     def set_node_types(self, node_types: list|ndarray):
         '''
@@ -265,7 +283,7 @@ class GeneNetworkModel(object):
         else:
             self.edge_types = edge_types
 
-        self.set_edge_types(self.edge_types)
+        self.set_edge_types(self.edge_types, add_interactions)
 
         # Now that indices are set, give nodes a type attribute:
         node_types = [NodeType.gene for i in self.nodes_index]  # Set all nodes to the gene type
@@ -287,28 +305,75 @@ class GeneNetworkModel(object):
         self.d_vect_s = [d_max_s[i] for i in self.nodes_index]
         self.c_vect_s = [c_s[i] for i in self.nodes_index]
 
-        efunc_vect = [[] for i in self.nodes_index]
-        for ei, ((i, j), fun_type) in enumerate(zip(self.edges_index, self.edge_funcs)):
-            efunc_vect[j].append(fun_type(c_s[i], K_s[ei], n_s[ei]))
+        efunc_add_growthterm_vect = [[] for i in self.nodes_index]
+        efunc_mult_growthterm_vect = [[] for i in self.nodes_index]
+        efunc_mult_decayterm_vect = [[] for i in self.nodes_index]
+        for ei, ((i, j), fun_type, add_tag, gwth_tag) in enumerate(zip(self.edges_index,
+                                                    self.edge_funcs,
+                                                    self.add_edge_interaction_bools,
+                                                    self.growth_interaction_bools)):
+            if add_tag and gwth_tag:
+                efunc_add_growthterm_vect[j].append(fun_type(c_s[i], K_s[ei], n_s[ei]))
+                efunc_mult_growthterm_vect[j].append(None)
+                efunc_mult_decayterm_vect[j].append(None)
+
+            elif not add_tag and gwth_tag:
+                efunc_mult_growthterm_vect[j].append(fun_type(c_s[i], K_s[ei], n_s[ei]))
+                efunc_add_growthterm_vect[j].append(None)
+                efunc_mult_decayterm_vect[j].append(None)
+
+            elif not add_tag and not gwth_tag:
+                efunc_mult_decayterm_vect[j].append(fun_type(c_s[i], K_s[ei], n_s[ei]))
+                efunc_add_growthterm_vect[j].append(None)
+                efunc_mult_growthterm_vect[j].append(None)
+            else:
+                raise Exception("Currently not supporting any other node interaction types.")
+
+        self.efunc_add_growthterm_vect = efunc_add_growthterm_vect
+        self.efunc_mult_growthterm_vect = efunc_mult_growthterm_vect
+        self.efunc_mult_decayterm_vect = efunc_mult_decayterm_vect
 
         dcdt_vect_s = []
 
-        for ni, fval_set in enumerate(efunc_vect):
-            if add_interactions:
-                # if len(fval_set) == 0:
-                #     normf = 1
-                # else:
-                #     normf = sp.Rational(1, len(fval_set))
+        # Process additive interactions acting on the growth term:
+        for ni, fval_set in enumerate(efunc_add_growthterm_vect):
 
-                dcdt_vect_s.append(r_max_s[ni] * np.sum(fval_set) - c_s[ni] * d_max_s[ni])
+            if (np.all(np.asarray(fval_set) == None) and len(fval_set) != 0):
+                fsum = 1
+
+            elif len(fval_set) == 0:
+                fsum = 1
+
             else:
-                dcdt_vect_s.append(r_max_s[ni] * np.prod(fval_set) - c_s[ni] * d_max_s[ni])
+                fsum = 0
+                for fi in fval_set:
+                    if fi is not None:
+                        fsum += fi
 
-        # The last thing we need to do is add on a rate term for those nodes that have no inputs,
-        # as they're otherwise ignored in the construction:
-        for ni, di in enumerate(self.in_degree_sequence):
-            if di == 0 and add_interactions is True:
-                dcdt_vect_s[ni] += self.r_vect_s[ni]
+            # replace the segment in the efunc vect with the sum:
+            efunc_add_growthterm_vect[ni] = fsum
+
+        # # Process multiplicative interactions acting on the growth term:
+        for ni, fval_set in enumerate(efunc_mult_growthterm_vect):
+            fprodg = 1
+            for fi in fval_set:
+                if fi is not None:
+                    fprodg = fprodg*fi
+
+            efunc_mult_growthterm_vect[ni] = fprodg
+
+        # # Process multiplicative interactions acting on the decay term:
+        for ni, fval_set in enumerate(efunc_mult_decayterm_vect):
+            fprodd = 1
+            for fi in fval_set:
+                if fi is not None:
+                    fprodd = fprodd*fi
+
+            efunc_mult_decayterm_vect[ni] = fprodd
+
+        for ni in range(self.N_nodes):
+            dcdt_vect_s.append(r_max_s[ni]*efunc_mult_growthterm_vect[ni]*efunc_add_growthterm_vect[ni]
+                               - c_s[ni] * d_max_s[ni] * efunc_mult_decayterm_vect[ni])
 
         # analytical rate of change of concentration vector for the network:
         self.dcdt_vect_s = sp.Matrix(dcdt_vect_s)
@@ -861,7 +926,7 @@ class GeneNetworkModel(object):
         return self.dcdt_zeros, self.dcdt_M_set, self.dcdt_dmag, self.c_lin_set, self.C_M_SET
 
     def create_parameter_vects(self, Ki: float|list=0.5,
-                                ni:float|list=10.0,
+                                ni:float|list=3.0,
                                 ri:float|list=1.0,
                                 di:float|list=1.0
                                 ):
@@ -1138,7 +1203,6 @@ class GeneNetworkModel(object):
 
                 else:
                     sol_root = fsolve(dcdt_funk, c_vecti, args=function_args, xtol=tol)
-                # # FIXME: We have to be careful with this as the process might be able to assume a negative value!
                     if self._include_process is False: # If we're not using the process, constrain all concs to be above zero
                         if (np.all(np.asarray(sol_root) >= 0.0)):
                             mins_found.append(sol_root)
@@ -1409,7 +1473,8 @@ class GeneNetworkModel(object):
                               Ki: float | list = 0.5,
                               ni: float | list = 3.0,
                               di: float | list = 1.0,
-                              search_tol: float = 1.0e-15
+                              search_tol: float = 1.0e-15,
+                              add_interactions: bool = True
                               ):
         '''
         By randomly generating sets of edge interaction (i.e. activator or inhibitor), find
@@ -1423,7 +1488,8 @@ class GeneNetworkModel(object):
 
         for i in range(N_iter):
             edge_types = self.get_edge_types(p_acti=0.5)
-            self.build_analytical_model(edge_types=edge_types, add_interactions=True)
+            self.build_analytical_model(edge_types=edge_types,
+                                        add_interactions=add_interactions)
             sols_0 = self.optimized_phase_space_search(Ns=N_space,
                                                    cmax=1.0*np.max(self.in_degree_sequence),
                                                    round_sol=round_sol,

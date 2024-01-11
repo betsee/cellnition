@@ -14,6 +14,9 @@ class EdgeType(Enum):
     A = 'Activator'
     I = 'Inhibitor'
     N = 'Normal'
+    As = 'Signal Activation'
+    Is = 'Signal Inhibition'
+
 
 class NodeType(Enum):
     gene = 'Gene'
