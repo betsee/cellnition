@@ -20,6 +20,7 @@ class EdgeType(Enum):
 
 class NodeType(Enum):
     gene = 'Gene'
+    signal = 'Signal'
     process = 'Process'
     sensor = 'Sensor'
     effector = 'Effector'

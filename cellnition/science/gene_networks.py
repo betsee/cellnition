@@ -235,9 +235,9 @@ class GeneNetworkModel(object):
                 self.add_edge_interaction_bools.append(False)
                 self.growth_interaction_bools.append(True)  # interact with growth component of reaction
             elif et is EdgeType.As: # else if it's As for a sensor activation interaction, then:
-                self.edge_funcs.append(self.f_inhi_s) # inhibit
-                self.add_edge_interaction_bools.append(False) # multiply
-                self.growth_interaction_bools.append(False)  # interact with decay component of reaction
+                self.edge_funcs.append(self.f_acti_s) # activate
+                self.add_edge_interaction_bools.append(True) # add
+                self.growth_interaction_bools.append(True)  # interact with growth component of reaction
             else:
                 self.edge_funcs.append(self.f_inhi_s) # inhibit
                 self.add_edge_interaction_bools.append(False) # multiply
@@ -270,6 +270,7 @@ class GeneNetworkModel(object):
     def build_analytical_model(self,
                                prob_acti: float=0.5,
                                edge_types: list|ndarray|None=None,
+                               node_type_dict: dict|None=None,
                                add_interactions: bool=False):
         '''
 
@@ -286,11 +287,28 @@ class GeneNetworkModel(object):
         self.set_edge_types(self.edge_types, add_interactions)
 
         # Now that indices are set, give nodes a type attribute:
-        node_types = [NodeType.gene for i in self.nodes_index]  # Set all nodes to the gene type
+        node_types = [NodeType.gene for i in self.nodes_index]  # First set all nodes
+        # to the gene type
+
+        if node_type_dict is not None:
+            for ntag, ntype in node_type_dict.items():
+                for ni, nn in enumerate(self.nodes_list):
+                    if type(nn) is str:
+                        if nn.startswith(ntag):
+                            node_types[ni] = ntype
+                    else:
+                        if nn == ntag:
+                            node_types[ni] = ntype
 
         # Set node types to the graph:
         self.node_types = node_types
         self.set_node_types(node_types)
+
+        # Determine the node indices of any signal nodes:
+        self.signal_inds = []
+        for ni, nt in enumerate(self.node_types):
+            if nt is NodeType.signal:
+                self.signal_inds.append(ni)
 
         c_s = sp.IndexedBase('c')
         K_s = sp.IndexedBase('K')
@@ -336,17 +354,18 @@ class GeneNetworkModel(object):
         dcdt_vect_s = []
 
         # Process additive interactions acting on the growth term:
-        for ni, fval_set in enumerate(efunc_add_growthterm_vect):
-
-            if (np.all(np.asarray(fval_set) == None) and len(fval_set) != 0):
+        for ni, (fval_add, fval_mult, fval_multd) in enumerate(zip(efunc_add_growthterm_vect,
+                                                                   efunc_mult_growthterm_vect,
+                                                                   efunc_mult_decayterm_vect)):
+            if (np.all(np.asarray(fval_add) == None) and len(fval_add) != 0):
                 fsum = 1
 
-            elif len(fval_set) == 0:
+            elif len(fval_add) == 0:
                 fsum = 1
 
             else:
                 fsum = 0
-                for fi in fval_set:
+                for fi in fval_add:
                     if fi is not None:
                         fsum += fi
 
@@ -354,26 +373,30 @@ class GeneNetworkModel(object):
             efunc_add_growthterm_vect[ni] = fsum
 
         # # Process multiplicative interactions acting on the growth term:
-        for ni, fval_set in enumerate(efunc_mult_growthterm_vect):
             fprodg = 1
-            for fi in fval_set:
+            for fi in fval_mult:
                 if fi is not None:
                     fprodg = fprodg*fi
 
             efunc_mult_growthterm_vect[ni] = fprodg
 
-        # # Process multiplicative interactions acting on the decay term:
-        for ni, fval_set in enumerate(efunc_mult_decayterm_vect):
+        # Process multiplicative interactions acting on the decay term:
             fprodd = 1
-            for fi in fval_set:
+            for fi in fval_multd:
                 if fi is not None:
                     fprodd = fprodd*fi
 
             efunc_mult_decayterm_vect[ni] = fprodd
 
-        for ni in range(self.N_nodes):
-            dcdt_vect_s.append(r_max_s[ni]*efunc_mult_growthterm_vect[ni]*efunc_add_growthterm_vect[ni]
-                               - c_s[ni] * d_max_s[ni] * efunc_mult_decayterm_vect[ni])
+        # for ni in range(self.N_nodes): # Creating the sum terms above, construct the equation
+            ntype = self.node_types[ni]  # get the node type
+            # if we're not dealing with a 'signal' node that's written externally:
+            if ntype is not NodeType.signal:
+                dcdt_vect_s.append(r_max_s[ni]*efunc_mult_growthterm_vect[ni]*efunc_add_growthterm_vect[ni]
+                                   - c_s[ni] * d_max_s[ni] * efunc_mult_decayterm_vect[ni])
+            else:
+                dcdt_vect_s.append(0)
+
 
         # analytical rate of change of concentration vector for the network:
         self.dcdt_vect_s = sp.Matrix(dcdt_vect_s)
@@ -1098,7 +1121,8 @@ class GeneNetworkModel(object):
                                      c_bounds: list|None = None,
                                      tol:float = 1.0e-15,
                                      round_sol: int=6, # decimals to round solutions to prevent duplicates
-                                     method: str='Root' # Solve by finding the roots of the dc/dt equation
+                                     method: str='Root', # Solve by finding the roots of the dc/dt equation
+                                     include_signals: bool=False # include signal node states in the search?
                                      ):
         '''
 
@@ -1111,7 +1135,8 @@ class GeneNetworkModel(object):
         if self._include_process is False:
             function_args = (self.r_vect, self.d_vect, self.K_vect, self.n_vect)
         else:
-            function_args = (self.r_vect, self.d_vect, self.K_vect, self.n_vect, self.process_params_f)
+            function_args = (self.r_vect, self.d_vect, self.K_vect, self.n_vect,
+                             self.process_params_f)
 
         # Initialize the equillibrium point solutions to be a set:
         mins_found = []
@@ -1141,20 +1166,27 @@ class GeneNetworkModel(object):
             c_test_lin_set = []
 
             if type(cmax) is list: # allow for different max along each axis of the search space:
-                for ci, cmi in zip(c_vect_s, cmax):
-                    i = c_vect_s.index(ci)
-                    if self._include_process is True and i == self._process_i:
-                        c_test_lin_set.append(np.linspace(self.Vp_min, self.Vp_max, Ns))
+                for nd_i, (ci, cmi) in enumerate(zip(c_vect_s, cmax)):
+                    if self.node_types[nd_i] is NodeType.signal and include_signals is False:
+                        pass
+
                     else:
-                        c_test_lin_set.append(np.linspace(cmin, cmi, Ns))
+                        i = c_vect_s.index(ci)
+                        if self._include_process is True and i == self._process_i:
+                            c_test_lin_set.append(np.linspace(self.Vp_min, self.Vp_max, Ns))
+                        else:
+                            c_test_lin_set.append(np.linspace(cmin, cmi, Ns))
 
             else:
-                for ci in c_vect_s:
-                    i = c_vect_s.index(ci)
-                    if self._include_process is True and i == self._process_i:
-                        c_test_lin_set.append(np.linspace(self.Vp_min, self.Vp_max, Ns))
+                for nd_i, ci in enumerate(c_vect_s):
+                    if self.node_types[nd_i] is NodeType.signal and include_signals is False:
+                        pass
                     else:
-                        c_test_lin_set.append(np.linspace(cmin, cmax, Ns))
+                        i = c_vect_s.index(ci)
+                        if self._include_process is True and i == self._process_i:
+                            c_test_lin_set.append(np.linspace(self.Vp_min, self.Vp_max, Ns))
+                        else:
+                            c_test_lin_set.append(np.linspace(cmin, cmax, Ns))
 
 
             # Create a set of matrices specifying the concentration grid for each
@@ -1163,6 +1195,11 @@ class GeneNetworkModel(object):
 
             # Create linearized arrays for each concentration, stacked into one column per node:
             c_test_set = np.asarray([cM.ravel() for cM in C_test_M_SET]).T
+
+            if include_signals is False: # then we need to add on a zeros block for signal state
+                n_rows_test = c_test_set.shape[0]
+                signal_block = np.zeros((n_rows_test, len(self.signal_inds)))
+                c_test_set = np.column_stack((c_test_set, signal_block))
 
             if c_bounds is None:
                 if type(cmax) is list:
