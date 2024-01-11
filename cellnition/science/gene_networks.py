@@ -11,6 +11,7 @@ import numpy as np
 from numpy import ndarray
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize, fsolve
+from scipy.signal import square
 import networkx as nx
 import sympy as sp
 from sympy.core.symbol import Symbol
@@ -875,6 +876,7 @@ class GeneNetworkModel(object):
                                 ri:float|list=1.0,
                                 di:float|list=1.0,
                                 zer_thresh: float=0.01,
+                                include_signals: bool = False
                                 ):
         '''
 
@@ -886,35 +888,19 @@ class GeneNetworkModel(object):
         if self._reduced_dims and self._solved_analytically is False:
             N_nodes = len(self.c_vect_reduced_s)
             dcdt_vect_f = self.dcdt_vect_reduced_f
+            c_vect_s = self.c_vect_reduced_s
         else:
             N_nodes = self.N_nodes
             dcdt_vect_f = self.dcdt_vect_f
+            c_vect_s = self.c_vect_s
 
-        # Create linear set of concentrations over the desired range
-        # for each node of the network:
-        c_lin_set = []
-        if type(cmax) is list: # Allow for different maxima along each axis of the space:
-            for i, cmi in zip(range(N_nodes), cmax):
-                if self._reduced_dims is False and self._include_process and i == self._process_i:
-                    c_lin_set.append(np.linspace(self.Vp_min, self.Vp_max, N_pts))
-                else:
-                    c_lin_set.append(np.linspace(cmin, cmi, N_pts))
-
-        else:
-            for i in range(N_nodes):
-                if self._reduced_dims is False and self._include_process and i == self._process_i:
-                    c_lin_set.append(np.linspace(self.Vp_min, self.Vp_max, N_pts))
-                else:
-                    c_lin_set.append(np.linspace(cmin, cmax, N_pts))
-
-        # Create a set of matrices specifying the concentation grid for each
-        # node of the network:
-        C_M_SET = np.meshgrid(*c_lin_set, indexing='ij')
+        c_vect_set, C_M_SET, c_lin_set = self._generate_state_space(c_vect_s,
+                                                   Ns=N_pts,
+                                                   cmin=cmin,
+                                                   cmax=cmax,
+                                                   include_signals=include_signals)
 
         M_shape = C_M_SET[0].shape
-
-        # Create linearized arrays for each concentration, stacked into one column per node:
-        c_vect_set = np.asarray([cM.ravel() for cM in C_M_SET]).T
 
         dcdt_M = np.zeros(c_vect_set.shape)
 
@@ -990,8 +976,6 @@ class GeneNetworkModel(object):
         self.n_vect = n_vect
         self.r_vect = r_vect
         self.d_vect = d_vect
-
-        # FIXME: also create the c_max vector here
 
     def read_edge_info_from_graph(self):
         '''
@@ -1109,6 +1093,55 @@ class GeneNetworkModel(object):
 
         G_plt.draw(save_filename)
 
+    def _generate_state_space(self,
+                              c_vect_s: list|ndarray,
+                              Ns: int=3,
+                              cmin: float=0.0,
+                              cmax: float|list=1.0,
+                              include_signals: bool = False # include signal node states in the search?
+                              ):
+        '''
+        
+        '''
+        c_test_lin_set = []
+
+        if type(cmax) is list:  # allow for different max along each axis of the search space:
+            for nd_i, (ci, cmi) in enumerate(zip(c_vect_s, cmax)):
+                if self.node_types[nd_i] is NodeType.signal and include_signals is False:
+                    pass
+
+                else:
+                    i = c_vect_s.index(ci)
+                    if self._include_process is True and i == self._process_i:
+                        c_test_lin_set.append(np.linspace(self.Vp_min, self.Vp_max, Ns))
+                    else:
+                        c_test_lin_set.append(np.linspace(cmin, cmi, Ns))
+
+        else:
+            for nd_i, ci in enumerate(c_vect_s):
+                if self.node_types[nd_i] is NodeType.signal and include_signals is False:
+                    pass
+                else:
+                    i = c_vect_s.index(ci)
+                    if self._include_process is True and i == self._process_i:
+                        c_test_lin_set.append(np.linspace(self.Vp_min, self.Vp_max, Ns))
+                    else:
+                        c_test_lin_set.append(np.linspace(cmin, cmax, Ns))
+
+        # Create a set of matrices specifying the concentration grid for each
+        # node of the network:
+        C_test_M_SET = np.meshgrid(*c_test_lin_set, indexing='ij')
+
+        # Create linearized arrays for each concentration, stacked into one column per node:
+        c_test_set = np.asarray([cM.ravel() for cM in C_test_M_SET]).T
+
+        if include_signals is False:  # then we need to add on a zeros block for signal state
+            n_rows_test = c_test_set.shape[0]
+            signal_block = np.zeros((n_rows_test, len(self.signal_inds)))
+            c_test_set = np.column_stack((c_test_set, signal_block))
+
+        return c_test_set, C_test_M_SET, c_test_lin_set
+
 
     def optimized_phase_space_search(self,
                                      Ns: int=3,
@@ -1122,7 +1155,7 @@ class GeneNetworkModel(object):
                                      tol:float = 1.0e-15,
                                      round_sol: int=6, # decimals to round solutions to prevent duplicates
                                      method: str='Root', # Solve by finding the roots of the dc/dt equation
-                                     include_signals: bool=False # include signal node states in the search?
+                                     include_signals: bool = False  # include signal node states in the search?
                                      ):
         '''
 
@@ -1163,43 +1196,12 @@ class GeneNetworkModel(object):
                 dcdt_funk = self.dcdt_vect_f
                 jac_funk = self.jac_f
 
-            c_test_lin_set = []
-
-            if type(cmax) is list: # allow for different max along each axis of the search space:
-                for nd_i, (ci, cmi) in enumerate(zip(c_vect_s, cmax)):
-                    if self.node_types[nd_i] is NodeType.signal and include_signals is False:
-                        pass
-
-                    else:
-                        i = c_vect_s.index(ci)
-                        if self._include_process is True and i == self._process_i:
-                            c_test_lin_set.append(np.linspace(self.Vp_min, self.Vp_max, Ns))
-                        else:
-                            c_test_lin_set.append(np.linspace(cmin, cmi, Ns))
-
-            else:
-                for nd_i, ci in enumerate(c_vect_s):
-                    if self.node_types[nd_i] is NodeType.signal and include_signals is False:
-                        pass
-                    else:
-                        i = c_vect_s.index(ci)
-                        if self._include_process is True and i == self._process_i:
-                            c_test_lin_set.append(np.linspace(self.Vp_min, self.Vp_max, Ns))
-                        else:
-                            c_test_lin_set.append(np.linspace(cmin, cmax, Ns))
-
-
-            # Create a set of matrices specifying the concentration grid for each
-            # node of the network:
-            C_test_M_SET = np.meshgrid(*c_test_lin_set, indexing='ij')
-
-            # Create linearized arrays for each concentration, stacked into one column per node:
-            c_test_set = np.asarray([cM.ravel() for cM in C_test_M_SET]).T
-
-            if include_signals is False: # then we need to add on a zeros block for signal state
-                n_rows_test = c_test_set.shape[0]
-                signal_block = np.zeros((n_rows_test, len(self.signal_inds)))
-                c_test_set = np.column_stack((c_test_set, signal_block))
+            # Generate the points in state space to sample at:
+            c_test_set, _, _ = self._generate_state_space(c_vect_s,
+                                                       Ns=Ns,
+                                                       cmin=cmin,
+                                                       cmax=cmax,
+                                                       include_signals=include_signals)
 
             if c_bounds is None:
                 if type(cmax) is list:
@@ -1391,6 +1393,7 @@ class GeneNetworkModel(object):
             osmolyte inside the cell.
 
         '''
+        # FIXME: we need to put in the c_factors here for the environmental osmolytes
 
         # Defining analytic equations for an osmotic cell volume change process:
         A_s, R_s, T_s, ni_s, m_s, V_s, Vc_s, dm_s, mu_s, Y_s, r_s = sp.symbols('A, R, T, ni, m, V, V_c, d_m, mu, Y, r',
@@ -1402,11 +1405,6 @@ class GeneNetworkModel(object):
         dVdt_1_s = (A_s ** 2 / (8 * dm_s * mu_s)) * (
                     R_s * T_s * ((ni_s / V_s) - m_s) - sp.Rational(4, 3) * ((Y_s * dm_s * (V_s - Vc_s) / (r_s * Vc_s))))
 
-        # the normalized moles inside the cell is taken to be equal to an effector concentration
-        # from the GRN and the normalized volume will be asigned to the c_process variable:
-        # np_s = c_effector
-        # Vp_s = c_process
-
         # Rate of change of Vp with respect to time for Vp < 1.0 is:
         dVpdt_0_s = (dVdt_0_s.subs(
             [(V_s, c_process * Vc_s), (A_s, Ap_s * Ac_s), (ni_s, nc_s * c_effector), (m_s, mc_s * mp_s)]) / Vc_s).simplify()
@@ -1416,16 +1414,13 @@ class GeneNetworkModel(object):
             [(V_s, c_process * Vc_s), (A_s, Ap_s * Ac_s), (ni_s, nc_s * c_effector), (m_s, mc_s * mp_s)]) / Vc_s).simplify()
 
         # Volume change rates (which are the input into the sensor node) are:
+        # FIXME: Substitute in expression for strain in terms of Vp here!
         dEdt_0_s = dVpdt_0_s
         dEdt_1_s = dVpdt_1_s
 
         # Piecewise function that defines this normalized-parameter osmotic cell volume change problem
         # as a strain rate:
         self.dEdt_s = sp.Piecewise((dEdt_0_s, c_process < 1.0), (dEdt_1_s, True))
-
-        # Transform this into a numerical function:
-        # self.dEdt_f = sp.lambdify([c_process, c_effector, mp_s, Ap_s, Vc_s, nc_s, mc_s, Ac_s, R_s, T_s, Y_s, dm_s, mu_s, r_s],
-        #                           dVpdt_0_s)
 
         # Go ahead and initialize some parameters for this process function: # FIXME these need to be
         # made easier to input, vary and change:
@@ -1554,3 +1549,33 @@ class GeneNetworkModel(object):
                         multisol_edges.append(edge_types_l)
 
         return multisols
+
+    def pulses(self,
+               tvect: list|ndarray,
+               t_on: float|int,
+               t_off: float|int,
+               p_max: float|int = 1.0,
+               p_min: float|int = 0.0,
+               f_pulses: float|int|None = None,
+               duty_cycle: float = 0.1):
+        '''
+
+        '''
+        itop = (tvect >= t_on).nonzero()[0]
+        ibot = (tvect <= t_off).nonzero()[0]
+
+        ipulse = np.intersect1d(ibot, itop)
+
+        pulse_sig = np.zeros(len(tvect))
+
+        if f_pulses is None:
+            pulse_sig[ipulse] = p_max
+            pulse_sig += p_min
+
+        else:
+            pulse_sig[ipulse] = p_max*square(2 * np.pi * tvect[ipulse] * f_pulses, duty=duty_cycle)
+            pulse_sig[(pulse_sig < 0.0).nonzero()[0]] = 0.0
+
+            pulse_sig += p_min
+
+        return pulse_sig
