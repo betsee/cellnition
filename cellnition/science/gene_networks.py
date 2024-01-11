@@ -131,13 +131,13 @@ class GeneNetworkModel(object):
 
         '''
         # Degree analysis:
-        self.in_degree_sequence = [di for ni, di in
+        self.in_degree_sequence = [deg_i for nde_i, deg_i in
                                    self.GG.in_degree(self.nodes_list)] # aligns with node order
 
         self.in_dmax = np.max(self.in_degree_sequence)
 
 
-        self.out_degree_sequence = [di for ni, di in
+        self.out_degree_sequence = [deg_i for nde_i, deg_i in
                                     self.GG.out_degree(self.nodes_list)]  # aligns with node order
 
         # The outward flow of interaction at each node of the graph:
@@ -251,8 +251,8 @@ class GeneNetworkModel(object):
         self.node_types = node_types
         # Set node type as graph node attribute:
         node_attr_dict = {}
-        for ni, nt in zip(self.nodes_index, node_types):
-            node_attr_dict[ni] = {"node_type": nt.value}
+        for nde_i, nde_t in zip(self.nodes_index, node_types):
+            node_attr_dict[nde_i] = {"node_type": nde_t.value}
 
         nx.set_node_attributes(self.GG, node_attr_dict)
 
@@ -293,13 +293,13 @@ class GeneNetworkModel(object):
 
         if node_type_dict is not None:
             for ntag, ntype in node_type_dict.items():
-                for ni, nn in enumerate(self.nodes_list):
-                    if type(nn) is str:
-                        if nn.startswith(ntag):
-                            node_types[ni] = ntype
+                for nde_i, nde_n in enumerate(self.nodes_list):
+                    if type(nde_n) is str:
+                        if nde_n.startswith(ntag):
+                            node_types[nde_i] = ntype
                     else:
-                        if nn == ntag:
-                            node_types[ni] = ntype
+                        if nde_n == ntag:
+                            node_types[nde_i] = ntype
 
         # Set node types to the graph:
         self.node_types = node_types
@@ -307,9 +307,9 @@ class GeneNetworkModel(object):
 
         # Determine the node indices of any signal nodes:
         self.signal_inds = []
-        for ni, nt in enumerate(self.node_types):
-            if nt is NodeType.signal:
-                self.signal_inds.append(ni)
+        for nde_i, nde_t in enumerate(self.node_types):
+            if nde_t is NodeType.signal:
+                self.signal_inds.append(nde_i)
 
         c_s = sp.IndexedBase('c')
         K_s = sp.IndexedBase('K')
@@ -355,7 +355,7 @@ class GeneNetworkModel(object):
         dcdt_vect_s = []
 
         # Process additive interactions acting on the growth term:
-        for ni, (fval_add, fval_mult, fval_multd) in enumerate(zip(efunc_add_growthterm_vect,
+        for nde_i, (fval_add, fval_mult, fval_multd) in enumerate(zip(efunc_add_growthterm_vect,
                                                                    efunc_mult_growthterm_vect,
                                                                    efunc_mult_decayterm_vect)):
             if (np.all(np.asarray(fval_add) == None) and len(fval_add) != 0):
@@ -371,7 +371,7 @@ class GeneNetworkModel(object):
                         fsum += fi
 
             # replace the segment in the efunc vect with the sum:
-            efunc_add_growthterm_vect[ni] = fsum
+            efunc_add_growthterm_vect[nde_i] = fsum
 
         # # Process multiplicative interactions acting on the growth term:
             fprodg = 1
@@ -379,7 +379,7 @@ class GeneNetworkModel(object):
                 if fi is not None:
                     fprodg = fprodg*fi
 
-            efunc_mult_growthterm_vect[ni] = fprodg
+            efunc_mult_growthterm_vect[nde_i] = fprodg
 
         # Process multiplicative interactions acting on the decay term:
             fprodd = 1
@@ -387,14 +387,14 @@ class GeneNetworkModel(object):
                 if fi is not None:
                     fprodd = fprodd*fi
 
-            efunc_mult_decayterm_vect[ni] = fprodd
+            efunc_mult_decayterm_vect[nde_i] = fprodd
 
         # for ni in range(self.N_nodes): # Creating the sum terms above, construct the equation
-            ntype = self.node_types[ni]  # get the node type
+            ntype = self.node_types[nde_i]  # get the node type
             # if we're not dealing with a 'signal' node that's written externally:
             if ntype is not NodeType.signal:
-                dcdt_vect_s.append(r_max_s[ni]*efunc_mult_growthterm_vect[ni]*efunc_add_growthterm_vect[ni]
-                                   - c_s[ni] * d_max_s[ni] * efunc_mult_decayterm_vect[ni])
+                dcdt_vect_s.append(r_max_s[nde_i]*efunc_mult_growthterm_vect[nde_i]*efunc_add_growthterm_vect[nde_i]
+                                   - c_s[nde_i] * d_max_s[nde_i] * efunc_mult_decayterm_vect[nde_i])
             else:
                 dcdt_vect_s.append(0)
 
@@ -500,8 +500,8 @@ class GeneNetworkModel(object):
 
         # Add a type tag to any nodes on the path between root hub and effector:
         for path_i in self.root_effector_paths:
-            for ni in path_i:
-                node_types[ni] = NodeType.path
+            for nde_i in path_i:
+                node_types[nde_i] = NodeType.path
 
         node_types[self._root_i] = NodeType.root  # Set the most connected node to the root hub
         node_types[self._effector_i] = NodeType.effector  # Set the least out-connected node to the effector
@@ -549,7 +549,7 @@ class GeneNetworkModel(object):
         # Create the time-change vector with the process node math applied:
         dcdt_vect_s = []
 
-        for ni, (fval_set, ntype) in enumerate(zip(efunc_vect, node_types)):
+        for nde_i, (fval_set, ntype) in enumerate(zip(efunc_vect, node_types)):
             if ntype is NodeType.process:  # if we're dealing with the phys/chem process node...
                 dcdt_vect_s.append(self.dEdt_s)  # ...append the osmotic strain rate equation.
 
@@ -560,16 +560,18 @@ class GeneNetworkModel(object):
                     else:
                         normf = sp.Rational(1, len(fval_set))
 
-                    dcdt_vect_s.append(self.r_vect_s[ni] * np.sum(fval_set) * normf - self.c_vect_s[ni] * self.d_vect_s[ni])
+                    dcdt_vect_s.append(self.r_vect_s[nde_i] * np.sum(fval_set) * normf -
+                                       self.c_vect_s[nde_i] * self.d_vect_s[nde_i])
                 else:
-                    dcdt_vect_s.append(self.r_vect_s[ni] * np.prod(fval_set) - self.c_vect_s[ni] * self.d_vect_s[ni])
+                    dcdt_vect_s.append(self.r_vect_s[nde_i]*np.prod(fval_set) -
+                                       self.c_vect_s[nde_i]*self.d_vect_s[nde_i])
 
 
         # The last thing we need to do is add on a rate term for those nodes that have no inputs,
         # as they're otherwise ignored in the construction:
-        for ni, di in enumerate(self.in_degree_sequence):
+        for nde_i, di in enumerate(self.in_degree_sequence):
             if di == 0 and add_interactions is True:
-                dcdt_vect_s[ni] += self.r_vect_s[ni]
+                dcdt_vect_s[nde_i] += self.r_vect_s[nde_i]
 
         # analytical rate of change of concentration vector for the network:
         self.dcdt_vect_s = sp.Matrix(dcdt_vect_s)
@@ -586,14 +588,14 @@ class GeneNetworkModel(object):
         # For this case the user may provide string names for
         # nodes, so we need to make numerical node and edge listings:
         self.nodes_index = []
-        for ni, nn in enumerate(self.nodes_list):
-            self.nodes_index.append(ni)
+        for nde_i, nn in enumerate(self.nodes_list):
+            self.nodes_index.append(nde_i)
 
         self.edges_index = []
         for ei, (nni, nnj) in enumerate(self.edges_list):
-            ni = self.nodes_list.index(nni)
-            nj = self.nodes_list.index(nnj)
-            self.edges_index.append((ni, nj))
+            nde_i = self.nodes_list.index(nni)
+            nde_j = self.nodes_list.index(nnj)
+            self.edges_index.append((nde_i, nde_j))
         # self.nodes_list = np.arange(self.N_nodes)
 
     def _generate_optimization_functions(self):
@@ -960,14 +962,14 @@ class GeneNetworkModel(object):
 
         if type(ri) is not list:
             r_vect = []
-            for ni in range(self.N_nodes):
+            for nde_i in range(self.N_nodes):
                 r_vect.append(ri)
         else:
             r_vect = ri
 
         if type(di) is not list:
             d_vect = []
-            for ni in range(self.N_nodes):
+            for nde_i in range(self.N_nodes):
                 d_vect.append(di)
         else:
             d_vect = di
@@ -1012,18 +1014,18 @@ class GeneNetworkModel(object):
         # get data stored on edge type key:
         node_data = nx.get_node_attributes(self.GG, "node_type")
 
-        for ni, nt in node_data.items():
-            if nt == 'Gene':
+        for nde_i, nde_t in node_data.items():
+            if nde_t == 'Gene':
                 self.node_types.append(NodeType.gene)
-            elif nt == 'Process':
+            elif nde_t == 'Process':
                 self.node_types.append(NodeType.process)
-            elif nt == 'Sensor':
+            elif nde_t == 'Sensor':
                 self.node_types.append(NodeType.sensor)
-            elif nt == 'Effector':
+            elif nde_t == 'Effector':
                 self.node_types.append(NodeType.effector)
-            elif nt == 'Root Hub':
+            elif nde_t == 'Root Hub':
                 self.node_types.append(NodeType.root)
-            elif nt == 'Path':
+            elif nde_t == 'Path':
                 self.node_types.append(NodeType.path)
             else:
                 raise Exception("Node type not found.")
@@ -1068,8 +1070,8 @@ class GeneNetworkModel(object):
                            ranksep=0.3,
                            dpi=300)
 
-        for ni in self.nodes_list:
-            G_plt.add_node(ni,
+        for nde_i in self.nodes_list:
+            G_plt.add_node(nde_i,
                            style='filled',
                            fillcolor='LightCyan',
                            color='Black',
@@ -1485,8 +1487,8 @@ class GeneNetworkModel(object):
         node_types = [NodeType.gene for i in self.nodes_index]  # Set all nodes to the gene type
         # Add any nodes on the path:
         for path_i in paths_i:
-            for ni in path_i:
-                node_types[ni] = NodeType.path
+            for nde_i in path_i:
+                node_types[nde_i] = NodeType.path
         # Add the path endpoint node highlights:
         node_types[root_i] = NodeType.root
         node_types[effector_i] = NodeType.effector
@@ -1579,3 +1581,55 @@ class GeneNetworkModel(object):
             pulse_sig += p_min
 
         return pulse_sig
+
+    def make_signals_matrix(self,
+                            tvect: list|ndarray,
+                            sig_inds: list|ndarray,
+                            sig_times: list|ndarray,
+                            sig_mag: list|ndarray):
+        '''
+
+        '''
+        Nt = len(tvect)
+
+        c_signals = np.zeros((Nt, self.N_nodes))  # Initialize matrix holding the signal sequences
+
+        for si, (ts, te), (smin, smax) in zip(sig_inds, sig_times, sig_mag):
+            c_signals[:, si] += self.pulses(tvect, ts, te, p_max=smax, p_min=smin, f_pulses=None, duty_cycle=0.1)
+
+        return c_signals
+
+    def run_time_sim(self,
+                     tend: float,
+                     dt: float,
+                     cvecti: ndarray|list,
+                     sig_inds: ndarray|list|None = None,
+                     sig_times: ndarray | list | None = None,
+                     sig_mag: ndarray | list | None = None,
+                     ):
+        '''
+
+        '''
+        Nt = int(tend/dt)
+        tvect = np.linspace(0.0, tend, Nt)
+
+        if sig_inds is not None:
+            c_signals = self.make_signals_matrix(tvect, sig_inds, sig_times, sig_mag)
+        else:
+            c_signals = None
+
+        concs_time = []
+
+        for ti, tt in enumerate(tvect):
+            dcdt = self.dcdt_vect_f(cvecti, self.r_vect, self.d_vect, self.K_vect, self.n_vect)
+            cvecti += dt * dcdt
+
+            if c_signals is not None:
+                # manually set the signal node values:
+                cvecti[self.signal_inds] = c_signals[ti, self.signal_inds]
+
+            concs_time.append(cvecti * 1)
+
+        concs_time = np.asarray(concs_time)
+
+        return concs_time, tvect
