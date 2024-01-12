@@ -23,10 +23,8 @@ from cellnition.science.stability import Solution
 import pygraphviz as pgv
 import pyvista as pv
 
-# TODO: Time simulations
 # TODO: Parameter scaling module: scale K and d by 's' and apply rate scaling 'v'
-# TODO: Optimization with substitution-based constraints, optimizing for parameters
-# TODO: Allow multiple process to be added to the network (node with different physics)
+# TODO: Allow multiple effectors to be added to the network
 # TODO: Plot a path through a graph
 
 class GeneNetworkModel(object):
@@ -753,6 +751,9 @@ class GeneNetworkModel(object):
             # dictionary to obtain solutions for the whole network
             self.sol_cset_s = None
 
+            self.signal_reduced_inds = None
+            self.nonsignal_reduced_inds = None
+
         else: # If we have solutions, proceed:
             self._reduced_dims = True
 
@@ -772,6 +773,14 @@ class GeneNetworkModel(object):
                 # dictionary to obtain solutions for the whole network:
                 self.sol_cset_s = sol_cset
 
+                # Create a set of signal node indices to the reduced c_vect array:
+                self.signal_reduced_inds = []
+                for si in self.signal_inds:
+                    if si in self.c_master_i:
+                        self.signal_reduced_inds.append(self.c_master_i.index(si))
+
+                self.nonsignal_reduced_inds = np.setdiff1d(np.arange(len(self.c_master_i)), self.signal_reduced_inds)
+
             else:
                 # Set most reduced system attributes to None:
                 self.dcdt_vect_reduced_s = None
@@ -779,6 +788,9 @@ class GeneNetworkModel(object):
                 self.c_master_i = None
                 self.c_remainder_i = None
                 self.c_vect_remainder_s = None
+                self.signal_reduced_inds = None
+                self.nonsignal_reduced_inds = None
+
 
                 # This is the dictionary of remaining concentrations that are in terms of the reduced concentrations,
                 # such that when the master equation set is solved, the results are plugged into the equations in this
@@ -1123,28 +1135,35 @@ class GeneNetworkModel(object):
         '''
         c_test_lin_set = []
 
-        if type(cmax) is list:  # allow for different max along each axis of the search space:
-            for nd_i, (ci, cmi) in enumerate(zip(c_vect_s, cmax)):
-                if self.node_types[nd_i] is NodeType.signal and include_signals is False:
-                    pass
+        if self._reduced_dims and self._solved_analytically is False:
+            signal_inds = self.signal_reduced_inds
+            nonsignal_inds = self.nonsignal_reduced_inds
+        else:
+            signal_inds = self.signal_inds
+            nonsignal_inds = self.nonsignal_inds
 
-                else:
-                    i = c_vect_s.index(ci)
-                    if self._include_process is True and i == self._process_i:
-                        c_test_lin_set.append(np.linspace(self.Vp_min, self.Vp_max, Ns))
-                    else:
-                        c_test_lin_set.append(np.linspace(cmin, cmi, Ns))
+        if include_signals is False:
+            # Create a c_vect sampled to the non-signal nodes:
+            c_vect = np.asarray(c_vect_s)[nonsignal_inds].tolist()
 
         else:
-            for nd_i, ci in enumerate(c_vect_s):
-                if self.node_types[nd_i] is NodeType.signal and include_signals is False:
-                    pass
+            c_vect = c_vect_s # otherwise use the whole vector
+
+        if type(cmax) is list:  # allow for different max along each axis of the search space:
+            for nd_i, (ci, cmi) in enumerate(zip(c_vect, cmax)):
+                i = c_vect.index(ci)
+                if self._include_process is True and i == self._process_i:
+                    c_test_lin_set.append(np.linspace(self.Vp_min, self.Vp_max, Ns))
                 else:
-                    i = c_vect_s.index(ci)
-                    if self._include_process is True and i == self._process_i:
-                        c_test_lin_set.append(np.linspace(self.Vp_min, self.Vp_max, Ns))
-                    else:
-                        c_test_lin_set.append(np.linspace(cmin, cmax, Ns))
+                    c_test_lin_set.append(np.linspace(cmin, cmi, Ns))
+
+        else:
+            for nd_i, ci in enumerate(c_vect):
+                i = c_vect.index(ci)
+                if self._include_process is True and i == self._process_i:
+                    c_test_lin_set.append(np.linspace(self.Vp_min, self.Vp_max, Ns))
+                else:
+                    c_test_lin_set.append(np.linspace(cmin, cmax, Ns))
 
         # Create a set of matrices specifying the concentration grid for each
         # node of the network:
@@ -1155,7 +1174,7 @@ class GeneNetworkModel(object):
 
         if include_signals is False:  # then we need to add on a zeros block for signal state
             n_rows_test = c_test_set.shape[0]
-            signal_block = np.zeros((n_rows_test, len(self.signal_inds)))
+            signal_block = np.zeros((n_rows_test, len(signal_inds)))
             c_test_set = np.column_stack((c_test_set, signal_block))
 
         return c_test_set, C_test_M_SET, c_test_lin_set
@@ -1211,12 +1230,10 @@ class GeneNetworkModel(object):
                 N_nodes = len(self.c_vect_reduced_s)
                 c_vect_s = self.c_vect_reduced_s
                 dcdt_funk = self.dcdt_vect_reduced_f
-                jac_funk = self.jac_reduced_f
             else:
                 N_nodes = self.N_nodes
                 c_vect_s = self.c_vect_s
                 dcdt_funk = self.dcdt_vect_f
-                jac_funk = self.jac_f
 
             # Generate the points in state space to sample at:
             c_test_set, _, _ = self._generate_state_space(c_vect_s,
