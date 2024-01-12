@@ -14,7 +14,8 @@ def plot_network(nodes_list: list|ndarray,
                  path_plot_edges: list|ndarray|None = None,
                  dpi: int|float=300,
                  save_path: str|None=None,
-                 layout: str='circo'):
+                 layout: str='circo',
+                 vminmax: tuple|None = None):
     '''
 
     layout options:
@@ -37,8 +38,13 @@ def plot_network(nodes_list: list|ndarray,
     edge_width = 2.0
 
     if node_vals is not None:
-        vmin = np.min(node_vals)
-        vmax = np.max(node_vals)
+        if vminmax is None:
+            vmin = np.min(node_vals)
+            vmax = np.max(node_vals)
+        else:
+            vmin = vminmax[0]
+            vmax = vminmax[1]
+
         if val_cmap is None:
             cmap = colormaps['Greys'] # default colormap
         else:
@@ -53,6 +59,13 @@ def plot_network(nodes_list: list|ndarray,
     node_dict_gene = {
     'node_font_color': 'Black',
     'node_color': 'GhostWhite',
+    'node_shape': 'ellipse',
+    'outline_color': 'Black'
+    }
+
+    node_dict_signal = {
+    'node_font_color': 'Black',
+    'node_color': 'LemonChiffon',
     'node_shape': 'ellipse',
     'outline_color': 'Black'
     }
@@ -93,6 +106,7 @@ def plot_network(nodes_list: list|ndarray,
     }
 
     node_plot_dict = {NodeType.gene.value: node_dict_gene,
+                      NodeType.signal.value: node_dict_signal,
                       NodeType.sensor.value: node_dict_sensor,
                       NodeType.process.value: node_dict_process,
                       NodeType.effector.value: node_dict_effector,
@@ -129,10 +143,10 @@ def plot_network(nodes_list: list|ndarray,
 
     for (ei, ej), et in zip(edge_list, edges_type):
 
-        if et is EdgeType.A:
+        if et is EdgeType.A or et is EdgeType.As:
             G.add_edge(ei, ej, arrowhead='dot', color='blue', penwidth=edge_width)
 
-        elif et is EdgeType.I:
+        elif et is EdgeType.I or et is EdgeType.Is:
             G.add_edge(ei, ej, arrowhead='tee', color='red', penwidth=edge_width)
 
         elif et is EdgeType.N:

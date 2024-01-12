@@ -311,6 +311,8 @@ class GeneNetworkModel(object):
             if nde_t is NodeType.signal:
                 self.signal_inds.append(nde_i)
 
+        self.nonsignal_inds = np.setdiff1d(self.nodes_index, self.signal_inds)
+
         c_s = sp.IndexedBase('c')
         K_s = sp.IndexedBase('K')
         n_s = sp.IndexedBase('n')
@@ -1517,6 +1519,8 @@ class GeneNetworkModel(object):
         This does not redefine any default 'edge_types' that have been assigned to the network.
 
         '''
+        # FIXME: instead of doing this randomly, use combinations with itersol permutations to explore all
+        # possible cases systematically
         multisols = []
         multisol_edges = []
 
@@ -1606,6 +1610,7 @@ class GeneNetworkModel(object):
                      sig_inds: ndarray|list|None = None,
                      sig_times: ndarray | list | None = None,
                      sig_mag: ndarray | list | None = None,
+                     dt_samp: float|None = None
                      ):
         '''
 
@@ -1620,6 +1625,15 @@ class GeneNetworkModel(object):
 
         concs_time = []
 
+        # sampling compression
+        if dt_samp is not None:
+            sampr = int(dt_samp / dt)
+            tvect_samp = tvect[0::sampr]
+            tvectr = tvect_samp
+        else:
+            tvect_samp = None
+            tvectr = tvect
+
         for ti, tt in enumerate(tvect):
             dcdt = self.dcdt_vect_f(cvecti, self.r_vect, self.d_vect, self.K_vect, self.n_vect)
             cvecti += dt * dcdt
@@ -1628,8 +1642,40 @@ class GeneNetworkModel(object):
                 # manually set the signal node values:
                 cvecti[self.signal_inds] = c_signals[ti, self.signal_inds]
 
-            concs_time.append(cvecti * 1)
+            if dt_samp is None:
+                concs_time.append(cvecti * 1)
+            else:
+                if tt in tvect_samp:
+                    concs_time.append(cvecti * 1)
 
         concs_time = np.asarray(concs_time)
 
-        return concs_time, tvect
+        return concs_time, tvectr
+
+    def find_attractor_sols(self,
+                            sols_0: list|ndarray,
+                            tol: float=1.0e-3,
+                            verbose: bool=True,
+                            N_round: int = 12
+                            ):
+        '''
+
+        '''
+        sol_char_0 = self.stability_estimate(sols_0)
+
+        solM = []
+        i = 0
+        for sol_dic in sol_char_0:
+            error = np.sum(sol_dic['Change at Minima'])**2
+            char = sol_dic['Stability Characteristic']
+            sols = sol_dic['Minima Values']
+
+            if char != 'Saddle Point' and error <= tol:
+                i += 1
+                if verbose:
+                    print(f'Soln {i}, {char}, {sols}, {np.round(error, N_round)}')
+                solM.append(sols)
+
+        solM = np.asarray(solM).T
+
+        return solM
