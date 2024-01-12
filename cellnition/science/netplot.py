@@ -14,21 +14,22 @@ def plot_network(nodes_list: list|ndarray,
                  path_plot_edges: list|ndarray|None = None,
                  dpi: int|float=300,
                  save_path: str|None=None,
-                 layout: str='circo',
+                 layout: str='dot',
                  vminmax: tuple|None = None):
     '''
 
     layout options:
+    'dot'
     "fdp"
     'neato'
     '''
 
     G = pgv.AGraph(strict=False,
-                   # splines=True,
+                   splines=True,
                    directed=True,
                    concentrate=False,
-                   nodesep=0.1,
-                   ranksep=0.3,
+                   # nodesep=0.1,
+                   # ranksep=0.3,
                    dpi=dpi)
 
     net_font_name = 'DejaVu Sans'
