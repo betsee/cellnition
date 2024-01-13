@@ -76,11 +76,6 @@ class GeneNetworkModel(object):
         self._include_process = False # Indicate that model does not include the process by default
         self._solved_analytically = False # Indicate that the model does not have an analytical solution
 
-        # Initialize internal parameters for steady-state solutions:
-        self.sols_0 = None
-        self.solsM = None
-        self.G_states = None
-
     def generate_network(self,
                          beta: float=0.15,
                          gamma: float=0.8,
@@ -436,7 +431,7 @@ class GeneNetworkModel(object):
         else:
             self.edge_types = edge_types
 
-        self.set_edge_types(edge_types)
+        self.set_edge_types(edge_types, add_interactions)
 
         # FIXME: we ultimately want to add more than one of each node type to the network (i.e. more
         # than one effector, or multiple processes and sensors, etc)
@@ -497,7 +492,7 @@ class GeneNetworkModel(object):
             self.edge_types[self.ei_effector_process] = EdgeType.N # This is always neutral
 
             # Update the edge types on the graph edges:
-            self.set_edge_types(self.edge_types)
+            self.set_edge_types(self.edge_types, add_interactions)
 
         # See if there are paths connecting the hub and effector node:
         try:
@@ -1315,26 +1310,20 @@ class GeneNetworkModel(object):
         mins_found = np.round(mins_found, round_sol)
         mins_found = np.unique(mins_found, axis=0).tolist()
 
-        self.sols_0 = mins_found
-
         return mins_found
 
     def stability_estimate(self,
-                           # mins_found: set|list,
+                           mins_found: set|list,
                            fname: str=None):
         '''
 
         '''
 
-        if self.sols_0 is None:
-            raise Exception("An optimization search must be run to find potential"
-                            "steady-states of this system.")
-
         eps = 1.0e-25 # we need a small value to add to avoid dividing by zero
 
         sol_dicts_list = []
         # in some Jacobians
-        for cminso in self.sols_0:
+        for cminso in mins_found:
 
             solution_dict = {}
 
@@ -1551,7 +1540,8 @@ class GeneNetworkModel(object):
                               ni: float | list = 3.0,
                               di: float | list = 1.0,
                               search_tol: float = 1.0e-15,
-                              add_interactions: bool = True
+                              add_interactions: bool = True,
+                              unique_sols: bool = True
                               ):
         '''
         By randomly generating sets of edge interaction (i.e. activator or inhibitor), find
@@ -1578,22 +1568,21 @@ class GeneNetworkModel(object):
                                                    tol=search_tol,
                                                    method="Root"
                                                   )
-            if len(sols_0) >= N_multi:
-                sol_char_0 = self.stability_estimate()
-                multi_char = 0
-                min_val = 0.0
-                for sol_dic in sol_char_0:
-                    stab_char = sol_dic['Stability Characteristic']
-                    if stab_char != 'Saddle Point':
-                        min_val += np.sum(sol_dic['Change at Minima']**2)
-                        multi_char += 1
-                if multi_char >= N_multi and min_val < tol*N_multi:
-                    edge_types_l = edge_types.tolist()
-                    if edge_types_l not in multisol_edges: # If we don't already have this combo:
-                        if verbose:
-                            print(f'Found solution with {multi_char} states on iteration {i}')
-                        multisols.append([sols_0, edge_types, sol_char_0])
-                        multisol_edges.append(edge_types_l)
+
+            solsM = self.find_attractor_sols(sols_0, unique_sols=unique_sols, verbose=False)
+
+            if len(solsM):
+                num_sols = solsM.shape[1]
+            else:
+                num_sols = 0
+
+            if num_sols >= N_multi:
+                edge_types_l = edge_types.tolist()
+                if edge_types_l not in multisol_edges: # If we don't already have this combo:
+                    if verbose:
+                        print(f'Found solution with {num_sols} states on iteration {i}')
+                    multisols.append([sols_0, edge_types])
+                    multisol_edges.append(edge_types_l)
 
         return multisols
 
@@ -1694,7 +1683,7 @@ class GeneNetworkModel(object):
         return concs_time, tvectr
 
     def find_attractor_sols(self,
-                            # sols_0: list|ndarray,
+                            sols_0: list|ndarray,
                             tol: float=1.0e-3,
                             verbose: bool=True,
                             N_round: int = 12,
@@ -1705,13 +1694,9 @@ class GeneNetworkModel(object):
 
         '''
 
-        if self.sols_0 is None:
-            raise Exception("An optimization search must be run to find potential"
-                            "steady-states of this system.")
+        sol_char_0 = self.stability_estimate(sols_0)
 
-        sol_char_0 = self.stability_estimate()
-
-        solM = []
+        solsM = []
         i = 0
         for sol_dic in sol_char_0:
             error = np.sum(sol_dic['Change at Minima'])**2
@@ -1722,36 +1707,31 @@ class GeneNetworkModel(object):
                 i += 1
                 if verbose:
                     print(f'Soln {i}, {char}, {sols}, {np.round(error, N_round)}')
-                solM.append(sols)
+                solsM.append(sols)
 
-        solM = np.asarray(solM).T
+        solsM = np.asarray(solsM).T
 
-        self.solsM = solM
-
-        if unique_sols and len(self.solsM) != 0:
-            solsy = np.unique(np.round(self.solsM, sol_round), axis=1)  # round the sols to avoid degenerates
+        if unique_sols and len(solsM) != 0:
+            solsy = np.unique(np.round(solsM, sol_round), axis=1)  # round the sols to avoid degenerates
             if verbose:
                 print('-----')
                 print(solsy.T)
                 print('----')
         else:
-            solsy = self.solsM
+            solsy = solsM
 
         return solsy
 
 
-    def find_state_match(self, cvecti: list|ndarray):
+    def find_state_match(self, solsM: ndarray, cvecti: list|ndarray):
         '''
-        Must run find_attractor_sols first to obtain a solsM
+
 
         '''
-        if self.solsM is None:
-            raise Exception("Must run the find_attractor_sols method to generate a"
-                            "solutions matrix.")
 
         # now what we need is a pattern match from concentrations to the stable states:
         errM = []
-        for soli in self.solsM.T:
+        for soli in solsM.T:
             sdiff = soli - cvecti
             errM.append(np.sum(sdiff ** 2))
         errM = np.asarray(errM)
@@ -1761,6 +1741,7 @@ class GeneNetworkModel(object):
 
 
     def create_transition_network(self,
+                                  solsM: ndarray,
                                   dt: float=1.0e-3,
                                   tend: float=100.0,
                                   sigtstart: float=33.0,
@@ -1770,13 +1751,9 @@ class GeneNetworkModel(object):
                                   verbose: bool=True
                                   ):
         '''
-        Must run find_attractor_sols first to obtain a solsM
+
 
         '''
-
-        if self.solsM is None:
-            raise Exception("Must run the find_attractor_sols method to generate a"
-                            "solutions matrix.")
 
         # See if we can build a transition matrix/diagram by starting the system
         # in different states and seeing which state it ends up in:
@@ -1785,10 +1762,10 @@ class GeneNetworkModel(object):
 
         # Create a steady-state solutions matrix that is stacked with the
         # 'zero' or 'base' state:
-        solsM_with0 = np.column_stack((c_zeros, self.solsM))
+        solsM_with0 = np.column_stack((c_zeros, solsM))
 
-        self.stateM = np.zeros((self.solsM.shape[1], self.solsM.shape[1]))
-        self.G_states = nx.DiGraph()
+        # stateM = np.zeros((solsM.shape[1], solsM.shape[1]))
+        G_states = nx.DiGraph()
 
         for stateio, cvecto in enumerate(solsM_with0.T):  # start the system off in each of the states
 
@@ -1816,37 +1793,34 @@ class GeneNetworkModel(object):
                 concs_after = concs_time[-1, :]
 
                 if stateio == 0 and si == 0:  # If we're on the zeros vector we've transitioned from {0} to some new state:
-                    statejo, _ = self.find_state_match(concs_before)
-                    self.G_states.add_edge(0, statejo + 1, transition=-1)
-                    print(f'From state 0 spontaneously to state {statejo + 1}')
+                    statejo, _ = self.find_state_match(solsM, concs_before)
+                    G_states.add_edge(0, statejo + 1, transition=-1)
+                    if verbose:
+                        print(f'From state 0 spontaneously to state {statejo + 1}')
 
-                statei, _ = self.find_state_match(concs_before)
-                statej, _ = self.find_state_match(concs_after)
+                statei, _ = self.find_state_match(solsM, concs_before)
+                statej, _ = self.find_state_match(solsM, concs_after)
 
-                self.G_states.add_edge(statei + 1, statej + 1, transition=si)
+                G_states.add_edge(statei + 1, statej + 1, transition=si)
 
                 if verbose:
                     print(f'From state {statei + 1} with signal {si} to state {statej + 1}')
 
-                self.stateM[statei, statej] = 1
+                # stateM[statei, statej] = 1
+        return G_states
 
-    def plot_transition_network(self, save_graph_net: str):
-        '''
-        Must run find_attractor_sols first to obtain a solsM followed by
-        create_transition_network to create a network to plot.
-
+    def plot_transition_network(self, G_states, solsM: ndarray, save_graph_net: str):
         '''
 
-        if self.G_states is None:
-            raise Exception("Must run the create_transition_network method to generate a"
-                            "state transition network.")
+        '''
 
-        edgedata_Gstates = nx.get_edge_attributes(self.G_states, "transition")
-        nodes_Gstates = list(self.G_states.nodes)
+
+        edgedata_Gstates = nx.get_edge_attributes(G_states, "transition")
+        nodes_Gstates = list(G_states.nodes)
 
         # cmap = colormaps['magma']
         cmap = colormaps['rainbow_r']
-        norm = colors.Normalize(vmin=0, vmax=self.solsM.shape[1])
+        norm = colors.Normalize(vmin=0, vmax=solsM.shape[1])
 
         G = pgv.AGraph(strict=False,
                        splines=True,
@@ -1889,22 +1863,18 @@ class GeneNetworkModel(object):
         G.draw(save_graph_net)
 
 
-    def plot_microarray_sols(self, figsave: str|None = None, cmap: str|None =None):
+    def plot_microarray_sols(self, solsM: ndarray, figsave: str|None = None, cmap: str|None =None):
         '''
 
         '''
-
-        if self.solsM is None:
-            raise Exception("Must run the find_attractor_sols method to generate a"
-                        "solutions matrix.")
 
         if cmap is None:
             cmap = 'magma'
 
-        state_labels = [f'State {i +1}' for i in range(self.solsM.shape[1])]
+        state_labels = [f'State {i +1}' for i in range(solsM.shape[1])]
         gene_labels = np.asarray(self.nodes_list)[self.nonsignal_inds]
         fig, ax = plt.subplots()
-        im = ax.imshow(self.solsM[self.nonsignal_inds, :], cmap=cmap)
+        im = ax.imshow(solsM[self.nonsignal_inds, :], cmap=cmap)
         # plt.colorbar(label='Expression Level')
         ax.set_xticks(np.arange(len(state_labels)), labels=state_labels)
         ax.set_yticks(np.arange(len(gene_labels)), labels=gene_labels)
@@ -1931,7 +1901,9 @@ class GeneNetworkModel(object):
                            search_round_sol: int=6,
                            tol: float=1.0e-3,
                            cmax_multi: float=2.0,
-                           verbose: bool=True):
+                           verbose: bool=True,
+                           hold_d_const: bool=True,
+                           di: float=0.5):
         '''
         Search parameter space of a model to find paameter combinations that give different multistable
         states.
@@ -1952,8 +1924,9 @@ class GeneNetworkModel(object):
         for edj_i in range(self.N_edges):
             param_lin_set.append(Klin*1) # append the linear K-vector choices for each edge
 
-        for nde_i in range(N_nodes):
-            param_lin_set.append(dlin*1)
+        if hold_d_const is False:
+            for nde_i in range(N_nodes):
+                param_lin_set.append(dlin*1)
 
         # Create a set of matrices specifying the concentration grid for each
         # node of the network:
@@ -1968,9 +1941,16 @@ class GeneNetworkModel(object):
         if verbose:
             print(param_M_SET[0].ravel().shape)
 
+        if verbose:
+            print(f'Search cmax will be {cmax_multi * np.max(self.in_degree_sequence)}')
+
         for param_set_i in param_test_set:
             kvecti = param_set_i[0:self.N_edges].tolist()
-            dvecti = param_set_i[self.N_edges:].tolist()
+
+            if hold_d_const is False:
+                dvecti = param_set_i[self.N_edges:].tolist()
+            else:
+                dvecti = di
 
             self.create_parameter_vects(Ki=kvecti, ni=ni, ri=ri, di=dvecti)
 
@@ -1984,7 +1964,7 @@ class GeneNetworkModel(object):
                                                        method="Root"
                                                        )
 
-            solsM = self.find_attractor_sols(tol=tol, verbose=False, unique_sols=True, sol_round=sol_round)
+            solsM = self.find_attractor_sols(sols_0, tol=tol, verbose=False, unique_sols=True, sol_round=sol_round)
 
             if len(solsM):
                 num_sols = solsM.shape[1]
