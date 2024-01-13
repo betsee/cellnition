@@ -61,27 +61,16 @@ class BinodeNetAdd(LibNet):
                       ]
 
         # Generates set of 4 nicely spaced attractors:
-        # self.K_vect = [0.1, 0.1, 1.05, 0.1]
-        # self.d_vect = [0.5, 5.25]
-        # self.n_vect = [3.0, 3.0, 3.0, 3.0]
-        # self.cmax = 4.0
+        self.K_vect = [0.2 , 1.55, 1.55, 1.1]
+        self.d_vect = [0.5, 0.5]
+        self.n_vect = [3.0, 3.0, 3.0, 3.0]
+        self.cmax = 4.0
 
-        # self.K_vect = [0.1, 1.05, 1.525, 1.05]
-        # self.d_vect = [0.5, 0.5]
-        # self.n_vect = [3.0, 3.0, 3.0, 3.0]
-        # self.cmax = 4.0
+        self.K_vect_alt = [1.55, 0.2 , 1.1 , 1.55]
+        self.d_vect_alt = [0.5, 0.5]
+        self.n_vect_alt = [3.0, 3.0, 3.0, 3.0]
+        self.cmax = 4.0
 
-        # self.K_vect = [0.575, 2.0, 2.0, 0.1]
-        # self.d_vect = [0.5, 0.5]
-        # self.n_vect = [3.0, 3.0, 3.0, 3.0]
-        # self.cmax = 4.0
-        #
-        #
-        # # Generates set of 3 nicely spaced attractors and 1 repellor (?):
-        # self.K_vect_alt = [0.1, 0.575, 1.05, 1.05]
-        # self.d_vect_alt = [0.5, 0.5]
-        # self.n_vect_alt = [3.0, 3.0, 3.0, 3.0]
-        # self.cmax_alt = 4.0
 
         # self.node_type_dict = {'S': NodeType.signal}
         self.node_type_dict = None
@@ -120,7 +109,7 @@ class TrinodeNetAdd(LibNet):
         self.K_vect = [0.05, 1.275, 2.5, 2.5, 2.5, 2.5]
         self.d_vect =  [0.2, 0.2, 0.2]
         self.n_vect = [3.0, 3.0, 3.0, 3.0]
-        self.cmax = 4.0
+        self.cmax = 10.0
 
 class QuadStateNetAdd(LibNet):
 
