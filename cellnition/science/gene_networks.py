@@ -1697,7 +1697,9 @@ class GeneNetworkModel(object):
                             # sols_0: list|ndarray,
                             tol: float=1.0e-3,
                             verbose: bool=True,
-                            N_round: int = 12
+                            N_round: int = 12,
+                            unique_sols: bool = False,
+                            sol_round: int = 1
                             ):
         '''
 
@@ -1726,7 +1728,16 @@ class GeneNetworkModel(object):
 
         self.solsM = solM
 
-        return self.solsM
+        if unique_sols and len(self.solsM) != 0:
+            solsy = np.unique(np.round(self.solsM, sol_round), axis=1)  # round the sols to avoid degenerates
+            if verbose:
+                print('-----')
+                print(solsy.T)
+                print('----')
+        else:
+            solsy = self.solsM
+
+        return solsy
 
 
     def find_state_match(self, cvecti: list|ndarray):
@@ -1905,3 +1916,82 @@ class GeneNetworkModel(object):
             plt.savefig(figsave, dpi=300, transparent=True, format='png')
 
         return fig, ax
+
+
+    def param_space_search(self,
+                           N_pts: int=3,
+                           ri: float = 1.0,
+                           ni: float = 3.0,
+                           K_min: float = 0.1,
+                           K_max: float = 2.0,
+                           d_min: float = 0.5,
+                           d_max: float = 10.0,
+                           sol_round: int = 1,
+                           N_search: int = 3,
+                           search_round_sol: int=6,
+                           tol: float=1.0e-3,
+                           cmax_multi: float=2.0,
+                           verbose: bool=True):
+        '''
+        Search parameter space of a model to find paameter combinations that give different multistable
+        states.
+        '''
+
+        if self._reduced_dims and self._solved_analytically is False:
+            N_nodes = len(self.c_vect_reduced_s)
+
+        else:
+            N_nodes = self.N_nodes
+
+        # What we wish to create is a parameter space search, as this net is small enough to enable that.
+        Klin = np.linspace(K_min, K_max, N_pts)
+        dlin = np.linspace(d_min, d_max, N_pts)
+
+        param_lin_set = []
+
+        for edj_i in range(self.N_edges):
+            param_lin_set.append(Klin*1) # append the linear K-vector choices for each edge
+
+        for nde_i in range(N_nodes):
+            param_lin_set.append(dlin*1)
+
+        # Create a set of matrices specifying the concentration grid for each
+        # node of the network:
+        param_M_SET = np.meshgrid(*param_lin_set, indexing='ij')
+
+        # Create linearized arrays for each concentration, stacked into one column per node:
+        param_test_set = np.asarray([pM.ravel() for pM in param_M_SET]).T
+
+        bif_space_M = [] # Matrix holding the parameter values and number of unique stable solutions
+        sols_space_M = []
+
+        if verbose:
+            print(param_M_SET[0].ravel().shape)
+
+        for param_set_i in param_test_set:
+            kvecti = param_set_i[0:self.N_edges].tolist()
+            dvecti = param_set_i[self.N_edges:].tolist()
+
+            self.create_parameter_vects(Ki=kvecti, ni=ni, ri=ri, di=dvecti)
+
+            sols_0 = self.optimized_phase_space_search(Ns=N_search,
+                                                       cmax=cmax_multi * np.max(self.in_degree_sequence),
+                                                       round_sol=search_round_sol,
+                                                       Ki=self.K_vect,
+                                                       di=self.d_vect,
+                                                       ni=self.n_vect,
+                                                       tol=1.0e-15,
+                                                       method="Root"
+                                                       )
+
+            solsM = self.find_attractor_sols(tol=tol, verbose=False, unique_sols=True, sol_round=sol_round)
+
+            if len(solsM):
+                num_sols = solsM.shape[1]
+            else:
+                num_sols = 0
+
+            bif_space_M.append([*self.K_vect, *self.d_vect, num_sols])
+            sols_space_M.append(solsM)
+
+        return np.asarray(bif_space_M), sols_space_M

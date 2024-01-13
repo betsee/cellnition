@@ -61,19 +61,66 @@ class BinodeNetAdd(LibNet):
                       ]
 
         # Generates set of 4 nicely spaced attractors:
-        self.K_vect = [0.1, 0.1, 1.05, 0.1]
-        self.d_vect = [0.5, 5.25]
-        self.cmax = 4.0
+        # self.K_vect = [0.1, 0.1, 1.05, 0.1]
+        # self.d_vect = [0.5, 5.25]
+        # self.n_vect = [3.0, 3.0, 3.0, 3.0]
+        # self.cmax = 4.0
 
-        # Generates set of 3 nicely spaced attractors and 1 repellor:
-        self.K_vect_alt = [0.1, 0.575, 1.05, 1.05]
-        self.d_vect_alt = [0.5, 0.5]
-        self.cmax_alt = 4.0
+        # self.K_vect = [0.1, 1.05, 1.525, 1.05]
+        # self.d_vect = [0.5, 0.5]
+        # self.n_vect = [3.0, 3.0, 3.0, 3.0]
+        # self.cmax = 4.0
+
+        # self.K_vect = [0.575, 2.0, 2.0, 0.1]
+        # self.d_vect = [0.5, 0.5]
+        # self.n_vect = [3.0, 3.0, 3.0, 3.0]
+        # self.cmax = 4.0
+        #
+        #
+        # # Generates set of 3 nicely spaced attractors and 1 repellor (?):
+        # self.K_vect_alt = [0.1, 0.575, 1.05, 1.05]
+        # self.d_vect_alt = [0.5, 0.5]
+        # self.n_vect_alt = [3.0, 3.0, 3.0, 3.0]
+        # self.cmax_alt = 4.0
 
         # self.node_type_dict = {'S': NodeType.signal}
         self.node_type_dict = None
 
         self.add_interactions = True
+
+class TrinodeNetAdd(LibNet):
+
+    def __init__(self):
+        '''
+
+        '''
+        # Initialize the superclass:
+        super().__init__()
+
+        self.name = 'TrinodeNet_AddInteract'
+        self.short_name = 'TrinodeNet_Add'
+
+        self.N_nodes = 3
+        self.edges = [('H0', 'H1'), ('H1', 'H2'), ('H2', 'H0'),
+                 ('H0', 'H0'), ('H2', 'H2'), ('H1', 'H1'),
+                 # ('S0', 'H0'), ('S1', 'H1'), ('S2', 'H2')
+                 ]
+
+        self.edge_types = [EdgeType.I, EdgeType.A, EdgeType.I,
+                      EdgeType.A, EdgeType.A, EdgeType.A,
+                      # EdgeType.Is, EdgeType.Is, EdgeType.Is,
+                      ]
+
+        self.node_type_dict = None
+
+        self.add_interactions = True
+
+
+        # Not a bad hex-state, well spaced in first vector on triangle (I, I, I)
+        self.K_vect = [0.05, 1.275, 2.5, 2.5, 2.5, 2.5]
+        self.d_vect =  [0.2, 0.2, 0.2]
+        self.n_vect = [3.0, 3.0, 3.0, 3.0]
+        self.cmax = 4.0
 
 class QuadStateNetAdd(LibNet):
 
