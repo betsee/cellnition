@@ -52,27 +52,27 @@ class BinodeNetAdd(LibNet):
         self.N_nodes = 2
         self.edges = [('H0', 'H1'), ('H1', 'H0'),
                  ('H0', 'H0'), ('H1', 'H1'),
-                 # ('S0', 'H0'), ('S1', 'H1')
+                 ('S0', 'H0'), ('S1', 'H1')
                  ]
 
         self.edge_types = [EdgeType.I, EdgeType.I,
                       EdgeType.A, EdgeType.A,
-                      # EdgeType.Is, EdgeType.Is
+                      EdgeType.Is, EdgeType.Is
                       ]
 
         # Generates set of 4 nicely spaced attractors:
         self.K_vect = [0.57857143, 1.43142857, 1.14714286, 0.57857143]
         self.d_vect = [1.0, 1.0]
         self.n_vect = [3.0, 3.0, 3.0, 3.0]
-        self.cmax = 2.0
+        self.cmax = 4.0
 
         self.K_vect_alt1 = [1.43142857, 0.57857143, 0.57857143, 1.14714286]
         self.d_vect_alt1 = [1.0, 1.0]
         self.n_vect_alt1 = [3.0, 3.0, 3.0, 3.0]
-        self.cmax_alt1 = 2.0
+        self.cmax_alt1 = 4.0
 
-        # self.node_type_dict = {'S': NodeType.signal}
-        self.node_type_dict = None
+        self.node_type_dict = {'S': NodeType.signal}
+        # self.node_type_dict = None
 
         self.add_interactions = True
 
@@ -91,30 +91,31 @@ class TrinodeNetAdd(LibNet):
         self.N_nodes = 3
         self.edges = [('H0', 'H1'), ('H1', 'H2'), ('H2', 'H0'),
                  ('H0', 'H0'), ('H2', 'H2'), ('H1', 'H1'),
-                 # ('S0', 'H0'), ('S1', 'H1'), ('S2', 'H2')
+                 ('S0', 'H0'), ('S1', 'H1'), ('S2', 'H2')
                  ]
 
         self.edge_types = [EdgeType.I, EdgeType.I, EdgeType.I,
                       EdgeType.A, EdgeType.A, EdgeType.A,
-                      # EdgeType.Is, EdgeType.Is, EdgeType.Is,
+                      EdgeType.Is, EdgeType.Is, EdgeType.Is,
                       ]
 
-        self.node_type_dict = None
+        self.node_type_dict = {'S': NodeType.signal}
+        # self.node_type_dict = None
 
         self.add_interactions = True
 
 
         # Penta-state, well spaced in all vectors on triangle (I, I, I)
         self.K_vect = [0.45, 0.45, 0.1 , 0.45, 0.45, 0.1]
-        self.d_vect =  [1.0, 1.0, 1.0]
-        self.n_vect = [3.0, 3.0, 3.0, 3.0]
-        self.cmax = 2.0
+        self.d_vect =  1.0
+        self.n_vect = 3.0
+        self.cmax = 4.0
 
         # Penta-state, well spaced in all vectors on triangle (I, I, I)
         self.K_vect_alt1 = [0.45, 0.1, 0.45, 0.45, 0.45, 0.45]
-        self.d_vect_alt1 =  [1.0, 1.0, 1.0]
-        self.n_vect_alt1 = [3.0, 3.0, 3.0, 3.0]
-        self.cmax_alt1 = 2.0
+        self.d_vect_alt1 =  1.0
+        self.n_vect_alt1 = 3.0
+        self.cmax_alt1 = 4.0
 
 
 
@@ -133,29 +134,30 @@ class PentanodeNetAdd(LibNet):
         self.N_nodes = 5
         self.edges = [('H0', 'H1'), ('H1', 'H2'), ('H2', 'H3'), ('H3', 'H4'), ('H4', 'H0'),
                  ('H0', 'H0'), ('H1', 'H1'), ('H2', 'H2'), ('H3', 'H3'), ('H4', 'H4'),
-                 # ('S0', 'H0'), ('S1', 'H1'), ('S2', 'H2')
+                 ('S0', 'H0'), ('S1', 'H1'), ('S2', 'H2'), ('S3', 'H3'), ('S4', 'H4')
                  ]
 
         self.edge_types = [EdgeType.I, EdgeType.I, EdgeType.I, EdgeType.I, EdgeType.I,
                       EdgeType.A, EdgeType.A, EdgeType.A, EdgeType.A, EdgeType.A,
-                      # EdgeType.Is, EdgeType.Is, EdgeType.Is,
+                      EdgeType.Is, EdgeType.Is, EdgeType.Is,EdgeType.Is, EdgeType.Is
                       ]
 
-        self.node_type_dict = None
+        self.node_type_dict = {'S': NodeType.signal}
+        # self.node_type_dict = None
 
         self.add_interactions = True
 
-        # 11 state net:
+        # 11 state net -- good:
         self.K_vect = [0.05,  0.05,  0.05,  0.05,  0.05,  0.5,  0.5,  0.5,  0.5, 0.5]
         self.d_vect =  1.0
         self.n_vect = 3.0
-        self.cmax = 2.0
+        self.cmax = 4.0
 
-        # Possible 12-state, not well spaced:
+        # Only 10-unique states, not a nice solution:
         self.K_vect_alt1 = [0.5,  0.05,  0.5,  0.5,  0.5,  0.05,  0.5,  0.05,  0.5, 0.5]
         self.d_vect_alt1 =  1.0
         self.n_vect_alt1 = 3.0
-        self.cmax_alt1 = 2.0
+        self.cmax_alt1 = 4.0
 
 class TrinodeNetLoaded(LibNet):
 
@@ -173,24 +175,31 @@ class TrinodeNetLoaded(LibNet):
         self.edges = [('H0', 'H1'), ('H1', 'H2'), ('H2', 'H0'),
                       ('H1', 'H0'), ('H2', 'H1'), ('H0', 'H2'),
                       ('H0', 'H0'), ('H2', 'H2'), ('H1', 'H1'),
-                     # ('S0', 'H0'), ('S1', 'H1'), ('S2', 'H2')
+                     ('S0', 'H0'), ('S1', 'H1'), ('S2', 'H2')
                      ]
 
         self.edge_types = [EdgeType.I, EdgeType.I, EdgeType.I,
                            EdgeType.I, EdgeType.I, EdgeType.I,
                            EdgeType.A, EdgeType.A, EdgeType.A,
-                      # EdgeType.Is, EdgeType.Is, EdgeType.Is,
+                      EdgeType.Is, EdgeType.Is, EdgeType.Is,
                       ]
 
-        self.node_type_dict = None
+        self.node_type_dict = {'S': NodeType.signal}
+        # self.node_type_dict = None
 
         self.add_interactions = True
 
         # OK hex-state
-        self.K_vect = [0.8, 0.8, 0.8, 1.5, 1.5, 0.8, 1.5, 0.8, 1.5]
-        self.d_vect =  [1.0, 1.0, 1.0]
-        self.n_vect = [3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0]
-        self.cmax = 3.0
+        self.K_vect = [0.02, 0.02, 0.02, 0.31, 0.31, 0.6 , 0.31, 0.6 , 0.6]
+        self.d_vect =  1.0
+        self.n_vect = 3.0
+        self.cmax = 4.0
+
+        # OK hex-state
+        self.K_vect_alt1 = [0.02, 0.02, 0.02, 0.31, 0.6 , 0.6 , 0.31, 0.31, 0.6]
+        self.d_vect_alt1 =  1.0
+        self.n_vect_alt1 = 3.0
+        self.cmax_alt1 = 6.0
 
 
 

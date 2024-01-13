@@ -15,6 +15,7 @@ from matplotlib import colormaps
 from scipy.optimize import minimize, fsolve
 from scipy.signal import square
 import networkx as nx
+from networkx import DiGraph
 import sympy as sp
 from sympy.core.symbol import Symbol
 from sympy.tensor.indexed import Indexed
@@ -1122,7 +1123,7 @@ class GeneNetworkModel(object):
                               c_vect_s: list|ndarray,
                               Ns: int=3,
                               cmin: float=0.0,
-                              cmax: float|list=1.0,
+                              cmax: float=1.0,
                               include_signals: bool = False # include signal node states in the search?
                               ):
         '''
@@ -1144,16 +1145,7 @@ class GeneNetworkModel(object):
         else:
             c_vect = c_vect_s # otherwise use the whole vector
 
-        if type(cmax) is list:  # allow for different max along each axis of the search space:
-            for nd_i, (ci, cmi) in enumerate(zip(c_vect, cmax)):
-                i = c_vect.index(ci)
-                if self._include_process is True and i == self._process_i:
-                    c_test_lin_set.append(np.linspace(self.Vp_min, self.Vp_max, Ns))
-                else:
-                    c_test_lin_set.append(np.linspace(cmin, cmi, Ns))
-
-        else:
-            for nd_i, ci in enumerate(c_vect):
+        for nd_i, ci in enumerate(c_vect):
                 i = c_vect.index(ci)
                 if self._include_process is True and i == self._process_i:
                     c_test_lin_set.append(np.linspace(self.Vp_min, self.Vp_max, Ns))
@@ -1178,7 +1170,7 @@ class GeneNetworkModel(object):
     def optimized_phase_space_search(self,
                                      Ns: int=3,
                                      cmin: float=0.0,
-                                     cmax: float|list=1.0,
+                                     cmax: float=1.0,
                                      Ki: float | list = 0.5,
                                      ni: float | list = 3.0,
                                      ri: float | list = 1.0,
@@ -1238,11 +1230,7 @@ class GeneNetworkModel(object):
                                                        include_signals=include_signals)
 
             if c_bounds is None:
-                if type(cmax) is list:
-                    c_bounds = [(cmin, cmi) for i, cmi in zip(range(N_nodes), cmax)]
-
-                else:
-                    c_bounds = [(cmin, cmax) for i in range(N_nodes)]
+                c_bounds = [(cmin, cmax) for i in range(N_nodes)]
 
                 if self._include_process:
                     if self._reduced_dims is False:
@@ -1809,7 +1797,7 @@ class GeneNetworkModel(object):
                 # stateM[statei, statej] = 1
         return G_states
 
-    def plot_transition_network(self, G_states, solsM: ndarray, save_graph_net: str):
+    def plot_transition_network(self, G_states: DiGraph, solsM: ndarray, save_graph_net: str):
         '''
 
         '''
