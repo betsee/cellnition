@@ -1579,19 +1579,19 @@ class GeneNetworkModel(object):
                                                    method="Root"
                                                   )
             if len(sols_0) >= N_multi:
-                sol_char_0 = self.stability_estimate(sols_0)
-                tri_char = 0
+                sol_char_0 = self.stability_estimate()
+                multi_char = 0
                 min_val = 0.0
                 for sol_dic in sol_char_0:
-                    for k, v in sol_dic.items():
-                        if k == 'Stability Characteristic' and v != 'Saddle Point':
-                            min_val += np.sum(sol_dic['Change at Minima']**2)
-                            tri_char += 1
-                if tri_char >= N_multi and min_val < tol*N_multi:
+                    stab_char = sol_dic['Stability Characteristic']
+                    if stab_char != 'Saddle Point':
+                        min_val += np.sum(sol_dic['Change at Minima']**2)
+                        multi_char += 1
+                if multi_char >= N_multi and min_val < tol*N_multi:
                     edge_types_l = edge_types.tolist()
                     if edge_types_l not in multisol_edges: # If we don't already have this combo:
                         if verbose:
-                            print(f'Found solution with {tri_char} states on iteration {i}')
+                            print(f'Found solution with {multi_char} states on iteration {i}')
                         multisols.append([sols_0, edge_types, sol_char_0])
                         multisol_edges.append(edge_types_l)
 

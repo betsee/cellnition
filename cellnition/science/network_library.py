@@ -38,28 +38,43 @@ class BinodeNetAdd(LibNet):
 
     def __init__(self):
         '''
+        This is indicated to be a tri-stable network. It is used for
+        parameter space searches to look for further states with changes
+        to parameters.
 
         '''
         # Initialize the superclass:
         super().__init__()
 
         self.name = 'BinodeNet_AddInteract'
-        self.short_name = '2Net_Add'
+        self.short_name = 'BinodeNet_Add'
 
         self.N_nodes = 2
         self.edges = [('H0', 'H1'), ('H1', 'H0'),
                  ('H0', 'H0'), ('H1', 'H1'),
-                 ('S0', 'H0'), ('S1', 'H1')
+                 # ('S0', 'H0'), ('S1', 'H1')
                  ]
 
-        self.edge_types = [EdgeType.I, EdgeType.A,
+        self.edge_types = [EdgeType.I, EdgeType.I,
                       EdgeType.A, EdgeType.A,
-                      EdgeType.Is, EdgeType.Is
+                      # EdgeType.Is, EdgeType.Is
                       ]
 
-        self.node_type_dict = {'S': NodeType.signal}
+        # Generates set of 4 nicely spaced attractors:
+        self.K_vect = [0.1, 0.1, 1.05, 0.1]
+        self.d_vect = [0.5, 5.25]
+        self.cmax = 4.0
+
+        # Generates set of 3 nicely spaced attractors and 1 repellor:
+        self.K_vect_alt = [0.1, 0.575, 1.05, 1.05]
+        self.d_vect_alt = [0.5, 0.5]
+        self.cmax_alt = 4.0
+
+        # self.node_type_dict = {'S': NodeType.signal}
+        self.node_type_dict = None
 
         self.add_interactions = True
+
 class QuadStateNetAdd(LibNet):
 
     def __init__(self):
@@ -86,6 +101,7 @@ class QuadStateNetAdd(LibNet):
         self.node_type_dict = {'S': NodeType.signal}
 
         self.add_interactions = True
+
 class QuadStateNetMult(LibNet):
 
     def __init__(self):
@@ -112,6 +128,7 @@ class QuadStateNetMult(LibNet):
         self.node_type_dict = {'S': NodeType.signal}
 
         self.add_interactions = False
+
 class FullQuadStateNetAdd(LibNet):
 
     def __init__(self):
