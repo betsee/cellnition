@@ -15,7 +15,8 @@ def plot_network(nodes_list: list|ndarray,
                  dpi: int|float=300,
                  save_path: str|None=None,
                  layout: str='dot',
-                 vminmax: tuple|None = None):
+                 vminmax: tuple|None = None,
+                 rev_font_color: bool=False):
     '''
 
     layout options:
@@ -127,10 +128,17 @@ def plot_network(nodes_list: list|ndarray,
             nde_color = colors.rgb2hex(cmap(norm(node_vals[ni])))
             nde_outline = 'Black'
 
-            if norm(node_vals[ni]) <= 0.6:
-                nde_font_color = 'Black'
+            if rev_font_color is False:
+                if norm(node_vals[ni]) <= 0.6:
+                    nde_font_color = 'Black'
+                else:
+                    nde_font_color = 'White'
+
             else:
-                nde_font_color = 'White'
+                if norm(node_vals[ni]) >= 0.6:
+                    nde_font_color = 'Black'
+                else:
+                    nde_font_color = 'White'
 
         G.add_node(nn,
                    style='filled',

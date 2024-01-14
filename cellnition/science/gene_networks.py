@@ -76,6 +76,7 @@ class GeneNetworkModel(object):
         self._reduced_dims = False # Indicate that model is full dimensions
         self._include_process = False # Indicate that model does not include the process by default
         self._solved_analytically = False # Indicate that the model does not have an analytical solution
+        self.dcdt_vect_reduced_s = None
 
     def generate_network(self,
                          beta: float=0.15,
@@ -131,6 +132,9 @@ class GeneNetworkModel(object):
         '''
 
         '''
+        # Indices of edges with selfloops:
+        self.selfloop_edge_inds = [self.edges_list.index(ei) for ei in list(nx.selfloop_edges(self.GG))]
+
         # Degree analysis:
         self.in_degree_sequence = [deg_i for nde_i, deg_i in
                                    self.GG.in_degree(self.nodes_list)] # aligns with node order
@@ -164,6 +168,62 @@ class GeneNetworkModel(object):
         self.graph_cycles = sorted(nx.simple_cycles(self.GG))
         self.N_cycles = len(self.graph_cycles)
 
+        # Graph structure characterization (from the amazing paper of Moutsinas, G. et al. Scientific Reports 11 (2021))
+        a_out = list(self.GG.adjacency())
+
+        # Adjacency matrix (outward connection directed)
+        self.A_out = np.zeros((self.N_nodes, self.N_nodes))
+        for nde_ni, nde_j_dict in a_out:
+            nde_i = self.nodes_list.index(nde_ni) # get the index in case nodes are names
+            for nde_nj, _ in nde_j_dict.items():
+                nde_j = self.nodes_list.index(nde_nj) # get the index in case nodes are names
+                self.A_out[nde_i, nde_j] += 1
+
+        # Diagonalized in and out degree sequences for the nodes:
+        D_in = np.diag(self.in_degree_sequence)
+        D_out = np.diag(self.out_degree_sequence)
+
+        # Graph Laplacians for out and in distributions:
+        L_out = D_out - self.A_out
+        L_in = D_in - self.A_out
+
+        # Moore-Penrose inverse of Graph Laplacians:
+        L_in_inv = np.linalg.pinv(L_in.T)
+        L_out_inv = np.linalg.pinv(L_out)
+
+        # Grading of hierarchical level of nodes:
+        # fwd hierachical levels grade vertices based on distance from source subgraphs
+        self.fwd_hier_node_level = L_in_inv.dot(self.in_degree_sequence)
+        # rev hierachical levels grade vertices based on distance from sink subgraphs
+        self.rev_hier_node_level = L_out_inv.dot(self.out_degree_sequence)
+        # overal hierachical levels of the graph (this is akin to a y-coordinate for each node of the network):
+        self.hier_node_level = (1 / 2) * (self.fwd_hier_node_level - self.rev_hier_node_level)
+
+        # Next, define a difference matrix for the network -- this calculates the difference between node i and j
+        # as an edge parameter when it is dotted with a parameter defined on nodes:
+        self.D_diff = np.zeros((self.N_edges, self.N_nodes))
+        for ei, (nde_i, nde_j) in enumerate(self.edges_index):
+            self.D_diff[ei, nde_i] = 1
+            self.D_diff[ei, nde_j] = -1
+
+        #Next calculate the forward and backward hierarchical differences:
+        self.fwd_hier_diff = self.D_diff.dot(self.fwd_hier_node_level)
+        self.rev_hier_diff = self.D_diff.dot(self.rev_hier_node_level)
+
+        #The democracy coefficient parameter (measures how much the influencers of a graph are influenced
+        #themselves):
+        self.dem_coeff = 1 - np.mean(self.fwd_hier_diff)
+        self.dem_coeff_rev = 1 - np.mean(self.rev_hier_diff)
+
+        # And the hierarchical incoherence parameter (measures how much feedback there is):
+        self.hier_incoherence = np.var(self.fwd_hier_diff)
+        self.hier_incoherence_rev = np.var(self.rev_hier_diff)
+
+        # A graph with high democracy coefficient and high incoherence has all verts with approximately the same
+        # hierarchical level. The graph is influenced by a high percentage of vertices. In a graph with low democracy
+        # coefficient and low incoherence, the graph is controlled by small percentage of vertices (maximally
+        # hierarchical at zero demo coeff and zero incoherence).
+
     def get_paths_matrix(self):
 
         # Matrix showing the number of paths from starting node to end node:
@@ -191,7 +251,7 @@ class GeneNetworkModel(object):
 
         return self.paths_matrix
 
-    def get_edge_types(self, p_acti: float=0.5):
+    def get_edge_types(self, p_acti: float=0.5, set_selfloops_acti: bool=True):
         '''
         Automatically generate a conse
         rved edge-type vector for use in
@@ -203,6 +263,9 @@ class GeneNetworkModel(object):
         edge_types_o = [EdgeType.A, EdgeType.I]
         edge_prob = [p_acti, p_inhi]
         edge_types = np.random.choice(edge_types_o, self.N_edges, p=edge_prob)
+
+        if set_selfloops_acti: # if self-loops of the network are forced to be activators:
+            edge_types[self.selfloop_edge_inds] = EdgeType.A
 
         return edge_types
 
@@ -1996,8 +2059,8 @@ class GeneNetworkModel(object):
                        euler=False,
                        dvioptions=["-T", "tight", "-z", "0", "--truecolor", "-D 600", "-bg", "Transparent"])
 
-            eqns_to_write.append(sp.print_latex(self.c_vect_reduced_s))
-            eqns_to_write.append(sp.print_latex(self.dcdt_vect_reduced_s))
+            eqns_to_write.append(sp.latex(self.c_vect_reduced_s))
+            eqns_to_write.append(sp.latex(self.dcdt_vect_reduced_s))
             header.extend(['Reduced Concentations', 'Reduced Change Vector'])
 
         with open(save_eqn_csv, 'w', newline="") as file:
