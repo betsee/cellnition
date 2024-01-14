@@ -6,7 +6,7 @@
 '''
 This module
 '''
-
+import csv
 import numpy as np
 from numpy import ndarray
 import matplotlib.pyplot as plt
@@ -1963,3 +1963,44 @@ class GeneNetworkModel(object):
             sols_space_M.append(solsM)
 
         return np.asarray(bif_space_M), sols_space_M
+
+    def save_model_equations(self,
+                             save_eqn_image: str,
+                             save_reduced_eqn_image: str,
+                             save_eqn_csv: str
+                             ):
+        '''
+
+        '''
+        t_s = sp.symbols('t')
+        c_change = sp.Matrix([sp.Derivative(ci, t_s) for ci in self.c_vect_s])
+        eqn_net = sp.Eq(c_change, self.dcdt_vect_s)
+
+        sp.preview(eqn_net,
+                   viewer='file',
+                   filename=save_eqn_image,
+                   euler=False,
+                   dvioptions=["-T", "tight", "-z", "0", "--truecolor", "-D 600", "-bg", "Transparent"])
+
+        # Save the equations for the graph to a file:
+        header = ['Concentrations', 'Change Vector']
+        eqns_to_write = [[sp.latex(self.c_vect_s), sp.latex(self.dcdt_vect_s)]]
+
+        if self.dcdt_vect_reduced_s is not None:
+            c_change_reduced = sp.Matrix([sp.Derivative(ci, t_s) for ci in self.c_vect_reduced_s])
+            eqn_net_reduced = sp.Eq(c_change_reduced, self.dcdt_vect_reduced_s)
+
+            sp.preview(eqn_net_reduced,
+                       viewer='file',
+                       filename=save_reduced_eqn_image,
+                       euler=False,
+                       dvioptions=["-T", "tight", "-z", "0", "--truecolor", "-D 600", "-bg", "Transparent"])
+
+            eqns_to_write.append(sp.print_latex(self.c_vect_reduced_s))
+            eqns_to_write.append(sp.print_latex(self.dcdt_vect_reduced_s))
+            header.extend(['Reduced Concentations', 'Reduced Change Vector'])
+
+        with open(save_eqn_csv, 'w', newline="") as file:
+            csvwriter = csv.writer(file)  # 2. create a csvwriter object
+            csvwriter.writerow(header)  # 4. write the header
+            csvwriter.writerows(eqns_to_write)  # 5. write the rest of the data

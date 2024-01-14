@@ -61,15 +61,20 @@ class BinodeNetAdd(LibNet):
                       ]
 
         # Generates set of 4 nicely spaced attractors:
-        self.K_vect = [0.57857143, 1.43142857, 1.14714286, 0.57857143]
-        self.d_vect = [1.0, 1.0]
-        self.n_vect = [3.0, 3.0, 3.0, 3.0]
+        self.K_vect = [0.57857143, 1.43142857, 1.14714286, 0.57857143, 0.5, 0.5]
+        self.d_vect = 1.0
+        self.n_vect = 3.0
         self.cmax = 4.0
 
-        self.K_vect_alt1 = [1.43142857, 0.57857143, 0.57857143, 1.14714286]
-        self.d_vect_alt1 = [1.0, 1.0]
-        self.n_vect_alt1 = [3.0, 3.0, 3.0, 3.0]
+        self.K_vect_alt1 = [1.43142857, 0.57857143, 0.57857143, 1.14714286, 0.5, 0.5]
+        self.d_vect_alt1 = 1.0
+        self.n_vect_alt1 = 3.0
         self.cmax_alt1 = 4.0
+
+        self.K_vect_alt2 = 0.5
+        self.d_vect_alt2 = 1.0
+        self.n_vect_alt2 = 3.0
+        self.cmax_alt2 = 4.0
 
         self.node_type_dict = {'S': NodeType.signal}
         # self.node_type_dict = None
@@ -106,18 +111,21 @@ class TrinodeNetAdd(LibNet):
 
 
         # Penta-state, well spaced in all vectors on triangle (I, I, I)
-        self.K_vect = [0.45, 0.45, 0.1 , 0.45, 0.45, 0.1]
+        self.K_vect = [0.45, 0.45, 0.1 , 0.45, 0.45, 0.1, 0.5, 0.5, 0.5]
         self.d_vect =  1.0
         self.n_vect = 3.0
         self.cmax = 4.0
 
         # Penta-state, well spaced in all vectors on triangle (I, I, I)
-        self.K_vect_alt1 = [0.45, 0.1, 0.45, 0.45, 0.45, 0.45]
+        self.K_vect_alt1 = [0.45, 0.1, 0.45, 0.45, 0.45, 0.45, 0.5, 0.5, 0.5]
         self.d_vect_alt1 =  1.0
         self.n_vect_alt1 = 3.0
         self.cmax_alt1 = 4.0
 
-
+        self.K_vect_alt2 = 0.5
+        self.d_vect_alt2 = 1.0
+        self.n_vect_alt2 = 3.0
+        self.cmax_alt2 = 4.0
 
 class PentanodeNetAdd(LibNet):
 
@@ -147,17 +155,22 @@ class PentanodeNetAdd(LibNet):
 
         self.add_interactions = True
 
-        # 11 state net -- good:
-        self.K_vect = [0.05,  0.05,  0.05,  0.05,  0.05,  0.5,  0.5,  0.5,  0.5, 0.5]
+        # 12 state net -- good:
+        self.K_vect = [0.05,  0.05,  0.5,  0.5,  0.5,  0.5,  0.5,  0.05,  0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
         self.d_vect =  1.0
         self.n_vect = 3.0
         self.cmax = 4.0
 
-        # Only 10-unique states, not a nice solution:
-        self.K_vect_alt1 = [0.5,  0.05,  0.5,  0.5,  0.5,  0.05,  0.5,  0.05,  0.5, 0.5]
+        # 11 state net -- good:
+        self.K_vect_alt1 = [0.05,  0.05,  0.05,  0.05,  0.05,  0.5,  0.5,  0.5,  0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
         self.d_vect_alt1 =  1.0
         self.n_vect_alt1 = 3.0
         self.cmax_alt1 = 4.0
+
+        self.K_vect_alt2 = 0.5
+        self.d_vect_alt2 = 1.0
+        self.n_vect_alt2 = 3.0
+        self.cmax_alt2 = 4.0
 
 class TrinodeNetLoaded(LibNet):
 
@@ -190,16 +203,21 @@ class TrinodeNetLoaded(LibNet):
         self.add_interactions = True
 
         # OK hex-state
-        self.K_vect = [0.02, 0.02, 0.02, 0.31, 0.31, 0.6 , 0.31, 0.6 , 0.6]
+        self.K_vect = [0.02, 0.02, 0.02, 0.31, 0.31, 0.6 , 0.31, 0.6 , 0.6, 0.5, 0.5, 0.5]
         self.d_vect =  1.0
         self.n_vect = 3.0
         self.cmax = 4.0
 
         # OK hex-state
-        self.K_vect_alt1 = [0.02, 0.02, 0.02, 0.31, 0.6 , 0.6 , 0.31, 0.31, 0.6]
+        self.K_vect_alt1 = [0.02, 0.02, 0.02, 0.31, 0.6 , 0.6 , 0.31, 0.31, 0.6, 0.5, 0.5, 0.5]
         self.d_vect_alt1 =  1.0
         self.n_vect_alt1 = 3.0
         self.cmax_alt1 = 6.0
+
+        self.K_vect_alt2 = 0.5
+        self.d_vect_alt2 = 1.0
+        self.n_vect_alt2 = 3.0
+        self.cmax_alt2 = 4.0
 
 
 
