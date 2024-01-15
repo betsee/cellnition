@@ -1591,15 +1591,16 @@ class GeneNetworkModel(object):
 
     def multistability_search(self,
                               N_multi: int,
-                              tol: float=1.0e-3,
+                              tol: float=1.0,
                               N_iter:int =100,
                               verbose: bool=True,
                               N_space: int=3,
-                              round_sol: int=3,
+                              N_round_sol: int=6,
+                              N_round_unique_sol: int=1,
                               Ki: float | list = 0.5,
                               ni: float | list = 3.0,
                               di: float | list = 1.0,
-                              search_tol: float = 1.0e-15,
+                              search_tol: float = 1.0e-6,
                               add_interactions: bool = True,
                               unique_sols: bool = True
                               ):
@@ -1610,8 +1611,7 @@ class GeneNetworkModel(object):
         This does not redefine any default 'edge_types' that have been assigned to the network.
 
         '''
-        # FIXME: instead of doing this randomly, use combinations with itersol permutations to explore all
-        # possible cases systematically
+
         multisols = []
         multisol_edges = []
         numsol_list = []
@@ -1621,16 +1621,20 @@ class GeneNetworkModel(object):
             self.build_analytical_model(edge_types=edge_types,
                                         add_interactions=add_interactions)
             sols_0 = self.optimized_phase_space_search(Ns=N_space,
-                                                   cmax=1.0*np.max(self.in_degree_sequence),
-                                                   round_sol=round_sol,
-                                                   Ki = Ki,
-                                                   di = di,
-                                                   ni = ni,
-                                                   tol=search_tol,
-                                                   method="Root"
-                                                  )
+                                                       cmax=1.0*np.max(self.in_degree_sequence),
+                                                       round_sol=N_round_sol,
+                                                       Ki = Ki,
+                                                       di = di,
+                                                       ni = ni,
+                                                       tol=search_tol,
+                                                       method="Root"
+                                                       )
 
-            solsM = self.find_attractor_sols(sols_0, unique_sols=unique_sols, verbose=False)
+            solsM = self.find_attractor_sols(sols_0,
+                                             tol=tol,
+                                             unique_sols=unique_sols,
+                                             verbose=False,
+                                             N_round=N_round_unique_sol)
 
             if len(solsM):
                 num_sols = solsM.shape[1]
@@ -1746,11 +1750,12 @@ class GeneNetworkModel(object):
 
     def find_attractor_sols(self,
                             sols_0: list|ndarray,
-                            tol: float=1.0e-3,
+                            tol: float=1.0,
                             verbose: bool=True,
                             N_round: int = 12,
                             unique_sols: bool = False,
-                            sol_round: int = 1
+                            sol_round: int = 1,
+                            save_file: str|None = None
                             ):
         '''
 
@@ -1759,6 +1764,8 @@ class GeneNetworkModel(object):
         sol_char_0 = self.stability_estimate(sols_0)
 
         solsM = []
+        sol_char_list = []
+        sol_char_error = []
         i = 0
         for sol_dic in sol_char_0:
             error = np.sum(sol_dic['Change at Minima'])**2
@@ -1767,22 +1774,35 @@ class GeneNetworkModel(object):
 
             if char != 'Saddle Point' and error <= tol:
                 i += 1
-                if verbose:
+                if verbose and unique_sols is False:
                     print(f'Soln {i}, {char}, {sols}, {np.round(error, N_round)}')
                 solsM.append(sols)
+                sol_char_list.append(char)
+                sol_char_error.append(error)
 
-        solsM = np.asarray(solsM).T
+        solsM_return = np.asarray(solsM).T
 
         if unique_sols and len(solsM) != 0:
-            solsy = np.unique(np.round(solsM, sol_round), axis=1)  # round the sols to avoid degenerates
+            # round the sols to avoid degenerates and return indices to the unique solutions:
+            solsy, inds_solsy = np.unique(np.round(solsM, sol_round), axis=0, return_index=True)
             if verbose:
-                print('-----')
-                print(solsy.T)
-                print('----')
-        else:
-            solsy = solsM
+                for i, si in enumerate(inds_solsy):
+                    print(f'Soln {i}: {sol_char_list[si]}, {solsM[si]}, error: {sol_char_error[si]}')
 
-        return solsy
+            solsM_return = np.asarray(solsM)[inds_solsy].T
+
+        if save_file is not None:
+            solsMi = np.asarray(solsM)
+            header = [f'State {i}' for i in range(solsMi.shape[0])]
+            with open(save_file, 'w', newline="") as file:
+                csvwriter = csv.writer(file)  # create a csvwriter object
+                csvwriter.writerow(header)  # write the header
+                csvwriter.writerow(sol_char_error)  # write the root error at steady-state
+                csvwriter.writerow(sol_char_list)  # write the attractor characterization
+                for si in solsMi.T:
+                    csvwriter.writerow(si)  # write the soln data rows for each gene
+
+        return solsM_return
 
 
     def find_state_match(self, solsM: ndarray, cvecti: list|ndarray):
@@ -1809,8 +1829,9 @@ class GeneNetworkModel(object):
                                   sigtstart: float=33.0,
                                   sigtend: float=66.0,
                                   sigmax: float=2.0,
-                                  delt_before: float=1.0,
+                                  delta_window: float=1.0,
                                   verbose: bool=True
+
                                   ):
         '''
 
@@ -1847,26 +1868,26 @@ class GeneNetworkModel(object):
                                                       sig_mags,
                                                       dt_samp=0.15)
 
-                it_30low = (tvect <= sigtstart - delt_before).nonzero()[0]
-                it_30high = (tvect >= sigtstart -2*delt_before).nonzero()[0]
+                it_30low = (tvect <= sigtstart - delta_window).nonzero()[0]
+                it_30high = (tvect >= sigtstart -2*delta_window).nonzero()[0]
                 it_30 = np.intersect1d(it_30low, it_30high)[0]
 
                 concs_before = concs_time[it_30, :]
                 concs_after = concs_time[-1, :]
 
                 if stateio == 0 and si == 0:  # If we're on the zeros vector we've transitioned from {0} to some new state:
-                    statejo, _ = self.find_state_match(solsM, concs_before)
-                    G_states.add_edge(0, statejo + 1, transition=-1)
+                    statejo, _ = self.find_state_match(solsM_with0, concs_before)
+                    G_states.add_edge(0, statejo, transition=-1)
                     if verbose:
-                        print(f'From state 0 spontaneously to state {statejo + 1}')
+                        print(f'From state 0 spontaneously to state {statejo}')
 
-                statei, _ = self.find_state_match(solsM, concs_before)
-                statej, _ = self.find_state_match(solsM, concs_after)
+                statei, _ = self.find_state_match(solsM_with0, concs_before)
+                statej, _ = self.find_state_match(solsM_with0, concs_after)
 
-                G_states.add_edge(statei + 1, statej + 1, transition=si)
+                G_states.add_edge(statei, statej, transition=si)
 
                 if verbose:
-                    print(f'From state {statei + 1} with signal {si} to state {statej + 1}')
+                    print(f'From state {statei} with signal {si} to state {statej}')
 
                 # stateM[statei, statej] = 1
         return G_states
@@ -1925,7 +1946,7 @@ class GeneNetworkModel(object):
         G.draw(save_graph_net)
 
 
-    def plot_microarray_sols(self, solsM: ndarray, figsave: str|None = None, cmap: str|None =None):
+    def plot_sols_array(self, solsM: ndarray, figsave: str | None = None, cmap: str | None =None):
         '''
 
         '''
@@ -1948,6 +1969,44 @@ class GeneNetworkModel(object):
             plt.savefig(figsave, dpi=300, transparent=True, format='png')
 
         return fig, ax
+
+    def plot_knockout_arrays(self, knockout_sol_set: list|ndarray, figsave: str=None):
+        '''
+        Plot all steady-state solution arrays in a knockout experiment solution set.
+
+        '''
+
+        # let's plot this as a multidimensional set of master arrays:
+        knock_flat = []
+        for kmat in knockout_sol_set:
+            for ki in kmat:
+                knock_flat.extend(ki)
+
+        vmax = np.max(knock_flat)
+        vmin = np.min(knock_flat)
+
+        cmap = 'magma'
+
+        N_axis = len(knockout_sol_set)
+
+        fig, axes = plt.subplots(1, N_axis, sharey=True, sharex=True)
+
+        for i, (axi, solsMio) in enumerate(zip(axes, knockout_sol_set)):
+            if len(solsMio):
+                solsMi = solsMio
+            else:
+                solsMi = np.asarray([np.zeros(self.N_nodes)]).T
+            axi.imshow(solsMi, aspect="equal", vmax=vmax, vmin=vmin, cmap=cmap)
+            axi.axis('off')
+            if i != 0:
+                axi.set_title(f'c{i - 1}')
+            else:
+                axi.set_title(f'Full')
+
+        if figsave is not None:
+            plt.savefig(figsave, dpi=300, transparent=True, format='png')
+
+        return fig, axes
 
     def plot_M_sols(self,
                     solsM: ndarray,
@@ -1988,7 +2047,7 @@ class GeneNetworkModel(object):
                            sol_round: int = 1,
                            N_search: int = 3,
                            search_round_sol: int=6,
-                           tol: float=1.0e-3,
+                           tol: float=1.0e-2,
                            cmax_multi: float=2.0,
                            verbose: bool=True,
                            hold_d_const: bool=True,
@@ -2105,3 +2164,236 @@ class GeneNetworkModel(object):
             csvwriter = csv.writer(file)  # 2. create a csvwriter object
             csvwriter.writerow(header)  # 4. write the header
             csvwriter.writerows(eqns_to_write)  # 5. write the rest of the data
+
+
+    def gene_knockout_experiment(self,
+                                 Ns: int=3,
+                                 cmin: float=0.0,
+                                 cmax: float=1.0,
+                                 Ki: float | list = 0.5,
+                                 ni: float | list = 3.0,
+                                 ri: float | list = 1.0,
+                                 di: float | list = 1.0,
+                                 tol:float = 1.0e-15,
+                                 round_sol: int=6,
+                                 round_unique_sol: int=2,
+                                 unique_sols: bool=True,
+                                 sol_tol: float = 1.0e-2,
+                                 verbose: bool = True,
+                                 save_file_basename: str | None = None
+                                 ):
+        '''
+        Performs a knockout of all genes in the network, computing all possible steady-state
+        solutions for the resulting knockout. This is different from the transition matrix,
+        as the knockouts aren't a temporary perturbation, but a long-term silencing.
+
+        '''
+
+
+        if self.dcdt_vect_s is None:
+            raise Exception("Must use the method build_analytical_model to generate attributes"
+                            "to use this function.")
+
+        knockout_sol_set = []
+        knockout_dcdt_s_set = []
+        knockout_dcdt_f_set = []
+
+        if save_file_basename is not None:
+            save_file_list = [f'{save_file_basename}_allc.csv']
+            save_file_list.extend([f'{save_file_basename}_ko_c{i}.csv' for i in range(self.N_nodes)])
+
+        else:
+            save_file_list = [None]
+            save_file_list.extend([None for i in range(self.N_nodes)])
+
+        # Create parameter vectors for the model:
+        self.create_parameter_vects(Ki, ni, ri, di)
+
+        # Determine the set of additional arguments to the optimization function:
+        if self._include_process is False:
+            function_args = (self.r_vect, self.d_vect, self.K_vect, self.n_vect)
+        else:
+            function_args = (self.r_vect, self.d_vect, self.K_vect, self.n_vect,
+                             self.process_params_f)
+
+        # Solve the system with all concentrations:
+        sols_0 = self.optimized_phase_space_search(Ns=Ns,
+                                                   cmax=cmax,
+                                                   round_sol=6,
+                                                   Ki=self.K_vect,
+                                                   di=self.d_vect,
+                                                   ni=self.n_vect,
+                                                   tol=tol,
+                                                   method="Root"
+                                                   )
+
+        # Screen only for attractor solutions:
+        solsM = self.find_attractor_sols(sols_0,
+                                         tol=sol_tol,
+                                         verbose=verbose,
+                                         unique_sols=unique_sols,
+                                         sol_round=round_unique_sol,
+                                         save_file=save_file_list[0])
+
+        if verbose:
+            print(f'-------------------')
+
+
+        knockout_sol_set.append(solsM.copy())
+
+        for i, c_ko_s in enumerate(self.c_vect_s): # Step through each concentration
+
+            # Define a new change vector by substituting in the knockout value for the gene (c=0) and
+            # clamping the gene at that level by setting its change rate to zero:
+            dcdt_vect_ko_s = self.dcdt_vect_s.subs(c_ko_s, 0)
+            dcdt_vect_ko_s[i] = 0
+
+            # FIXME: We need to define a new concentration vector to solve for that doesn't have the
+            # knockout concentration present. That's because we need to have it always be zero, if this isn't
+            # done the solver can set it arbitrarily....
+
+            knockout_dcdt_s_set.append(dcdt_vect_ko_s) # Store for later
+
+            if self._include_process is False:
+                lambda_params = [self.c_vect_s,
+                                 self.r_vect_s,
+                                 self.d_vect_s,
+                                 self.K_vect_s,
+                                 self.n_vect_s,
+                                 ]
+
+            else:
+                lambda_params = [self.c_vect_s,
+                                 self.r_vect_s,
+                                 self.d_vect_s,
+                                 self.K_vect_s,
+                                 self.n_vect_s,
+                                 self.process_params_s
+                                 ]
+
+            flatten_f = np.asarray([fs for fs in dcdt_vect_ko_s])
+            dcdt_vect_ko_f = sp.lambdify(lambda_params, flatten_f)
+
+            knockout_dcdt_f_set.append(dcdt_vect_ko_f) # store for later use
+
+            # Generate the points in state space to sample at:
+            c_test_set, _, _ = self._generate_state_space(self.c_vect_s,
+                                                       Ns=Ns,
+                                                       cmin=cmin,
+                                                       cmax=cmax,
+                                                       include_signals=True)
+
+            # Initialize the equillibrium point solutions to be a set:
+            mins_found = []
+
+            for c_vecti in c_test_set:
+
+                sol_root = fsolve(dcdt_vect_ko_f, c_vecti, args=function_args, xtol=tol)
+
+                if self._include_process is False:  # If we're not using the process, constrain all concs to be above zero
+                    if (np.all(np.asarray(sol_root) >= 0.0)):
+                        mins_found.append(sol_root)
+                else:
+                    # get the nodes that must be constrained above zero:
+                    conc_nodes = np.setdiff1d(self.nodes_index, self._process_i)
+                    # Then, only the nodes that are gene products must be above zero
+                    if (np.all(np.asarray(sol_root)[conc_nodes] >= 0.0)):
+                        mins_found.append(sol_root)
+
+                mins_found = np.round(mins_found, round_sol)
+                mins_found = np.unique(mins_found, axis=0).tolist()
+
+            if verbose:
+                print(f'Steady-state solutions for {self.c_vect_s[i].name} knockout:')
+
+            # Screen only for attractor solutions:
+            solsM = self.find_attractor_sols(mins_found,
+                                             tol=sol_tol,
+                                             verbose=verbose,
+                                             unique_sols=unique_sols,
+                                             sol_round=round_unique_sol,
+                                             save_file=save_file_list[i + 1])
+
+            if verbose:
+                print(f'-------------------')
+
+            knockout_sol_set.append(solsM.copy())
+
+        return knockout_sol_set, knockout_dcdt_s_set, knockout_dcdt_f_set
+
+    def gene_knockout_solve(self, verbose: bool = True):
+        '''
+        Performs a knockout of all genes in the network, attempting to analytically solve for the
+        resulting knockout change vector at steady-state.
+
+        '''
+
+        knockout_dcdt_reduced_s_set = []
+        knockout_c_reduced_s_set = []
+        knockout_sol_s_set = [] # for full analytical solution equations
+
+        if self.dcdt_vect_s is None:
+            raise Exception("Must use the method build_analytical_model to generate attributes"
+                            "to use this function.")
+
+        for i, c_ko_s in enumerate(self.c_vect_s): # Step through each concentration
+
+            # Define a new change vector by substituting in the knockout value for the gene (c=0) and
+            # clamping the gene at that level by setting its change rate to zero:
+            dcdt_vect_ko_s = self.dcdt_vect_s.subs(c_ko_s, 0)
+            dcdt_vect_ko_s[i] = 0
+
+            nosol = False
+
+            try:
+                sol_csetoo = sp.nonlinsolve(dcdt_vect_ko_s, self.c_vect_s)
+                # Clean up the sympy container for the solutions:
+                sol_cseto = list(list(sol_csetoo)[0])
+
+                if len(sol_cseto):
+
+                    c_master_i = []  # the indices of concentrations involved in the master equations (the reduced dims)
+                    sol_cset = {}  # A dictionary of auxillary solutions (plug and play)
+                    for i, c_eq in enumerate(sol_cseto):
+                        if c_eq in self.c_vect_s:  # If it's a non-solution for the term, append it as a non-reduced conc.
+                            c_master_i.append(self.c_vect_s.index(c_eq))
+                        else:  # Otherwise append the plug-and-play solution set:
+                            sol_cset[self.c_vect_s[i]] = c_eq
+
+                    sol_eqn_vect = []
+                    for ci, eqi in sol_cset.items():
+                        sol_eqn = sp.Eq(ci, eqi)
+                        sol_eqn_vect.append(sol_eqn)
+
+                    knockout_sol_s_set.append(sol_eqn_vect) # append the expressions for the system solution
+
+                    master_eq_list = []  # master equations to be numerically optimized (reduced dimension network equations)
+                    c_vect_reduced = []  # concentrations involved in the master equations
+
+                    if len(c_master_i):
+                        for ii in c_master_i:
+                            # substitute in the expressions in terms of master concentrations to form the master equations:
+                            ci_solve_eq = dcdt_vect_ko_s[ii].subs([(k, v) for k, v in sol_cset.items()])
+                            master_eq_list.append(ci_solve_eq)
+                            c_vect_reduced.append(self.c_vect_s[ii])
+
+                    else:  # if there's nothing in c_master_i but there are solutions in sol_cseto, then it's been fully solved:
+                        if verbose:
+                            print("Solution solved analytically!")
+
+                    knockout_dcdt_reduced_s_set.append([])
+                    knockout_c_reduced_s_set.append([])
+
+                else:
+                    nosol = True
+
+            except:
+                nosol = True
+
+            if nosol:
+                knockout_dcdt_reduced_s_set.append(dcdt_vect_ko_s)
+                knockout_c_reduced_s_set.append(self.c_vect_s)
+
+        return knockout_sol_s_set, knockout_dcdt_reduced_s_set, knockout_c_reduced_s_set
+
+

@@ -95,8 +95,13 @@ class NetworkWorkflow(object):
                    di: float|list = 1.0,
                    add_interactions: bool = True,
                    edge_type_search: bool = True,
-                   N_search: int = 5,
-                   find_solutions: bool = True
+                   N_edge_search: int = 5,
+                   find_solutions: bool = True,
+                   knockout_experiments: bool = True,
+                   sol_search_tol: float = 1.0e-6,
+                   N_round_sol: int = 6,
+                   N_round_unique_sol: int = 1,
+                   sol_unique_tol: float = 1.0
                    ):
         '''
         A single frame of the workflow
@@ -119,11 +124,12 @@ class NetworkWorkflow(object):
 
         else:
             numsols, multisols = gmod.multistability_search(1,
-                                                   tol=1.0e-3,
-                                                   N_iter=N_search,
-                                                   verbose=False,
-                                                   add_interactions=add_interactions,
-                                                   unique_sols=True)
+                                                            tol=sol_unique_tol,
+                                                            N_iter=N_edge_search,
+                                                            verbose=False,
+                                                            add_interactions=add_interactions,
+                                                            N_round_unique_sol=N_round_unique_sol,
+                                                            unique_sols=True)
 
             i_max = (np.asarray(numsols) == np.max(numsols)).nonzero()[0]
 
@@ -190,13 +196,12 @@ class NetworkWorkflow(object):
             rev_font_color=True
            )
 
-        plt.figure()
         # Plot and save the degree distribution for this graph:
         graph_deg = f'{fname_base}_degree_sequence.png'
         save_graph_deg = os.path.join(save_path, graph_deg)
         fig, ax = gmod.plot_degree_distributions()
         fig.savefig(save_graph_deg, dpi=300, transparent=True, format='png')
-        plt.close()
+        plt.close(fig)
 
         if find_solutions:
 
@@ -209,15 +214,22 @@ class NetworkWorkflow(object):
 
             sols_0 = gmod.optimized_phase_space_search(Ns=2,
                                                cmax=cmax,
-                                               round_sol=3,
+                                               round_sol=N_round_sol,
                                                Ki = gmod.K_vect,
                                                di = gmod.d_vect,
                                                ni = gmod.n_vect,
-                                               tol=1.0e-15,
+                                               tol=sol_search_tol,
                                                method="Root"
                                               )
 
-            solsM = gmod.find_attractor_sols(sols_0, tol=1.0e-3, verbose=False, unique_sols=True)
+            soln_fn = f'{fname_base}_soln_dat.csv'
+            save_solns = os.path.join(save_path, soln_fn)
+            solsM = gmod.find_attractor_sols(sols_0,
+                                             tol=sol_unique_tol,
+                                             N_round=N_round_unique_sol,
+                                             verbose=False,
+                                             unique_sols=True,
+                                             save_file=save_solns)
 
             if len(solsM):
                 num_sols = solsM.shape[1]
@@ -227,9 +239,42 @@ class NetworkWorkflow(object):
             fign = f'{fname_base}_solArray.png'
             figsave = os.path.join(save_path, fign)
 
-            plt.figure()
-            fig, ax = gmod.plot_microarray_sols(solsM, figsave)
-            plt.close()
+            fig, ax = gmod.plot_sols_array(solsM, figsave)
+            plt.close(fig)
+
+            # Perform knockout experiments:
+            dat_knockout_save = os.path.join(save_path, f'f{fname_base}_knockout')
+
+            if add_interactions is True:
+                cmax = 1.5 * np.max(gmod.in_degree_sequence)
+            else:
+                cmax = (1 / np.max(np.asarray(gmod.d_vect)))
+
+            if knockout_experiments:
+                knockout_sol_set, _, _ = gmod.gene_knockout_experiment(Ns=3,
+                                                                       cmin=0.0,
+                                                                       cmax=cmax,
+                                                                       Ki=0.5,
+                                                                       ni=3.0,
+                                                                       ri=1.0,
+                                                                       di=1.0,
+                                                                       tol=sol_search_tol,
+                                                                       round_sol=N_round_sol,
+                                                                       round_unique_sol=N_round_unique_sol,
+                                                                       verbose=False,
+                                                                       unique_sols=True,
+                                                                       sol_tol=1.0,
+                                                                       save_file_basename=dat_knockout_save
+                                                                       )
+
+                ko_file = f'{fname_base}_KO_Arrays.png'
+                save_ko = os.path.join(save_path, ko_file)
+                fig, ax = gmod.plot_knockout_arrays(knockout_sol_set, figsave=save_ko)
+                plt.close(fig)
+
+
+
+
         else:
             num_sols = 0
 
@@ -249,6 +294,7 @@ class NetworkWorkflow(object):
         if verbose is True:
             print(f'{update_string} Nsols: {num_sols}')
 
+
         return graph_data
 
     def write_network_data_file(self, dat_frame_list: list[dict], save_path: str):
@@ -256,10 +302,10 @@ class NetworkWorkflow(object):
 
         '''
 
-        networks_data_file = os.path.join(save_path, 'networks_data_file.csv')
+        # networks_data_file = os.path.join(save_path, 'networks_data_file.csv')
 
         # Open a file in write mode.
-        with open(networks_data_file, 'w') as f:
+        with open(save_path, 'w') as f:
             # Write all the dictionary keys in a file with commas separated.
             f.write(','.join(dat_frame_list[0].keys()))
             f.write('\n')  # Add a new line
@@ -350,6 +396,28 @@ class NetworkWorkflow(object):
             gmod.set_edge_types(edge_types, add_interactions=add_interactions)
 
         return gmod
+
+    # gmod_list = []
+    # for i, graph_file in enumerate(graph_files_list):
+    #     print(i)
+    #     read_gfile = os.path.join(read_path, graph_file)
+    #     gmod = sim.read_network(read_gfile, add_interactions = True, build_analytical=True)
+
+    #     # What we want to see is: can the model be reduced?
+    #     gmod.reduce_model_dimensions()
+
+    #     eqn_render = f'f{graph_file[0:-4]}_Eqn.png'
+    #     save_eqn_render = os.path.join(save_path, eqn_render)
+
+    #     eqn_renderr = f'f{graph_file[0:-4]}_Eqnr.png'
+    #     save_eqn_renderr = os.path.join(save_path, eqn_renderr)
+
+    #     eqn_net_file = f'{graph_file[0:-4]}_Eqns.csv'
+    #     save_eqn_net = os.path.join(save_path, eqn_net_file)
+
+    #     gmod.save_model_equations(save_eqn_render, save_eqn_renderr, save_eqn_net)
+
+    #     gmod_list.append(gmod)
 
 
 
