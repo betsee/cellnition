@@ -168,6 +168,15 @@ class GeneNetworkModel(object):
         self.graph_cycles = sorted(nx.simple_cycles(self.GG))
         self.N_cycles = len(self.graph_cycles)
 
+        # Determine the nodes in the cycles:
+        nodes_in_cycles = set()
+        for nde_lst in self.graph_cycles:
+            for nde_i in nde_lst:
+                nodes_in_cycles.add(nde_i)
+
+        self.nodes_in_cycles = list(nodes_in_cycles)
+        self.nodes_acyclic = np.setdiff1d(self.nodes_index, nodes_in_cycles)
+
         # Graph structure characterization (from the amazing paper of Moutsinas, G. et al. Scientific Reports 11 (2021))
         a_out = list(self.GG.adjacency())
 
@@ -1124,25 +1133,25 @@ class GeneNetworkModel(object):
         '''
         nx.write_gml(self.GG, filename)
 
-    def read_network(self, filename: str):
-        '''
-        Read a network, including edge types, from a saved file.
-
-        '''
-        self.GG = nx.read_gml(filename, label=None)
-        self.nodes_list = sorted(self.GG.nodes())
-        self.N_nodes = len(self.nodes_list)
-
-        self.read_edge_info_from_graph()
-        self.read_node_info_from_graph()
-
-        self.N_edges = len(self.edges_list)
-
-        # Create numerical indices for the network:
-        self._make_node_edge_indices()
-
-        # Calculate key characteristics of the graph:
-        self.characterize_graph()
+    # def read_network(self, filename: str):
+    #     '''
+    #     Read a network, including edge types, from a saved file.
+    #
+    #     '''
+    #     self.GG = nx.read_gml(filename, label=None)
+    #     self.nodes_list = sorted(self.GG.nodes())
+    #     self.N_nodes = len(self.nodes_list)
+    #
+    #     self.read_edge_info_from_graph()
+    #     self.read_node_info_from_graph()
+    #
+    #     self.N_edges = len(self.edges_list)
+    #
+    #     # Create numerical indices for the network:
+    #     self._make_node_edge_indices()
+    #
+    #     # Calculate key characteristics of the graph:
+    #     self.characterize_graph()
 
     def save_network_image(self, save_filename: str, use_dot_layout: bool=False):
         '''
@@ -1605,6 +1614,7 @@ class GeneNetworkModel(object):
         # possible cases systematically
         multisols = []
         multisol_edges = []
+        numsol_list = []
 
         for i in range(N_iter):
             edge_types = self.get_edge_types(p_acti=0.5)
@@ -1633,9 +1643,10 @@ class GeneNetworkModel(object):
                     if verbose:
                         print(f'Found solution with {num_sols} states on iteration {i}')
                     multisols.append([sols_0, edge_types])
+                    numsol_list.append(num_sols)
                     multisol_edges.append(edge_types_l)
 
-        return multisols
+        return numsol_list, multisols
 
     def pulses(self,
                tvect: list|ndarray,
@@ -1932,6 +1943,33 @@ class GeneNetworkModel(object):
         plt.setp(ax.get_xticklabels(), rotation=45, ha="right",
                  rotation_mode="anchor")
         fig.colorbar(im, label='Expression Level')
+
+        if figsave is not None:
+            plt.savefig(figsave, dpi=300, transparent=True, format='png')
+
+        return fig, ax
+
+    def plot_M_sols(self,
+                    solsM: ndarray,
+                    gene_labels: list|ndarray,
+                    figsave: str|None = None,
+                    cmap: str|None =None,
+                    cbar_label: str=''):
+        '''
+        Plot a correlation or adjacency matrix for a subset of genes.
+
+        '''
+
+        if cmap is None:
+            cmap = 'magma'
+
+        fig, ax = plt.subplots()
+        im = ax.imshow(solsM, cmap=cmap)
+        ax.set_xticks(np.arange(len(gene_labels)), labels=gene_labels)
+        ax.set_yticks(np.arange(len(gene_labels)), labels=gene_labels)
+        plt.setp(ax.get_xticklabels(), rotation=45, ha="right",
+                 rotation_mode="anchor")
+        fig.colorbar(im, label=cbar_label)
 
         if figsave is not None:
             plt.savefig(figsave, dpi=300, transparent=True, format='png')
