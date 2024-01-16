@@ -32,9 +32,32 @@ and thus expected by external automation.
 
 # ....................{ IMPORTS                            }....................
 from beartype.claw import beartype_this_package
+from warnings import filterwarnings
 
 # Enforce type hints across this package with @beartype.
 beartype_this_package()
+
+# Unconditionall ignore all non-fatal warnings emitted by the
+# scipy.optimize.fsolve() function of the forms:
+#     ../conda/envs/ionyou_dev/lib/python3.11/site-packages/scipy/optimize/_minpack_py.py:177:
+#     RuntimeWarning: The iteration is not making good progress, as measured by the
+#     improvement from the last five Jacobian evaluations.
+#     warnings.warn(msg, RuntimeWarning)
+#
+#     ../py/conda/envs/ionyou_dev/lib/python3.11/site-packages/scipy/optimize/_minpack_py.py:177:
+#     RuntimeWarning: xtol=0.000000 is too small, no further improvement in the approximate
+#     solution is possible.
+#     warnings.warn(msg, RuntimeWarning)
+filterwarnings(
+    action='ignore',
+    category=RuntimeWarning,
+    message='The iteration is not making good progress',
+)
+filterwarnings(
+    action='ignore',
+    category=RuntimeWarning,
+    message='xtol=0.000000 is too small',
+)
 
 # ....................{ GLOBALS                            }....................
 # Declare PEP 8-compliant version constants expected by external automation.

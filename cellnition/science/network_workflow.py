@@ -99,9 +99,11 @@ class NetworkWorkflow(object):
                    find_solutions: bool = True,
                    knockout_experiments: bool = True,
                    sol_search_tol: float = 1.0e-6,
+                   N_search_space: int = 3,
                    N_round_sol: int = 6,
                    N_round_unique_sol: int = 1,
-                   sol_unique_tol: float = 1.0
+                   sol_unique_tol: float = 1.0e-1,
+                   sol_ko_tol: float = 1.0
                    ):
         '''
         A single frame of the workflow
@@ -151,29 +153,30 @@ class NetworkWorkflow(object):
         else: # otherwise assign it to zero
             N_reduced_dims = 0
 
-        eqn_render = f'f{fname_base}_Eqn.png'
+        eqn_render = f'Eqn_{fname_base}.png'
         save_eqn_render = os.path.join(save_path, eqn_render)
 
-        eqn_renderr = f'f{fname_base}_Eqnr.png'
+        eqn_renderr = f'Eqnr_{fname_base}.png'
         save_eqn_renderr = os.path.join(save_path, eqn_renderr)
 
-        eqn_net_file = f'{fname_base}_Eqns.csv'
+        eqn_net_file = f'Eqns_{fname_base}.csv'
         save_eqn_net = os.path.join(save_path, eqn_net_file)
 
         gmod.save_model_equations(save_eqn_render, save_eqn_renderr, save_eqn_net)
 
         # save the randomly generated network as a text file:
-        gfile = f'{fname_base}_network.gml'
+        gfile = f'network_{fname_base}.gml'
         save_gfile = os.path.join(save_path, gfile)
         gmod.save_network(save_gfile)
 
-        # Save the network image:
-        graph_net = f'{fname_base}_hier.png'
+        # Save the network images:
+        graph_net = f'hier_graph_{fname_base}.png'
         save_graph_net = os.path.join(save_path, graph_net)
 
-        graph_net_c = f'{fname_base}_circ.png'
+        graph_net_c = f'circ_graph_{fname_base}.png'
         save_graph_net_circo = os.path.join(save_path, graph_net_c)
 
+        # Highlight the hierarchical nature of the graph and info flow:
         gp=plot_network(gmod.nodes_list,
                     gmod.edges_list,
                     gmod.node_types,
@@ -185,11 +188,15 @@ class NetworkWorkflow(object):
                     rev_font_color=True
                    )
 
+        # Highlight the existance of a "core" graph:
+        cycle_tags = np.zeros(gmod.N_nodes)
+        cycle_tags[gmod.nodes_in_cycles] = 1.0
+
         gp=plot_network(gmod.nodes_list,
             gmod.edges_list,
             gmod.node_types,
             gmod.edge_types,
-            node_vals = gmod.hier_node_level,
+            node_vals = cycle_tags,
             val_cmap = 'Greys_r',
             save_path=save_graph_net_circo,
             layout='circo',
@@ -197,7 +204,7 @@ class NetworkWorkflow(object):
            )
 
         # Plot and save the degree distribution for this graph:
-        graph_deg = f'{fname_base}_degree_sequence.png'
+        graph_deg = f'degseq_{fname_base}.png'
         save_graph_deg = os.path.join(save_path, graph_deg)
         fig, ax = gmod.plot_degree_distributions()
         fig.savefig(save_graph_deg, dpi=300, transparent=True, format='png')
@@ -212,7 +219,7 @@ class NetworkWorkflow(object):
             else:
                 cmax = (1/np.max(np.asarray(gmod.d_vect)))
 
-            sols_0 = gmod.optimized_phase_space_search(Ns=2,
+            sols_0 = gmod.optimized_phase_space_search(Ns=N_search_space,
                                                cmax=cmax,
                                                round_sol=N_round_sol,
                                                Ki = gmod.K_vect,
@@ -222,7 +229,7 @@ class NetworkWorkflow(object):
                                                method="Root"
                                               )
 
-            soln_fn = f'{fname_base}_soln_dat.csv'
+            soln_fn = f'soldat_{fname_base}.csv'
             save_solns = os.path.join(save_path, soln_fn)
             solsM = gmod.find_attractor_sols(sols_0,
                                              tol=sol_unique_tol,
@@ -236,22 +243,20 @@ class NetworkWorkflow(object):
             else:
                 num_sols = 0
 
-            fign = f'{fname_base}_solArray.png'
+            fign = f'solArray_{fname_base}.png'
             figsave = os.path.join(save_path, fign)
 
             fig, ax = gmod.plot_sols_array(solsM, figsave)
             plt.close(fig)
 
             # Perform knockout experiments:
-            dat_knockout_save = os.path.join(save_path, f'f{fname_base}_knockout')
-
             if add_interactions is True:
                 cmax = 1.5 * np.max(gmod.in_degree_sequence)
             else:
-                cmax = (1 / np.max(np.asarray(gmod.d_vect)))
+                cmax = 1.5*(1 / np.max(np.asarray(gmod.d_vect)))
 
             if knockout_experiments:
-                knockout_sol_set, _, _ = gmod.gene_knockout_experiment(Ns=3,
+                knockout_sol_set, knockout_matrix = gmod.gene_knockout_experiment(Ns=N_search_space,
                                                                        cmin=0.0,
                                                                        cmax=cmax,
                                                                        Ki=0.5,
@@ -263,22 +268,26 @@ class NetworkWorkflow(object):
                                                                        round_unique_sol=N_round_unique_sol,
                                                                        verbose=False,
                                                                        unique_sols=True,
-                                                                       sol_tol=1.0,
-                                                                       save_file_basename=dat_knockout_save
+                                                                       sol_tol=sol_ko_tol,
+                                                                       save_file_basename=None
                                                                        )
 
-                ko_file = f'{fname_base}_KO_Arrays.png'
+                ko_file = f'knockoutArrays{fname_base}.png'
                 save_ko = os.path.join(save_path, ko_file)
                 fig, ax = gmod.plot_knockout_arrays(knockout_sol_set, figsave=save_ko)
                 plt.close(fig)
 
-
-
+                # save the knockout data to a file:
+                dat_knockout_save = os.path.join(save_path, f'knockoutData_f{fname_base}.csv')
+                np.savetxt(dat_knockout_save, knockout_matrix, delimiter=',')
 
         else:
             num_sols = 0
 
-        graph_data = {'Beta': bi, # this only applies for scale-free graphs
+        graph_data = {'Index': i_frame,
+                      'Base File': fname_base,
+                      'Alpha': 1.0 - bi - gi,
+                      'Beta': bi, # this only applies for scale-free graphs
                       'Gamma': gi,
                       'Edge p': p_edge, # this only applies for binomial graphs
                       'N Cycles': gmod.N_cycles,
@@ -293,7 +302,6 @@ class NetworkWorkflow(object):
 
         if verbose is True:
             print(f'{update_string} Nsols: {num_sols}')
-
 
         return graph_data
 
