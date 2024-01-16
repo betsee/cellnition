@@ -197,10 +197,10 @@ class NetworkWorkflow(object):
             gmod.node_types,
             gmod.edge_types,
             node_vals = cycle_tags,
-            val_cmap = 'Greys_r',
+            val_cmap = 'Blues',
             save_path=save_graph_net_circo,
             layout='circo',
-            rev_font_color=True
+            rev_font_color=False
            )
 
         # Plot and save the degree distribution for this graph:
