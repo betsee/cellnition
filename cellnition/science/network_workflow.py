@@ -38,7 +38,7 @@ class NetworkWorkflow(object):
         '''
         self._save_path = save_path
 
-    def scalefree_graph_gen(self, N_nodes: int, bi: float, gi: float, i: int):
+    def scalefree_graph_gen(self, N_nodes: int, bi: float, gi: float, delta_in: float, delta_out: float, i: int):
         '''
 
         '''
@@ -49,17 +49,18 @@ class NetworkWorkflow(object):
                                 edges=None,
                                 beta=bi,
                                 gamma=gi,
-                                delta=0.0)
+                                delta_in=delta_in,
+                                delta_out=delta_out)
 
 
         dem_coeff = np.round(gmod.dem_coeff, 1)
         incoh = np.round(gmod.hier_incoherence, 1)
         fname_base = f'{i}_sf{N_nodes}_b{bi}_g{gi}_Ncycles{gmod.N_cycles}_dem{dem_coeff}_incoh{incoh}'
 
-        update_string = (f'{i}: params {ai, bi, gi}, '
+        update_string = (f'{i}: params {np.round(ai,2), bi, gi, delta_in, delta_out}, '
                          f'cycles: {gmod.N_cycles}, '
                          f'dem_coeff: {dem_coeff}, '
-                         f'incoherence: {incoh}')
+                         f'incoh.: {incoh}')
 
         return gmod, update_string, fname_base
 
@@ -85,6 +86,8 @@ class NetworkWorkflow(object):
                    save_path: str,
                    bi: float=0.7,
                    gi: float=0.2,
+                   delta_in: float=0.0,
+                   delta_out: float=0.0,
                    p_edge: float = 0.1,
                    i_frame: int=0,
                    verbose: bool=True,
@@ -111,7 +114,7 @@ class NetworkWorkflow(object):
 
         if graph_type is GraphType.scale_free:
             # generate a graph for this frame
-            gmod, update_string, fname_base = self.scalefree_graph_gen(N_nodes, bi, gi, i_frame)
+            gmod, update_string, fname_base = self.scalefree_graph_gen(N_nodes, bi, gi, delta_in, delta_out, i_frame)
 
         else: # generate a random (a.k.a binomial) graph
             gmod, update_string, fname_base = self.binomial_graph_gen(N_nodes, p_edge, i_frame)
@@ -119,6 +122,10 @@ class NetworkWorkflow(object):
         if verbose is True:
             print(f'Iteration {i_frame}...')
             # print(update_string)
+
+        # set node types to the network:
+        gmod.node_types = [NodeType.gene for i in gmod.nodes_index]  # First set all nodes
+        gmod.set_node_types(gmod.node_types)
 
         if edge_type_search is False:
             # Create random edge types:
@@ -137,32 +144,9 @@ class NetworkWorkflow(object):
 
             _, edge_types = multisols[i_max[0]]
 
-
-        gmod.build_analytical_model(edge_types=edge_types,
-                            add_interactions=add_interactions,
-                            node_type_dict=None
-                           )
-
-        if reduce_dims: # If reduce dimensions then perform this calculation
-            gmod.reduce_model_dimensions()
-
-        if gmod._reduced_dims: # if dim reduction was attempted and was successful...
-            # determine the size of the reduced dimensions vector:
-            N_reduced_dims = len(gmod.dcdt_vect_reduced_s)
-
-        else: # otherwise assign it to zero
-            N_reduced_dims = 0
-
-        eqn_render = f'Eqn_{fname_base}.png'
-        save_eqn_render = os.path.join(save_path, eqn_render)
-
-        eqn_renderr = f'Eqnr_{fname_base}.png'
-        save_eqn_renderr = os.path.join(save_path, eqn_renderr)
-
-        eqn_net_file = f'Eqns_{fname_base}.csv'
-        save_eqn_net = os.path.join(save_path, eqn_net_file)
-
-        gmod.save_model_equations(save_eqn_render, save_eqn_renderr, save_eqn_net)
+        # set edge types to the network:
+        gmod.edge_types = edge_types
+        gmod.set_edge_types(gmod.edge_types, add_interactions)
 
         # save the randomly generated network as a text file:
         gfile = f'network_{fname_base}.gml'
@@ -211,6 +195,35 @@ class NetworkWorkflow(object):
         plt.close(fig)
 
         if find_solutions:
+
+            gmod.build_analytical_model(edge_types=edge_types,
+                                        add_interactions=add_interactions,
+                                        node_type_dict=None
+                                        )
+
+            if reduce_dims:  # If reduce dimensions then perform this calculation
+                gmod.reduce_model_dimensions()
+
+            if gmod._reduced_dims and gmod._solved_analytically is False:  # if dim reduction was attempted and was successful...
+                # determine the size of the reduced dimensions vector:
+                N_reduced_dims = len(gmod.dcdt_vect_reduced_s)
+
+            elif gmod._solved_analytically:
+                N_reduced_dims = gmod.N_nodes
+
+            else:  # otherwise assign it to zero
+                N_reduced_dims = 0
+
+            eqn_render = f'Eqn_{fname_base}.png'
+            save_eqn_render = os.path.join(save_path, eqn_render)
+
+            eqn_renderr = f'Eqnr_{fname_base}.png'
+            save_eqn_renderr = os.path.join(save_path, eqn_renderr)
+
+            eqn_net_file = f'Eqns_{fname_base}.csv'
+            save_eqn_net = os.path.join(save_path, eqn_net_file)
+
+            gmod.save_model_equations(save_eqn_render, save_eqn_renderr, save_eqn_net)
 
             gmod.create_parameter_vects(Ki=Ki, ni=ni, ri=1.0, di=di)
 
@@ -283,12 +296,15 @@ class NetworkWorkflow(object):
 
         else:
             num_sols = 0
+            N_reduced_dims = 0
 
         graph_data = {'Index': i_frame,
                       'Base File': fname_base,
-                      'Alpha': 1.0 - bi - gi,
+                      'Alpha': np.round(1.0 - bi - gi,2),
                       'Beta': bi, # this only applies for scale-free graphs
                       'Gamma': gi,
+                      'Delta in': delta_in,
+                      'Delta out': delta_out,
                       'Edge p': p_edge, # this only applies for binomial graphs
                       'N Cycles': gmod.N_cycles,
                       'N Nodes': gmod.N_nodes,

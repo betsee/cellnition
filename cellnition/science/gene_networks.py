@@ -39,12 +39,14 @@ class GeneNetworkModel(object):
                  graph_type: GraphType = GraphType.scale_free,
                  beta: float = 0.20,
                  gamma: float=0.75,
-                 delta: float=0.0,
+                 delta_in: float=0.0,
+                 delta_out: float = 0.0,
                  p_edge: float=0.5):
         '''
 
         '''
         self.N_nodes = N_nodes # number of nodes in the network (as defined by user initially)
+        self._graph_type = graph_type
 
         # Depending on whether edges are supplied by user, generate
         # a graph:
@@ -53,8 +55,8 @@ class GeneNetworkModel(object):
             self.generate_network(beta=beta,
                                   gamma=gamma,
                                   graph_type=graph_type,
-                                  delta_in=delta,
-                                  delta_out=delta,
+                                  delta_in=delta_in,
+                                  delta_out=delta_out,
                                   p_edge=p_edge)
 
             self.edges_index = self.edges_list
@@ -177,6 +179,7 @@ class GeneNetworkModel(object):
         self.nodes_in_cycles = list(nodes_in_cycles)
         self.nodes_acyclic = np.setdiff1d(self.nodes_index, nodes_in_cycles)
 
+
         # Graph structure characterization (from the amazing paper of Moutsinas, G. et al. Scientific Reports 11 (2021))
         a_out = list(self.GG.adjacency())
 
@@ -192,46 +195,52 @@ class GeneNetworkModel(object):
         D_in = np.diag(self.in_degree_sequence)
         D_out = np.diag(self.out_degree_sequence)
 
-        # Graph Laplacians for out and in distributions:
-        L_out = D_out - self.A_out
-        L_in = D_in - self.A_out
+        if D_out.shape == self.A_out.shape:
+            # Graph Laplacians for out and in distributions:
+            L_out = D_out - self.A_out
+            L_in = D_in - self.A_out
 
-        # Moore-Penrose inverse of Graph Laplacians:
-        L_in_inv = np.linalg.pinv(L_in.T)
-        L_out_inv = np.linalg.pinv(L_out)
+            # Moore-Penrose inverse of Graph Laplacians:
+            L_in_inv = np.linalg.pinv(L_in.T)
+            L_out_inv = np.linalg.pinv(L_out)
 
-        # Grading of hierarchical level of nodes:
-        # fwd hierachical levels grade vertices based on distance from source subgraphs
-        self.fwd_hier_node_level = L_in_inv.dot(self.in_degree_sequence)
-        # rev hierachical levels grade vertices based on distance from sink subgraphs
-        self.rev_hier_node_level = L_out_inv.dot(self.out_degree_sequence)
-        # overal hierachical levels of the graph (this is akin to a y-coordinate for each node of the network):
-        self.hier_node_level = (1 / 2) * (self.fwd_hier_node_level - self.rev_hier_node_level)
+            # Grading of hierarchical level of nodes:
+            # fwd hierachical levels grade vertices based on distance from source subgraphs
+            self.fwd_hier_node_level = L_in_inv.dot(self.in_degree_sequence)
+            # rev hierachical levels grade vertices based on distance from sink subgraphs
+            self.rev_hier_node_level = L_out_inv.dot(self.out_degree_sequence)
+            # overal hierachical levels of the graph (this is akin to a y-coordinate for each node of the network):
+            self.hier_node_level = (1 / 2) * (self.fwd_hier_node_level - self.rev_hier_node_level)
 
-        # Next, define a difference matrix for the network -- this calculates the difference between node i and j
-        # as an edge parameter when it is dotted with a parameter defined on nodes:
-        self.D_diff = np.zeros((self.N_edges, self.N_nodes))
-        for ei, (nde_i, nde_j) in enumerate(self.edges_index):
-            self.D_diff[ei, nde_i] = 1
-            self.D_diff[ei, nde_j] = -1
+            # Next, define a difference matrix for the network -- this calculates the difference between node i and j
+            # as an edge parameter when it is dotted with a parameter defined on nodes:
+            self.D_diff = np.zeros((self.N_edges, self.N_nodes))
+            for ei, (nde_i, nde_j) in enumerate(self.edges_index):
+                self.D_diff[ei, nde_i] = 1
+                self.D_diff[ei, nde_j] = -1
 
-        #Next calculate the forward and backward hierarchical differences:
-        self.fwd_hier_diff = self.D_diff.dot(self.fwd_hier_node_level)
-        self.rev_hier_diff = self.D_diff.dot(self.rev_hier_node_level)
+            #Next calculate the forward and backward hierarchical differences:
+            self.fwd_hier_diff = self.D_diff.dot(self.fwd_hier_node_level)
+            self.rev_hier_diff = self.D_diff.dot(self.rev_hier_node_level)
 
-        #The democracy coefficient parameter (measures how much the influencers of a graph are influenced
-        #themselves):
-        self.dem_coeff = 1 - np.mean(self.fwd_hier_diff)
-        self.dem_coeff_rev = 1 - np.mean(self.rev_hier_diff)
+            #The democracy coefficient parameter (measures how much the influencers of a graph are influenced
+            #themselves):
+            self.dem_coeff = 1 - np.mean(self.fwd_hier_diff)
+            self.dem_coeff_rev = 1 - np.mean(self.rev_hier_diff)
 
-        # And the hierarchical incoherence parameter (measures how much feedback there is):
-        self.hier_incoherence = np.var(self.fwd_hier_diff)
-        self.hier_incoherence_rev = np.var(self.rev_hier_diff)
+            # And the hierarchical incoherence parameter (measures how much feedback there is):
+            self.hier_incoherence = np.var(self.fwd_hier_diff)
+            self.hier_incoherence_rev = np.var(self.rev_hier_diff)
 
-        # A graph with high democracy coefficient and high incoherence has all verts with approximately the same
-        # hierarchical level. The graph is influenced by a high percentage of vertices. In a graph with low democracy
-        # coefficient and low incoherence, the graph is controlled by small percentage of vertices (maximally
-        # hierarchical at zero demo coeff and zero incoherence).
+            # A graph with high democracy coefficient and high incoherence has all verts with approximately the same
+            # hierarchical level. The graph is influenced by a high percentage of vertices. In a graph with low democracy
+            # coefficient and low incoherence, the graph is controlled by small percentage of vertices (maximally
+            # hierarchical at zero demo coeff and zero incoherence).
+
+        else:
+            self.hier_node_level = np.zeros(self.N_nodes)
+            self.hier_incoherence = 0.0
+            self.dem_coeff = 0.0
 
     def get_paths_matrix(self):
 
@@ -1580,7 +1589,7 @@ class GeneNetworkModel(object):
                               Ki: float | list = 0.5,
                               ni: float | list = 3.0,
                               di: float | list = 1.0,
-                              search_tol: float = 1.0e-6,
+                              search_tol: float = 1.0e-15,
                               add_interactions: bool = True,
                               unique_sols: bool = True
                               ):
@@ -1601,7 +1610,7 @@ class GeneNetworkModel(object):
             self.build_analytical_model(edge_types=edge_types,
                                         add_interactions=add_interactions)
             sols_0 = self.optimized_phase_space_search(Ns=N_space,
-                                                       cmax=1.0*np.max(self.in_degree_sequence),
+                                                       cmax=1.5*np.max(self.in_degree_sequence),
                                                        round_sol=N_round_sol,
                                                        Ki = Ki,
                                                        di = di,
@@ -1810,7 +1819,8 @@ class GeneNetworkModel(object):
                                   sigtend: float=66.0,
                                   sigmax: float=2.0,
                                   delta_window: float=1.0,
-                                  verbose: bool=True
+                                  verbose: bool=True,
+                                  tol: float=1.0e-6,
 
                                   ):
         '''
@@ -1829,6 +1839,8 @@ class GeneNetworkModel(object):
 
         # stateM = np.zeros((solsM.shape[1], solsM.shape[1]))
         G_states = nx.DiGraph()
+
+        max_states = solsM_with0.T.shape[1]
 
         for stateio, cvecto in enumerate(solsM_with0.T):  # start the system off in each of the states
 
@@ -1856,20 +1868,34 @@ class GeneNetworkModel(object):
                 concs_after = concs_time[-1, :]
 
                 if stateio == 0 and si == 0:  # If we're on the zeros vector we've transitioned from {0} to some new state:
-                    statejo, _ = self.find_state_match(solsM_with0, concs_before)
-                    G_states.add_edge(0, statejo, transition=-1)
-                    if verbose:
-                        print(f'From state 0 spontaneously to state {statejo}')
+                    statejo, errio = self.find_state_match(solsM_with0, concs_before)
+                    if errio < tol:
+                        G_states.add_edge(0, statejo, transition=-1)
 
-                statei, _ = self.find_state_match(solsM_with0, concs_before)
-                statej, _ = self.find_state_match(solsM_with0, concs_after)
+                    else: # otherwise it's not a match so add the new state to the system:
+                        solsM_with0 = np.column_stack((solsM_with0, concs_before))
+                        statejo, errio = self.find_state_match(solsM_with0, concs_before)
+                        G_states.add_edge(0, statejo, transition=-1)
+
+                    if verbose:
+                        print(f'From state 0 spontaneously to state {statejo}, error{errio}')
+
+                statei, erri = self.find_state_match(solsM_with0, concs_before)
+                statej, errj = self.find_state_match(solsM_with0, concs_after)
+
+                if erri > tol:
+                    solsM_with0 = np.column_stack((solsM_with0, concs_before))
+                    statei, erri = self.find_state_match(solsM_with0, concs_before)
+
+                if errj > tol:
+                    solsM_with0 = np.column_stack((solsM_with0, concs_after))
+                    statej, errj = self.find_state_match(solsM_with0, concs_after)
 
                 G_states.add_edge(statei, statej, transition=si)
 
                 if verbose:
-                    print(f'From state {statei} with signal {si} to state {statej}')
+                    print(f'From state {statei} with signal {si} to state {statej}, errors{erri, errj}')
 
-                # stateM[statei, statej] = 1
         return G_states
 
     def plot_transition_network(self, G_states: DiGraph, solsM: ndarray, save_graph_net: str):

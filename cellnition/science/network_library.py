@@ -81,6 +81,53 @@ class BinodeNetAdd(LibNet):
 
         self.add_interactions = True
 
+class BasicBinodeNet(LibNet):
+
+    def __init__(self):
+        '''
+        This is indicated to be a tri-stable network. It is used for
+        parameter space searches to look for further states with changes
+        to parameters.
+
+        '''
+        # Initialize the superclass:
+        super().__init__()
+
+        self.name = 'BinodeNet_Simple'
+        self.short_name = 'SimpleBinodeNet'
+
+        self.N_nodes = 4
+        self.edges = [('H0', 'H1'), ('H1', 'H0'),
+                 # ('H0', 'H0'), ('H1', 'H1'),
+                 ('S0', 'H0'), ('S1', 'H1')
+                 ]
+
+        self.edge_types = [EdgeType.I, EdgeType.I,
+                      # EdgeType.A, EdgeType.A,
+                      EdgeType.Is, EdgeType.Is
+                      ]
+
+        # Generates set of 4 nicely spaced attractors:
+        # self.K_vect = [0.57857143, 1.43142857, 1.14714286, 0.57857143, 0.5, 0.5]
+        # self.d_vect = 1.0
+        # self.n_vect = 3.0
+        # self.cmax = 4.0
+        #
+        # self.K_vect_alt1 = [1.43142857, 0.57857143, 0.57857143, 1.14714286, 0.5, 0.5]
+        # self.d_vect_alt1 = 1.0
+        # self.n_vect_alt1 = 3.0
+        # self.cmax_alt1 = 4.0
+        #
+        # self.K_vect_alt2 = 0.5
+        # self.d_vect_alt2 = 1.0
+        # self.n_vect_alt2 = 3.0
+        # self.cmax_alt2 = 4.0
+
+        self.node_type_dict = {'S': NodeType.signal}
+        # self.node_type_dict = None
+
+        self.add_interactions = True
+
 class TrinodeNetAdd(LibNet):
 
     def __init__(self):
@@ -106,6 +153,51 @@ class TrinodeNetAdd(LibNet):
 
         self.node_type_dict = {'S': NodeType.signal}
         # self.node_type_dict = None
+
+        self.add_interactions = True
+
+
+        # Penta-state, well spaced in all vectors on triangle (I, I, I)
+        self.K_vect = [0.45, 0.45, 0.1 , 0.45, 0.45, 0.1, 0.5, 0.5, 0.5]
+        self.d_vect =  1.0
+        self.n_vect = 3.0
+        self.cmax = 4.0
+
+        # Penta-state, well spaced in all vectors on triangle (I, I, I)
+        self.K_vect_alt1 = [0.45, 0.1, 0.45, 0.45, 0.45, 0.45, 0.5, 0.5, 0.5]
+        self.d_vect_alt1 =  1.0
+        self.n_vect_alt1 = 3.0
+        self.cmax_alt1 = 4.0
+
+        self.K_vect_alt2 = 0.5
+        self.d_vect_alt2 = 1.0
+        self.n_vect_alt2 = 3.0
+        self.cmax_alt2 = 4.0
+
+class BasicTrinodeNet(LibNet):
+
+    def __init__(self):
+        '''
+
+        '''
+        # Initialize the superclass:
+        super().__init__()
+
+        self.name = 'TrinodeNet_Simple'
+        self.short_name = 'SimpleTrinodeNet'
+
+        self.N_nodes = 3
+        self.edges = [('C0', 'C1'), ('C1', 'C2'), ('C2', 'C0'),
+                 # ('S0', 'H0'), ('S1', 'H1'), ('S2', 'H2')
+                 ]
+
+        self.edge_types = [EdgeType.I, EdgeType.A, EdgeType.I,
+                      # EdgeType.A, EdgeType.A, EdgeType.A,
+                      # EdgeType.Is, EdgeType.Is, EdgeType.Is,
+                      ]
+
+        self.node_type_dict = {'S': NodeType.signal}
+        self.node_type_dict = None
 
         self.add_interactions = True
 
@@ -219,8 +311,6 @@ class TrinodeNetLoaded(LibNet):
         self.n_vect_alt2 = 3.0
         self.cmax_alt2 = 4.0
 
-
-
 class QuadStateNetAdd(LibNet):
 
     def __init__(self):
@@ -245,6 +335,7 @@ class QuadStateNetAdd(LibNet):
                       ]
 
         self.node_type_dict = {'S': NodeType.signal}
+        # self.node_type_dict = None
 
         self.add_interactions = True
 
