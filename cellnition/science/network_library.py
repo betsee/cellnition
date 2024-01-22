@@ -7,21 +7,8 @@
 This module defines several types of study networks.
 '''
 from abc import ABCMeta, abstractmethod
-import numpy as np
-from numpy import ndarray
-import matplotlib.pyplot as plt
-from matplotlib import colors
-from matplotlib import colormaps
-from scipy.optimize import minimize, fsolve
-from scipy.signal import square
-import networkx as nx
-import sympy as sp
-from sympy.core.symbol import Symbol
-from sympy.tensor.indexed import Indexed
-from cellnition.science.enumerations import EdgeType, GraphType, NodeType
-from cellnition.science.stability import Solution
-import pygraphviz as pgv
-import pyvista as pv
+from cellnition.science.network_enums import EdgeType, GraphType, NodeType
+
 
 class LibNet(object, metaclass=ABCMeta):
     '''

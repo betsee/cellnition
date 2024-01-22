@@ -7,26 +7,17 @@
 This module describes a workflow class that can process a set of randomly created graphs.
 '''
 import os
-import csv
 import numpy as np
-from numpy import ndarray
 import matplotlib.pyplot as plt
-from matplotlib import colors
-from matplotlib import colormaps
-from scipy.optimize import minimize, fsolve
-from scipy.signal import square
 import networkx as nx
-from networkx import DiGraph
-import sympy as sp
-from sympy.core.symbol import Symbol
-from sympy.tensor.indexed import Indexed
-from cellnition.science.enumerations import EdgeType, GraphType, NodeType
-from cellnition.science.stability import Solution
+from cellnition.science.network_enums import EdgeType, GraphType, NodeType
 from cellnition.science.gene_networks import GeneNetworkModel
 from cellnition.science.netplot import plot_network
-import pygraphviz as pgv
-import pyvista as pv
+from cellnition.science.gene_knockout import GeneKnockout
 
+# FIXME: allow a workframe to run off of a set of loaded graphs
+# FIXME: make this more modularized in terms of functions performs (like an FSM)
+# TODO: Allow knockout to be time-simmed or total steady-state
 
 class NetworkWorkflow(object):
     '''
@@ -269,7 +260,9 @@ class NetworkWorkflow(object):
                 cmax = 1.5*(1 / np.max(np.asarray(gmod.d_vect)))
 
             if knockout_experiments:
-                knockout_sol_set, knockout_matrix = gmod.gene_knockout_experiment(Ns=N_search_space,
+                gko = GeneKnockout(gmod)
+                knockout_sol_set, knockout_matrix = gko.gene_knockout_ss_solve(
+                                                                           Ns=N_search_space,
                                                                        cmin=0.0,
                                                                        cmax=cmax,
                                                                        Ki=0.5,
@@ -287,7 +280,7 @@ class NetworkWorkflow(object):
 
                 ko_file = f'knockoutArrays{fname_base}.png'
                 save_ko = os.path.join(save_path, ko_file)
-                fig, ax = gmod.plot_knockout_arrays(knockout_sol_set, figsave=save_ko)
+                fig, ax = gko.plot_knockout_arrays(knockout_sol_set, figsave=save_ko)
                 plt.close(fig)
 
                 # save the knockout data to a file:

@@ -24,8 +24,8 @@ in order to generate more effective (i.e. intelligent) responses.
 
 import numpy as np
 from numpy import ndarray
-from cellnition.science.model_params import ModelParams
-from cellnition.science.analytic_model import AnalyticOsmoticModel
+from cellnition.science.osmoadaptation.model_params import ModelParams
+from cellnition.science.osmoadaptation.analytic_model import AnalyticOsmoticModel
 
 
 class OsmoticCell(object):
