@@ -26,6 +26,7 @@ class NodeType(Enum):
     effector = 'Effector'
     root = 'Root Hub'
     path = 'Path'
+    factor = 'Factor'
 
 class GraphType(Enum):
     scale_free = 'Scale Free'

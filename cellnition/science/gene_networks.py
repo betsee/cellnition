@@ -173,7 +173,8 @@ class GeneNetworkModel(object):
         # Determine the nodes in the cycles:
         nodes_in_cycles = set()
         for nde_lst in self.graph_cycles:
-            for nde_i in nde_lst:
+            for nde_ni in nde_lst:
+                nde_i = self.nodes_list.index(nde_ni)
                 nodes_in_cycles.add(nde_i)
 
         self.nodes_in_cycles = list(nodes_in_cycles)
@@ -975,7 +976,7 @@ class GeneNetworkModel(object):
                                 cmin: float=0.0,
                                 cmax: float|list=1.0,
                                 Ki: float|list=0.5,
-                                ni:float|list=10.0,
+                                ni:float|list=3.0,
                                 ri:float|list=1.0,
                                 di:float|list=1.0,
                                 zer_thresh: float=0.01,
@@ -1878,7 +1879,7 @@ class GeneNetworkModel(object):
                         G_states.add_edge(0, statejo, transition=-1)
 
                     if verbose:
-                        print(f'From state 0 spontaneously to state {statejo}, error{errio}')
+                        print(f'From state 0 spontaneously to state {statejo}')
 
                 statei, erri = self.find_state_match(solsM_with0, concs_before)
                 statej, errj = self.find_state_match(solsM_with0, concs_after)
@@ -1894,7 +1895,7 @@ class GeneNetworkModel(object):
                 G_states.add_edge(statei, statej, transition=si)
 
                 if verbose:
-                    print(f'From state {statei} with signal {si} to state {statej}, errors{erri, errj}')
+                    print(f'From state {statei} with signal {si} to state {statej}')
 
         return G_states
 
