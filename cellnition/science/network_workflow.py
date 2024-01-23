@@ -14,6 +14,7 @@ from cellnition.science.network_enums import EdgeType, GraphType, NodeType
 from cellnition.science.gene_networks import GeneNetworkModel
 from cellnition.science.netplot import plot_network
 from cellnition.science.gene_knockout import GeneKnockout
+from cellnition.science.phase_space_searches import multistability_search
 
 # FIXME: allow a workframe to run off of a set of loaded graphs
 # FIXME: make this more modularized in terms of functions performs (like an FSM)
@@ -123,7 +124,7 @@ class NetworkWorkflow(object):
             edge_types = gmod.get_edge_types(p_acti=0.5)
 
         else:
-            numsols, multisols = gmod.multistability_search(1,
+            numsols, multisols = multistability_search(1,
                                                             tol=sol_unique_tol,
                                                             N_iter=N_edge_search,
                                                             verbose=False,

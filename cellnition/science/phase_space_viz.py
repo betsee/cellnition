@@ -5,7 +5,8 @@
 
 '''
 This module implements a 'brute force' style approach to the network as a dynamic system,
-allowing for plots and visualizations of phase portraits and optimization functions.
+allowing for plots and visualizations of phase portraits and optimization functions on
+points of a grid in a phase space.
 
 '''
 import csv
@@ -29,6 +30,12 @@ class PhaseSpace(object):
     '''
     def __init__(self, gmod: GeneNetworkModel):
         '''
+        Initialize the PhaseSpace object.
+
+        Parameters
+        ----------
+        gmod : GeneNetworkModel
+            An instance of GeneNetworkModel, which has an analytical model already built.
 
         '''
 
@@ -50,6 +57,41 @@ class PhaseSpace(object):
                                 include_signals: bool = False
                                 ):
         '''
+        Generate a sampling of the phase space of the system on multiple dimensions, and calculate
+        the instantaneous change vector at each point of the space.
+
+        Parameters
+        ------------
+        N_pts : int=15
+            Number of points to sample along each axis of the phase space.
+
+        cmin : float=0.0
+            Minimum value of concentration to start sampling.
+        cmax : float|list=1.0
+            Maximum value of concentration to stop sampling.
+
+        Ki : float|list=0.5
+            Value or list of Hill constants for each concentration in the system.
+            If a float is specified, all concentrations will use the same value.
+
+        ni : float|list=3.0
+            Value or list of Hill exponents for each concentration in the system.
+            If a float is specified, all concentrations will use the same value.
+
+        ri : float|list=1.0
+            Value or list of maximum production rates for each concentration in the system.
+            If a float is specified, all concentrations will use the same value.
+
+        di : float|list=1.0
+            Value or list of maximum decay rates for each concentration in the system.
+            If a float is specified, all concentrations will use the same value.
+
+        zer_thresh : float=0.01
+            Value to use as a threshold for assessing points where the magnitude of the rate of change is zero
+            (value at which the equilibrium points are assessed).
+
+        include_signals : bool = False
+            Include any signal nodes in the network dynamics or exclude them?
 
         '''
 

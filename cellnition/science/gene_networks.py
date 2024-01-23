@@ -4,7 +4,9 @@
 # See "LICENSE" for further details.
 
 '''
-This module
+This module builds the model network as a symbolic graph, has attributes to
+analyze the network, and has the ability to build an analytic (symbolic) model
+that can be used to study the network as a continuous dynamic system.
 '''
 import csv
 import numpy as np
@@ -32,6 +34,79 @@ import pygraphviz as pgv
 
 class GeneNetworkModel(object):
     '''
+    This class allows one to generate a network using a random construction
+    algorithm, or from user-input edges. It then performs analysis on the
+    resulting graph to determine cycles, input and output degree distributions,
+    and hierarchical attributes. The class then enables the user to build an
+    analytical (i.e. symbolic math) module using the network, and has various routines
+    to determine equilibrium points and stable states of the network model. The
+    class then allows for time simulation of the network model as a dynamic system.
+
+    Public Attributes
+    -----------------
+    GG = nx.DiGraph(self.edges_list)
+    N_nodes = N_nodes # number of nodes in the network (as defined by user initially)
+    nodes_index = self.nodes_list
+    nodes_list = sorted(self.GG.nodes())
+    N_edges = len(self.edges_list)
+    edges_index = self.edges_list
+    edges_list
+
+# Indices of edges with selfloops:
+        self.selfloop_edge_inds = [self.edges_list.index(ei) for ei in list(nx.selfloop_edges(self.GG))]
+
+        # Degree analysis:
+        self.in_degree_sequence = [deg_i for nde_i, deg_i in
+                                   self.GG.in_degree(self.nodes_list)] # aligns with node order
+
+        self.in_dmax = np.max(self.in_degree_sequence)
+
+
+        self.out_degree_sequence = [deg_i for nde_i, deg_i in
+                                    self.GG.out_degree(self.nodes_list)]  # aligns with node order
+
+        # The outward flow of interaction at each node of the graph:
+        self.node_divergence = np.asarray(self.out_degree_sequence) - np.asarray(self.in_degree_sequence)
+
+        self.out_dmax = np.max(self.out_degree_sequence)
+        self.in_dmax = np.max(self.in_degree_sequence)
+
+        self.in_bins, self.in_degree_counts = np.unique(self.in_degree_sequence,
+                                                        return_counts=True)
+        self.out_bins, self.out_degree_counts = np.unique(self.out_degree_sequence,
+                                                          return_counts=True)
+
+        # Nodes sorted by number of out-degree edges:
+        self.nodes_by_out_degree = np.flip(np.argsort(self.out_degree_sequence))
+
+        self.nodes_by_in_degree = np.flip(np.argsort(self.in_degree_sequence))
+
+        self.root_hub = self.nodes_by_out_degree[0]
+        self.leaf_hub = self.nodes_by_out_degree[-1]
+
+        # Number of cycles:
+        self.graph_cycles = sorted(nx.simple_cycles(self.GG))
+        self.N_cycles = len(self.graph_cycles)
+
+            dcdt_vect_reduced_s = None
+
+        self.nodes_in_cycles = list(nodes_in_cycles)
+        self.nodes_acyclic = np.setdiff1d(self.nodes_index, nodes_in_cycles)
+
+                    self.hier_node_level = np.zeros(self.N_nodes)
+            self.hier_incoherence = 0.0
+            self.dem_coeff = 0.0
+
+
+
+
+    Private Attributes
+    ------------------
+    _graph_type = graph_type
+    _reduced_dims = False # Indicate that model is full dimensions
+    _include_process = False # Indicate that model does not include the process by default
+    _solved_analytically = False # Indicate that the model does not have an analytical solution
+
 
     '''
 
@@ -43,8 +118,47 @@ class GeneNetworkModel(object):
                  gamma: float=0.75,
                  delta_in: float=0.0,
                  delta_out: float = 0.0,
-                 p_edge: float=0.5):
+                 p_edge: float=0.2
+                 ):
         '''
+        Initialize the class and build and characterize a network.
+
+        Parameters
+        -----------
+        N_nodes: int
+            The number of nodes to build the network (only used in randomly built networks, otherwise the number of
+            nodes is calculated from the number of unique nodes supplied in the edges list).
+
+        edges: list|ndarray|None = None
+            A list of tuples that defines edges of a network, where each directed edge is a pair of nodes. The
+            nodes may be integers or strings, but cannot be mixed type. If edges is left as None, then a
+            graph will be randomly constructed.
+
+        graph_type: GraphType = GraphType.scale_free
+            The type of graph to generate in randomly-constructed networks.
+
+        beta: float = 0.20
+            For scale-free randomly-constructed networks, this determines the amount of interconnectivity between
+            the in and out degree distributions, and in practical terms, increases the number of cycles in the graph.
+            Note that 1 - beta - gamma must be greater than 0.0.
+
+        gamma: float=0.75
+            For scale-free randomly-constructed networks, this determines the emphasis on the network's
+            out degree distribution, and in practical terms, increases the scale-free character of the out-distribution
+            of the graph. Note that 1 - beta - gamma must be greater than 0.0.
+
+        delta_in: float=0.0
+            A parameter that increases the complexity of the network core, leading to more nodes being involved in
+            cycles.
+        delta_out: float = 0.0
+            A parameter that increases the complexity of the network core, leading to more nodes being involved in
+            cycles.
+
+        p_edge: float=0.2
+            For randomly constructed binomial-type networks, this parameter determines the probability of forming
+            an edge. As p_edge increases, the number of network edges increases drammatically.
+
+
 
         '''
         self.N_nodes = N_nodes # number of nodes in the network (as defined by user initially)
@@ -91,6 +205,34 @@ class GeneNetworkModel(object):
                          graph_type: GraphType = GraphType.scale_free
                          ):
         '''
+        Randomly generate a network with a scale-free or binomial degree distribution.
+
+        Parameters
+        ----------
+        graph_type : GraphType = GraphType.scale_free
+            The type of graph to generate in randomly-constructed networks.
+
+        beta : float = 0.20
+            For scale-free randomly-constructed networks, this determines the amount of interconnectivity between
+            the in and out degree distributions, and in practical terms, increases the number of cycles in the graph.
+            Note that 1 - beta - gamma must be greater than 0.0.
+
+        gamma : float=0.75
+            For scale-free randomly-constructed networks, this determines the emphasis on the network's
+            out degree distribution, and in practical terms, increases the scale-free character of the out-distribution
+            of the graph. Note that 1 - beta - gamma must be greater than 0.0.
+
+        delta_in : float=0.0
+            A parameter that increases the complexity of the network core, leading to more nodes being involved in
+            cycles.
+
+        delta_out : float = 0.0
+            A parameter that increases the complexity of the network core, leading to more nodes being involved in
+            cycles.
+
+        p_edge : float=0.2
+            For randomly constructed binomial-type networks, this parameter determines the probability of forming
+            an edge. As p_edge increases, the number of network edges increases dramatically.
 
         '''
 
@@ -134,6 +276,9 @@ class GeneNetworkModel(object):
 
     def characterize_graph(self):
         '''
+        Perform a number of graph-theory style characterizations on the network to determine
+        cycle number, analyze in- and out- degree distribution, and analyze hierarchy. Hierarchical
+        structure analysis was from the work of Moutsinas, G. et al. Scientific Reports 11 (2021).
 
         '''
         # Indices of edges with selfloops:
@@ -245,9 +390,20 @@ class GeneNetworkModel(object):
             self.hier_incoherence = 0.0
             self.dem_coeff = 0.0
 
-    def get_paths_matrix(self):
+    def get_paths_matrix(self) -> ndarray:
+        '''
+        Compute a matrix showing the number of paths from starting node to end node. Note that this
+        matrix can be extraordinarily large in a complicated graph such as most binomial networks.
 
-        # Matrix showing the number of paths from starting node to end node:
+        Returns
+        -------
+        ndarray
+            The paths matrix, which specifies the number of paths between one node index as row index and another
+            node index as the column index.
+
+        '''
+
+
         # What we want to show is that the nodes with the highest degree have the most connectivity to nodes in the network:
         # mn_i = 10 # index of the master node, organized according to nodes_by_out_degree
         paths_matrix = []
@@ -274,9 +430,23 @@ class GeneNetworkModel(object):
 
     def get_edge_types(self, p_acti: float=0.5, set_selfloops_acti: bool=True):
         '''
-        Automatically generate a conse
-        rved edge-type vector for use in
-        model building.
+        Automatically generate an edge "type" vector for use in model building.
+        Edge type specifies whether the edge is an activating or inhibiting
+        relationship between the nodes. This routine randomly chooses a set of
+        activating and inhibiting edge types for a model.
+
+        Parameters
+        ----------
+        p_acti : float = 0.5
+            The probability of an edge being an activation. Note that this value
+            must be less than 1.0, and that the probability of an edge being an
+            inhibitor becomes 1.0 - p_acti.
+
+        set_selfloops_acti : bool = True
+            Work shows that self-inhibition does not generate models with multistable
+            states. Therefore, this edge-type assignment routine allows one to
+            automatically set all self-loops to be activation interactions.
+
         '''
 
         p_inhi = 1.0 - p_acti
@@ -292,7 +462,17 @@ class GeneNetworkModel(object):
 
     def set_edge_types(self, edge_types: list|ndarray, add_interactions: bool):
         '''
-        Assign edge_types to the graph and create an edge function list.
+        Assign edge_types to the graph and create an edge function list used in analytical model building.
+
+        Parameters
+        ----------
+        edge_types : list
+            A list of edge type enumerations; one for each edge of the network.
+
+        add_interactions : bool
+            In a network, the interaction of two or more regulators at a node can be multiplicative
+            (equivalent to an "And" condition) or additive (equivalent to an "or condition). This
+            bool specifies whether multiple interactions should be additive (True) or multiplicative (False).
         '''
         self.edge_types = edge_types
 
@@ -335,6 +515,11 @@ class GeneNetworkModel(object):
     def set_node_types(self, node_types: list|ndarray):
         '''
         Assign node types to the graph.
+
+        Parameters
+        ----------
+        node_types : list
+            A list of node type enumerations for each node of the network.
         '''
         self.node_types = node_types
         # Set node type as graph node attribute:
@@ -344,8 +529,20 @@ class GeneNetworkModel(object):
 
         nx.set_node_attributes(self.GG, node_attr_dict)
 
-    def edges_from_path(self, path_nodes: list|ndarray):
+    def edges_from_path(self, path_nodes: list|ndarray) -> list:
         '''
+        If specifying a path in terms of a set of nodes, this method
+        returns the set of edges corresponding to the path.
+
+        Parameters
+        ----------
+        path_nodes : list
+            A list of nodes in the network over which the path is specified.
+
+        Returns
+        -------
+        list
+            The list of edges corresponding to the path.
 
         '''
         path_edges = []
@@ -360,8 +557,34 @@ class GeneNetworkModel(object):
                                prob_acti: float=0.5,
                                edge_types: list|ndarray|None=None,
                                node_type_dict: dict|None=None,
-                               add_interactions: bool=False):
+                               add_interactions: bool=True):
         '''
+        Using the network to supply structure, this method constructs an
+        analytical (symbolic) model of the regulatory network as a dynamic
+        system.
+
+        prob_acti : float = 0.5
+            The probability of an edge being an activation. Note that this value
+            must be less than 1.0, and that the probability of an edge being an
+            inhibitor becomes 1.0 - p_acti.
+
+        edge_types : list|None
+            A list of edge type enumerations; one for each edge of the network. If edge_types
+            is not specified, then they will be randomly generated, with all self-loops set to be
+            activations.
+
+        node_type_dict : dict|None
+            Dictionary that allows for specification of different node types. If node names are
+            strings, the node dict can be used to assign a node type based on the first letter
+            of the node name. For example, if nodes labeled 'S0', 'S1', 'S2' are desired to be
+            signal-type nodes, then the node dictionary would specify {'S': NodeType.signal}.
+            Nodes that are numerically named must be individually specified by their number in the
+            dictionary. If node_type_dict is None, then all nodes become NodeType.Gene.
+
+        add_interactions : bool = False
+            In a network, the interaction of two or more regulators at a node can be multiplicative
+            (equivalent to an "And" condition) or additive (equivalent to an "or condition). This
+            bool specifies whether multiple interactions should be additive (True) or multiplicative (False).
 
         '''
 
@@ -673,6 +896,10 @@ class GeneNetworkModel(object):
 
     def _make_node_edge_indices(self):
         '''
+        Especially important for the case where node names are strings,
+        this method creates numerical (int) indices for the nodes and
+        stores them in a nodes_index. It does the same for nodes in edges,
+        storing them in an edges_index object.
 
         '''
         # For this case the user may provide string names for
@@ -690,7 +917,8 @@ class GeneNetworkModel(object):
 
     def _generate_optimization_functions(self):
         '''
-
+        Using the model equations, generate numerical optimization functions
+        and rate functions required to solve system properties numerically.
         '''
 
         if self._reduced_dims and self._solved_analytically is False:
@@ -774,11 +1002,12 @@ class GeneNetworkModel(object):
 
     def reduce_model_dimensions(self):
         '''
+        Using analytical methods, attempt to reduce the multidimensional
+        network equations to as few equations as possible.
 
         '''
 
         # Solve the nonlinear system as best as possible:
-
         nosol = False
 
         try:
@@ -905,9 +1134,12 @@ class GeneNetworkModel(object):
                                 di:float|list=1.0
                                 ):
         '''
+        Create parameter vectors for the rate equations of the model nodes.
+        If floats are specified, use the same parameters for all edges and nodes in the network; if lists
+        are specified use them to create the model parameter vectors.
 
         '''
-        # Create parameter vectors as the same parameters for all edges and nodes in the network:
+        # :
         if type(Ki) is not list:
             K_vect = []
             for ei in range(self.N_edges):
@@ -1436,69 +1668,6 @@ class GeneNetworkModel(object):
         self.node_types = node_types
         self.set_node_types(node_types)
 
-    def multistability_search(self,
-                              N_multi: int,
-                              tol: float=1.0e-3,
-                              N_iter:int =100,
-                              verbose: bool=True,
-                              N_space: int=3,
-                              N_round_sol: int=6,
-                              N_round_unique_sol: int=1,
-                              Ki: float | list = 0.5,
-                              ni: float | list = 3.0,
-                              di: float | list = 1.0,
-                              search_tol: float = 1.0e-15,
-                              add_interactions: bool = True,
-                              unique_sols: bool = True
-                              ):
-        '''
-        By randomly generating sets of edge interaction (i.e. activator or inhibitor), find
-        as many unique multistable systems as possible for a given base network.
-
-        This does not redefine any default 'edge_types' that have been assigned to the network.
-
-        '''
-
-        multisols = []
-        multisol_edges = []
-        numsol_list = []
-
-        for i in range(N_iter):
-            edge_types = self.get_edge_types(p_acti=0.5)
-            self.build_analytical_model(edge_types=edge_types,
-                                        add_interactions=add_interactions)
-            sols_0 = self.optimized_phase_space_search(Ns=N_space,
-                                                       cmax=1.5*np.max(self.in_degree_sequence),
-                                                       round_sol=N_round_sol,
-                                                       Ki = Ki,
-                                                       di = di,
-                                                       ni = ni,
-                                                       tol=search_tol,
-                                                       method="Root"
-                                                       )
-
-            solsM = self.find_attractor_sols(sols_0,
-                                             tol=tol,
-                                             unique_sols=unique_sols,
-                                             verbose=False,
-                                             N_round=N_round_unique_sol)
-
-            if len(solsM):
-                num_sols = solsM.shape[1]
-            else:
-                num_sols = 0
-
-            if num_sols >= N_multi:
-                edge_types_l = edge_types.tolist()
-                if edge_types_l not in multisol_edges: # If we don't already have this combo:
-                    if verbose:
-                        print(f'Found solution with {num_sols} states on iteration {i}')
-                    multisols.append([sols_0, edge_types])
-                    numsol_list.append(num_sols)
-                    multisol_edges.append(edge_types_l)
-
-        return numsol_list, multisols
-
     def pulses(self,
                tvect: list|ndarray,
                t_on: float|int,
@@ -1651,165 +1820,6 @@ class GeneNetworkModel(object):
 
         return solsM_return
 
-
-    def find_state_match(self, solsM: ndarray, cvecti: list|ndarray):
-        '''
-
-
-        '''
-
-        # now what we need is a pattern match from concentrations to the stable states:
-        errM = []
-        for soli in solsM.T:
-            sdiff = soli - cvecti
-            errM.append(np.sum(sdiff ** 2))
-        errM = np.asarray(errM)
-        state_best_match = (errM == errM.min()).nonzero()[0][0]
-
-        return state_best_match, errM[state_best_match]
-
-
-    def create_transition_network(self,
-                                  solsM: ndarray,
-                                  dt: float=1.0e-3,
-                                  tend: float=100.0,
-                                  sigtstart: float=33.0,
-                                  sigtend: float=66.0,
-                                  sigmax: float=2.0,
-                                  delta_window: float=1.0,
-                                  verbose: bool=True,
-                                  tol: float=1.0e-6,
-
-                                  ):
-        '''
-
-
-        '''
-
-        # See if we can build a transition matrix/diagram by starting the system
-        # in different states and seeing which state it ends up in:
-
-        c_zeros = np.zeros(self.N_nodes)  # start everything out low
-
-        # Create a steady-state solutions matrix that is stacked with the
-        # 'zero' or 'base' state:
-        solsM_with0 = np.column_stack((c_zeros, solsM))
-
-        # stateM = np.zeros((solsM.shape[1], solsM.shape[1]))
-        G_states = nx.DiGraph()
-
-        max_states = solsM_with0.T.shape[1]
-
-        for stateio, cvecto in enumerate(solsM_with0.T):  # start the system off in each of the states
-
-            # For each signal in the network:
-            for si, sigi in enumerate(self.signal_inds):
-                cvecti = cvecto.copy()  # reset the state to the desired starting state
-                sig_inds = [sigi]
-                sig_times = [(sigtstart, sigtend)]
-                sig_mags = [(0.0, sigmax)]
-
-                # Run the time simulation:
-                concs_time, tvect = self.run_time_sim(tend,
-                                                      dt,
-                                                      cvecti,
-                                                      sig_inds,
-                                                      sig_times,
-                                                      sig_mags,
-                                                      dt_samp=0.15)
-
-                it_30low = (tvect <= sigtstart - delta_window).nonzero()[0]
-                it_30high = (tvect >= sigtstart -2*delta_window).nonzero()[0]
-                it_30 = np.intersect1d(it_30low, it_30high)[0]
-
-                concs_before = concs_time[it_30, :]
-                concs_after = concs_time[-1, :]
-
-                if stateio == 0 and si == 0:  # If we're on the zeros vector we've transitioned from {0} to some new state:
-                    statejo, errio = self.find_state_match(solsM_with0, concs_before)
-                    if errio < tol:
-                        G_states.add_edge(0, statejo, transition=-1)
-
-                    else: # otherwise it's not a match so add the new state to the system:
-                        solsM_with0 = np.column_stack((solsM_with0, concs_before))
-                        statejo, errio = self.find_state_match(solsM_with0, concs_before)
-                        G_states.add_edge(0, statejo, transition=-1)
-
-                    if verbose:
-                        print(f'From state 0 spontaneously to state {statejo}')
-
-                statei, erri = self.find_state_match(solsM_with0, concs_before)
-                statej, errj = self.find_state_match(solsM_with0, concs_after)
-
-                if erri > tol:
-                    solsM_with0 = np.column_stack((solsM_with0, concs_before))
-                    statei, erri = self.find_state_match(solsM_with0, concs_before)
-
-                if errj > tol:
-                    solsM_with0 = np.column_stack((solsM_with0, concs_after))
-                    statej, errj = self.find_state_match(solsM_with0, concs_after)
-
-                if statei != statej: # stop putting on the self-edges:
-                    G_states.add_edge(statei, statej, transition=si)
-                    if verbose:
-                        print(f'From state {statei} with signal {si} to state {statej}')
-
-        return G_states
-
-    def plot_transition_network(self, G_states: DiGraph, solsM: ndarray, save_graph_net: str):
-        '''
-
-        '''
-
-
-        edgedata_Gstates = nx.get_edge_attributes(G_states, "transition")
-        nodes_Gstates = list(G_states.nodes)
-
-        # cmap = colormaps['magma']
-        cmap = colormaps['rainbow_r']
-        norm = colors.Normalize(vmin=0, vmax=solsM.shape[1])
-
-        G = pgv.AGraph(strict=False,
-                       splines=True,
-                       directed=True,
-                       concentrate=False,
-                       # nodesep=0.1,
-                       # ranksep=0.3,
-                       dpi=300)
-
-        for ni, nde_stateo in enumerate(nodes_Gstates):
-            nde_color = colors.rgb2hex(cmap(norm(ni)))
-            nde_color += '80'  # add some transparancy to the node
-            # if norm(ni) >= 0.6:
-            #     nde_font_color = 'Black'
-            # else:
-            #     nde_font_color = 'White'
-            nde_font_color = 'Black'
-
-            nde_state = f'State {nde_stateo}'
-
-            G.add_node(nde_state,
-                       style='filled',
-                       fillcolor=nde_color,
-                       fontcolor=nde_font_color,
-                       # fontname=net_font_name,
-                       # fontsize=node_font_size,
-                       )
-
-        for (eio, ejo), etranso in edgedata_Gstates.items():
-            ei = f'State {eio}'
-            ej = f'State {ejo}'
-            if etranso == -1:
-                etrans = 'Spont.'
-            else:
-                etrans = f'S{etranso}'
-            G.add_edge(ei, ej, label=etrans)
-
-        G.layout(prog='dot')  # default to dot
-
-        G.draw(save_graph_net)
-
-
     def plot_sols_array(self, solsM: ndarray, figsave: str | None = None, cmap: str | None =None):
         '''
 
@@ -1862,100 +1872,25 @@ class GeneNetworkModel(object):
         return fig, ax
 
 
-    def param_space_search(self,
-                           N_pts: int=3,
-                           ri: float = 1.0,
-                           ni: float = 3.0,
-                           K_min: float = 0.1,
-                           K_max: float = 2.0,
-                           d_min: float = 0.5,
-                           d_max: float = 10.0,
-                           sol_round: int = 1,
-                           N_search: int = 3,
-                           search_round_sol: int=6,
-                           tol: float=1.0e-3,
-                           cmax_multi: float=2.0,
-                           verbose: bool=True,
-                           hold_d_const: bool=True,
-                           di: float=0.5):
-        '''
-        Search parameter space of a model to find paameter combinations that give different multistable
-        states.
-        '''
-
-        if self._reduced_dims and self._solved_analytically is False:
-            N_nodes = len(self.c_vect_reduced_s)
-
-        else:
-            N_nodes = self.N_nodes
-
-        # What we wish to create is a parameter space search, as this net is small enough to enable that.
-        Klin = np.linspace(K_min, K_max, N_pts)
-        dlin = np.linspace(d_min, d_max, N_pts)
-
-        param_lin_set = []
-
-        for edj_i in range(self.N_edges):
-            param_lin_set.append(Klin*1) # append the linear K-vector choices for each edge
-
-        if hold_d_const is False:
-            for nde_i in range(N_nodes):
-                param_lin_set.append(dlin*1)
-
-        # Create a set of matrices specifying the concentration grid for each
-        # node of the network:
-        param_M_SET = np.meshgrid(*param_lin_set, indexing='ij')
-
-        # Create linearized arrays for each concentration, stacked into one column per node:
-        param_test_set = np.asarray([pM.ravel() for pM in param_M_SET]).T
-
-        bif_space_M = [] # Matrix holding the parameter values and number of unique stable solutions
-        sols_space_M = []
-
-        if verbose:
-            print(param_M_SET[0].ravel().shape)
-
-        if verbose:
-            print(f'Search cmax will be {cmax_multi * np.max(self.in_degree_sequence)}')
-
-        for param_set_i in param_test_set:
-            kvecti = param_set_i[0:self.N_edges].tolist()
-
-            if hold_d_const is False:
-                dvecti = param_set_i[self.N_edges:].tolist()
-            else:
-                dvecti = di
-
-            self.create_parameter_vects(Ki=kvecti, ni=ni, ri=ri, di=dvecti)
-
-            sols_0 = self.optimized_phase_space_search(Ns=N_search,
-                                                       cmax=cmax_multi * np.max(self.in_degree_sequence),
-                                                       round_sol=search_round_sol,
-                                                       Ki=self.K_vect,
-                                                       di=self.d_vect,
-                                                       ni=self.n_vect,
-                                                       tol=1.0e-6,
-                                                       method="Root"
-                                                       )
-
-            solsM = self.find_attractor_sols(sols_0, tol=tol, verbose=False, unique_sols=True, sol_round=sol_round)
-
-            if len(solsM):
-                num_sols = solsM.shape[1]
-            else:
-                num_sols = 0
-
-            bif_space_M.append([*self.K_vect, *self.d_vect, num_sols])
-            sols_space_M.append(solsM)
-
-        return np.asarray(bif_space_M), sols_space_M
-
     def save_model_equations(self,
                              save_eqn_image: str,
-                             save_reduced_eqn_image: str,
-                             save_eqn_csv: str
+                             save_reduced_eqn_image: str|None = None,
+                             save_eqn_csv: str|None = None
                              ):
         '''
+        Save images of the model equations, as well as a csv file that has
+        model equations written in LaTeX format.
+
+        Parameters
+        -----------
+        save_eqn_image : str
+            The path and filename to save the main model equations as an image.
+
+        save_reduced_eqn_image : str|None = None
+            The path and filename to save the reduced main model equations as an image (if model is reduced).
+
+        save_eqn_csv : str|None = None
+            The path and filename to save the main and reduced model equations as LaTex in a csv file.
 
         '''
         t_s = sp.symbols('t')
@@ -1972,7 +1907,7 @@ class GeneNetworkModel(object):
         header = ['Concentrations', 'Change Vector']
         eqns_to_write = [[sp.latex(self.c_vect_s), sp.latex(self.dcdt_vect_s)]]
 
-        if self.dcdt_vect_reduced_s is not None:
+        if self.dcdt_vect_reduced_s is not None and save_reduced_eqn_image is not None:
             c_change_reduced = sp.Matrix([sp.Derivative(ci, t_s) for ci in self.c_vect_reduced_s])
             eqn_net_reduced = sp.Eq(c_change_reduced, self.dcdt_vect_reduced_s)
 
@@ -1986,10 +1921,11 @@ class GeneNetworkModel(object):
             eqns_to_write.append(sp.latex(self.dcdt_vect_reduced_s))
             header.extend(['Reduced Concentations', 'Reduced Change Vector'])
 
-        with open(save_eqn_csv, 'w', newline="") as file:
-            csvwriter = csv.writer(file)  # 2. create a csvwriter object
-            csvwriter.writerow(header)  # 4. write the header
-            csvwriter.writerows(eqns_to_write)  # 5. write the rest of the data
+        if save_eqn_csv is not None:
+            with open(save_eqn_csv, 'w', newline="") as file:
+                csvwriter = csv.writer(file)  # 2. create a csvwriter object
+                csvwriter.writerow(header)  # 4. write the header
+                csvwriter.writerows(eqns_to_write)  # 5. write the rest of the data
 
 
 
