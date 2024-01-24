@@ -40,15 +40,12 @@ import sympy as sp
 from sympy.core.symbol import Symbol
 from sympy.tensor.indexed import Indexed
 from cellnition.science.network_enums import EdgeType, GraphType, NodeType
-from cellnition.science.interaction_functions import f_acti_s, f_inhi_s, f_neut_s
+from cellnition.science.interaction_functions import f_acti_s, f_inhi_s, f_neut_s, f_logi_s
 import pygraphviz as pgv
 
 # TODO: allow system to build model with automatically substituting in P, S, F, E, etc
-# TODO: change osmotic process equation to be in terms of strain
-# TODO: Parameter scaling: divide through by 'd' and apply rate scaling 'v' to time sims
-# TODO: Allow multiple effectors to be added to the network
 # TODO: Add in stochasticity
-# TODO: Make analytical system variables the same as node names (for string node names)
+# TODO: In time sims, remember to deal separately with any sensor nodes
 
 class GeneNetworkModel(object):
     '''
@@ -656,7 +653,10 @@ class GeneNetworkModel(object):
         for tt in type_tags:
             self.regular_node_inds += self.node_type_inds[tt]
 
-        self.signal_node_inds = self.node_type_inds['signal']
+        # aliases for convenience:
+        self.signal_node_inds = self.node_type_inds[NodeType.signal.name]
+        self.sensor_node_inds = self.node_type_inds[NodeType.sensor.name]
+        self.process_node_inds = self.node_type_inds[NodeType.process.name]
 
         # Next we want to distinguish a subset of edges that connect only "regular nodes":
         self.regular_edges_index = []
@@ -667,9 +667,9 @@ class GeneNetworkModel(object):
         # Next, create a process dict that organizes features required for
         # constructing the heterogenous process:
         self.processes_list = []
-        if len(self.node_type_inds['process']):
-            for pi in self.node_type_inds['process']:
-                process_dict = {'process_ind': pi}
+        if len(self.process_node_inds):
+            for pi in self.process_node_inds:
+                process_dict = {NodeType.process.name: pi} # store the process node
                 # Allow for multiple effectors, sensors and factors:
                 process_dict[NodeType.effector.name] = []
                 process_dict[NodeType.sensor.name] = []
@@ -702,6 +702,19 @@ class GeneNetworkModel(object):
             c_s = sp.IndexedBase('c')
             self.c_vect_s = [c_s[i] for i in self.nodes_index]
 
+        # If there are sensors in the network, described by logistic function
+        # they have their own parameters:
+        if len(self.sensor_node_inds):
+            k_s = sp.IndexedBase('k') # steepness of sensor reaction
+            co_s = sp.IndexedBase('co') # centre of sensor reaction
+            self.sensor_params_s = {}
+            for ii, sens_i in enumerate(self.sensor_node_inds):
+                self.sensor_params_s[sens_i] = (co_s[ii], k_s[ii])
+        else:
+            self.sensor_params_s = {}
+
+        self.process_params_s = [] # initialize this to be an empty list
+
         efunc_add_growthterm_vect = [[] for i in self.nodes_index]
         efunc_mult_growthterm_vect = [[] for i in self.nodes_index]
         efunc_mult_decayterm_vect = [[] for i in self.nodes_index]
@@ -710,28 +723,31 @@ class GeneNetworkModel(object):
                                                     self.edge_funcs,
                                                     self.add_edge_interaction_bools,
                                                     self.growth_interaction_bools)):
-            if add_tag and gwth_tag:
-                efunc_add_growthterm_vect[j].append(fun_type(self.c_vect_s[i], B_s[ei], n_s[ei]))
-                efunc_mult_growthterm_vect[j].append(None)
-                efunc_mult_decayterm_vect[j].append(None)
+            if (i, j) in self.regular_edges_index:
+                if add_tag and gwth_tag:
+                    efunc_add_growthterm_vect[j].append(fun_type(self.c_vect_s[i], B_s[ei], n_s[ei]))
+                    efunc_mult_growthterm_vect[j].append(None)
+                    efunc_mult_decayterm_vect[j].append(None)
 
-            elif not add_tag and gwth_tag:
-                efunc_mult_growthterm_vect[j].append(fun_type(self.c_vect_s[i], B_s[ei], n_s[ei]))
-                efunc_add_growthterm_vect[j].append(None)
-                efunc_mult_decayterm_vect[j].append(None)
+                elif not add_tag and gwth_tag:
+                    efunc_mult_growthterm_vect[j].append(fun_type(self.c_vect_s[i], B_s[ei], n_s[ei]))
+                    efunc_add_growthterm_vect[j].append(None)
+                    efunc_mult_decayterm_vect[j].append(None)
 
-            elif not add_tag and not gwth_tag:
-                efunc_mult_decayterm_vect[j].append(fun_type(self.c_vect_s[i], B_s[ei], n_s[ei]))
-                efunc_add_growthterm_vect[j].append(None)
-                efunc_mult_growthterm_vect[j].append(None)
-            else:
-                raise Exception("Currently not supporting any other node interaction types.")
+                elif not add_tag and not gwth_tag:
+                    efunc_mult_decayterm_vect[j].append(fun_type(self.c_vect_s[i], B_s[ei], n_s[ei]))
+                    efunc_add_growthterm_vect[j].append(None)
+                    efunc_mult_growthterm_vect[j].append(None)
+                else:
+                    raise Exception("Currently not supporting any other node interaction types.")
 
         self.efunc_add_growthterm_vect = efunc_add_growthterm_vect
         self.efunc_mult_growthterm_vect = efunc_mult_growthterm_vect
         self.efunc_mult_decayterm_vect = efunc_mult_decayterm_vect
 
-        dcdt_vect_s = []
+        # Initialize the dcdt_vect_s with zeros:
+        dcdt_vect_s = [0 for nni in self.nodes_index]  # equations for rate of change of a node
+        eq_c_vect_s = [0 for nni in self.nodes_index]  # null equations for direct solutions for a node
 
         # Process additive interactions acting on the growth term:
         for nde_i, (fval_add, fval_mult, fval_multd) in enumerate(zip(efunc_add_growthterm_vect,
@@ -768,20 +784,64 @@ class GeneNetworkModel(object):
 
             efunc_mult_decayterm_vect[nde_i] = fprodd
 
-        # for ni in range(self.N_nodes): # Creating the sum terms above, construct the equation
-            ntype = self.node_types[nde_i]  # get the node type
-            # if we're not dealing with a 'signal' node that's written externally:
-            if ntype is not NodeType.signal:
-                dcdt_vect_s.append(d_max_s[nde_i]*efunc_mult_growthterm_vect[nde_i]*efunc_add_growthterm_vect[nde_i]
+            # for ni in range(self.N_nodes): # Creating the sum terms above, construct the equation
+            # if we're not dealing with a 'special' node that follows non-Hill dynamics:
+            if (nde_i in self.node_type_inds[NodeType.gene.name] or
+                    nde_i in self.node_type_inds[NodeType.effector.name]):
+                dcdt_vect_s[nde_i] = (d_max_s[nde_i]*efunc_mult_growthterm_vect[nde_i]*efunc_add_growthterm_vect[nde_i]
                                    - self.c_vect_s[nde_i] * d_max_s[nde_i] * efunc_mult_decayterm_vect[nde_i])
-            else:
-                dcdt_vect_s.append(0)
+            elif nde_i in self.process_node_inds:
+                proc_i = self.process_node_inds.index(nde_i) # get the index of the process
+                proc_dict = self.processes_list[proc_i] # get the correct info dictionary for the process
+                i_eff = proc_dict[NodeType.effector.name] # allow for multiple effectors
+                i_fact = proc_dict[NodeType.factor.name][0]
+                i_proc = proc_dict[NodeType.process.name]
+                i_sens = proc_dict[NodeType.sensor.name][0]
 
+                c_proc = self.c_vect_s[i_proc]
+                c_fact = self.c_vect_s[i_fact]
+
+                if len(i_eff) == 1:
+                    c_eff = self.c_vect_s[i_eff[0]]
+                    # Add the osmotic process attributes to the network:
+                    self.osmotic_process(c_eff, c_proc, c_fact)
+
+                elif len(i_eff) == 2:
+                    c_eff0 = self.c_vect_s[i_eff[0]]
+                    c_eff1 = self.c_vect_s[i_eff[1]]
+                    self.osmotic_process(c_eff0, c_proc, c_fact, c_channel=c_eff1)
+
+                else:
+                    raise Exception("To define a process must have either 1 or 2 effectors!")
+
+                # and add the process rate equation to the change vector:
+                dcdt_vect_s[nde_i] = self.dEdt_s
+
+                # Finally, we need an 'auxillary' equation that represents the value of the
+                # sensor in terms of the process, but equals zero (so we can include it in
+                # optimization root finding):
+                eq_c_vect_s[i_sens] = -self.c_vect_s[i_sens] + f_logi_s(c_proc,
+                                                                       self.sensor_params_s[i_sens][0],
+                                                                       self.sensor_params_s[i_sens][1])
+
+        # construct an 'extra params' list that holds non-GRN parameter arguments
+        # from sensors and the osmotic process:
+        self.extra_params_s = []
+
+        for k, v in self.sensor_params_s.items():
+            self.extra_params_s.extend(v)
+
+        self.extra_params_s.extend(self.process_params_s)
+
+        self.eq_c_vect_s = sp.Matrix(eq_c_vect_s)
 
         # analytical rate of change of concentration vector for the network:
         self.dcdt_vect_s = sp.Matrix(dcdt_vect_s)
 
         self._include_process = False  # Set the internal boolean to True for consistency
+
+        # vector to find roots of in any search (want to find the zeros of this function):
+        self.dcdt_vect_s = self.eq_c_vect_s + self.dcdt_vect_s
 
         # Generate the optimization "energy" function as well as jacobians and hessians for the system:
         self._generate_optimization_functions()
@@ -821,32 +881,20 @@ class GeneNetworkModel(object):
             dcdt_vect_s = self.dcdt_vect_s
             c_vect_s = self.c_vect_s
 
-        if self._include_process:
-            lambda_params = [self.c_vect_s,
-                             self.d_vect_s,
-                             self.B_vect_s,
-                             self.n_vect_s,
-                             self.process_params_s]
+        lambda_params = [self.c_vect_s,
+                         self.d_vect_s,
+                         self.B_vect_s,
+                         self.n_vect_s,
+                         ]
 
+        lambda_params_r = [c_vect_s,
+                           self.d_vect_s,
+                           self.B_vect_s,
+                           self.n_vect_s]
 
-            lambda_params_r = [c_vect_s,
-                             self.d_vect_s,
-                             self.B_vect_s,
-                             self.n_vect_s,
-                             self.process_params_s]
-
-        else:
-            lambda_params = [self.c_vect_s,
-                             self.d_vect_s,
-                             self.B_vect_s,
-                             self.n_vect_s,
-                             ]
-
-
-            lambda_params_r = [c_vect_s,
-                             self.d_vect_s,
-                             self.B_vect_s,
-                             self.n_vect_s]
+        if len(self.process_node_inds) or len(self.sensor_node_inds):
+            lambda_params.append(self.extra_params_s)
+            lambda_params_r.append(self.extra_params_s)
 
         # Create a Jacobian for the whole system
         self.jac_s = self.dcdt_vect_s.jacobian(sp.Matrix(self.c_vect_s))
@@ -886,7 +934,8 @@ class GeneNetworkModel(object):
 
             self.sol_cset_f = {}
             for ci, eqci in self.sol_cset_s.items():
-                self.sol_cset_f[ci.indices[0]] = sp.lambdify(lambda_params_r, eqci)
+                c_ind = self.c_vect_s.index(ci)
+                self.sol_cset_f[c_ind] = sp.lambdify(lambda_params_r, eqci)
 
     def reduce_model_dimensions(self):
         '''
@@ -1016,7 +1065,9 @@ class GeneNetworkModel(object):
 
     def create_parameter_vects(self, Bi: float|list=2.0,
                                 ni:float|list=3.0,
-                                di:float|list=1.0
+                                di:float|list=1.0,
+                                co: float|list = 0.0,
+                                ki: float|list = 10.0
                                 ):
         '''
         Create parameter vectors for the rate equations of the model nodes.
@@ -1047,9 +1098,32 @@ class GeneNetworkModel(object):
         else:
             d_vect = di
 
+        if type(ki) is not list:
+            k_vect = []
+            for nde_i in self.sensor_node_inds:
+                k_vect.append(ki)
+
+        else:
+            k_vect = ki
+
+        if type(co) is not list:
+            co_vect = []
+            for nde_i in self.sensor_node_inds:
+                co_vect.append(co)
+
+        else:
+            co_vect = co
+
         self.B_vect = B_vect
         self.n_vect = n_vect
         self.d_vect = d_vect
+
+        self.extra_params_f = []
+        for cc, kk in zip(co_vect, k_vect):
+            self.extra_params_f.extend((cc, kk))
+
+        if len(self.process_params_s):
+            self.extra_params_f.extend(self.process_params_f)
 
     def read_edge_info_from_graph(self):
         '''
@@ -1433,137 +1507,6 @@ class GeneNetworkModel(object):
 
         return fig, ax
 
-
-    def set_osmotic_process(self,
-                            c_effector: Symbol|Indexed,
-                            c_process: Symbol|Indexed,
-                            c_factor: Symbol|Indexed,
-                            c_channel: Symbol|Indexed|None = None):
-        '''
-        This method generates the symbolic and numerical equations required to define an
-        osmotic process, whereby differences in osmolyte concentrations on either side of
-        the membrane generate circumferential strains in a cell due to volume shrinkage
-        (case where c_effector < c_factor; c_process will be negative reflecting shrinkage
-        strain) or volume expansion (case where c_effector > c_factor; c_process will be
-        positive reflecting expansive strain). The functions return the strain rate for the
-        system, which is substituted into the system change vector.  In these expresions, all
-        parameters are normalized so that their values lay between 0 and 1 under most
-        circumstances.
-
-        c_effector : Symbol
-            Symbolic concentration from a node in the GRN network that represents the moles of
-            osmolyte inside the cell. This should correspond with an 'Effector' type node.
-
-        c_process : Symbol
-            Symbolic concentration from a node in the GRN network that represents the circumferential
-            strain of the cell membrane. Note when c_process < 0, the cell has shrunk and when
-            c_process is > 0, the cell has expanded from its equilibrium volume state.
-            This should correspond with a 'Process' type node.
-
-        c_factor : Symbol
-            Symbolic concentration from a node in the GRN network that represents the moles of
-            osmolyte outside the cell. This should correspond with a 'Factor' type node.
-
-        c_channel : Symbol|Indexed|None = None
-            Optional parameter allowing for use of a second effector, which controls the
-            expression of water channels.
-
-        '''
-        # FIXME: we need to put in the c_factors here for the environmental osmolytes
-
-        # Defining analytic equations for an osmotic cell volume change process:
-        A_s, R_s, T_s, ni_s, m_s, V_s, Vc_s, dm_s, mu_s, Y_s, r_s = sp.symbols('A, R, T, ni, m, V, V_c, d_m, mu, Y, r',
-                                                                              real=True)
-        # Normalized parameters:
-        Ap_s, mp_s, Ac_s, nc_s, epsilon_s = sp.symbols('A_p, m_p, A_c, n_c, epsilon', real=True)
-        if c_channel is not None:
-            # if c_channel is not None, then redefine the Normalized channel parameter so it
-            # corresponds with the supplied symbol:
-            Ap_s = c_channel
-
-
-        dVdt_0_s = A_s ** 2 * R_s * T_s * (ni_s - m_s * V_s) / (8 * dm_s * mu_s * V_s)
-        dVdt_1_s = (A_s ** 2 / (8 * dm_s * mu_s)) * (
-                    R_s * T_s * ((ni_s / V_s) - m_s) - sp.Rational(4, 3) * ((Y_s * dm_s * (V_s - Vc_s) / (r_s * Vc_s))))
-
-        # Rate of change of Vp with respect to time for Vp < 1.0 is:
-        dVpdt_0_s = (dVdt_0_s.subs(
-            [(V_s, (c_process +1) * Vc_s),
-             (A_s, Ap_s * Ac_s),
-             (ni_s, nc_s * c_effector), (m_s, c_factor * mp_s)]) / Vc_s).simplify()
-
-        # Rate of change of Vp with respect to time for Vp >= 1.0
-        dVpdt_1_s = (dVdt_1_s.subs(
-            [(V_s, (c_process +1) * Vc_s), (A_s, Ap_s * Ac_s), (ni_s, nc_s * c_effector),
-             (m_s, c_factor * mp_s)]) / Vc_s).simplify()
-
-        # Volume change rates (which are the input into the sensor node) are:
-        # FIXME: Substitute in expression for strain in terms of Vp here!
-        dEdt_0_s = dVpdt_0_s
-        dEdt_1_s = dVpdt_1_s
-
-        # Piecewise function that defines this normalized-parameter osmotic cell volume change problem
-        # as a strain rate:
-        self.dEdt_s = sp.Piecewise((dEdt_0_s, c_process < 0.0), (dEdt_1_s, True))
-
-        # Go ahead and initialize some parameters for this process function: # FIXME these need to be
-        # made easier to input, vary and change:
-        # self.m_f = 0.8  # Normalized environmental osmolyte concentration (high)
-        self.A_f = 1.0  # Normalized water/glycerol channel area
-        self.R_f = 8.3145  # Ideal Gas constant
-        self.T_f = 310.0  # System temperature in K
-        self.Y_f = 100e6  # Young's modulus for membrane or wall
-        self.dm_f = 1.0e-6  # membrane or wall thickness
-        self.mu_f = 1.0e-3  # water viscosity
-        self.r_f = 10.0e-6  # Undeformed cell radius
-        self.Vc_f = 2 * np.pi * self.r_f ** 2  # undeformed cell volume
-        self.nc_f = 1000.0 * self.Vc_f  # osmolyte moles in the cell (near max)
-        self.mc_f = 1000.0  # osmolyte concentration in the environment (near max)
-        self.Ac_f = 0.12e6 * np.pi * 1.0e-9 ** 2  # normalizing total water channel area (near max)
-
-        self.Vp_min = 0.2 # minimum relative volume that can be achieved
-        self.Vp_max = 2.0 # maximum relative volume that can be achieved
-
-        # symbolic parameters for the dV/dt process (these must be augmented onto the GRN parameters
-        # when lambdifying):
-
-        if c_channel is None:
-            self.process_params_s = (Ap_s, Vc_s, nc_s, mp_s, Ac_s, R_s, T_s, Y_s, dm_s, mu_s, r_s)
-            self.dEdt_f = sp.lambdify([c_process, c_effector, c_factor, self.process_params_s], self.dEdt_s)
-
-            # Numeric parameters for the dV/dt process (these must be augmented onto the GRN parameters
-            # when using numerical network equations):
-            self.process_params_f = (
-                                   self.A_f,
-                                   self.Vc_f,
-                                   self.nc_f,
-                                   self.mc_f,
-                                    self.Ac_f,
-                                    self.R_f,
-                                    self.T_f,
-                                    self.Y_f,
-                                    self.dm_f,
-                                    self.mu_f,
-                                    self.r_f)
-
-        else:
-            self.process_params_s = (Vc_s, nc_s, mp_s, Ac_s, R_s, T_s, Y_s, dm_s, mu_s, r_s)
-            self.dEdt_f = sp.lambdify([c_process, c_effector, c_channel, c_factor, self.process_params_s], self.dEdt_s)
-
-            # Numeric parameters for the dV/dt process (these must be augmented onto the GRN parameters
-            # when using numerical network equations):
-            self.process_params_f = (
-                                   self.Vc_f,
-                                   self.nc_f,
-                                   self.mc_f,
-                                    self.Ac_f,
-                                    self.R_f,
-                                    self.T_f,
-                                    self.Y_f,
-                                    self.dm_f,
-                                    self.mu_f,
-                                    self.r_f)
-
     def set_node_type_path(self,
                            root_i: int|None = None,
                            effector_i: int|None=None):
@@ -1855,6 +1798,142 @@ class GeneNetworkModel(object):
                 csvwriter = csv.writer(file)  # 2. create a csvwriter object
                 csvwriter.writerow(header)  # 4. write the header
                 csvwriter.writerows(eqns_to_write)  # 5. write the rest of the data
+
+    def osmotic_process(self,
+                        c_effector: Symbol | Indexed,
+                        c_process: Symbol | Indexed,
+                        c_factor: Symbol | Indexed,
+                        c_channel: Symbol | Indexed | None = None):
+        '''
+        This method generates the symbolic and numerical equations required to define an
+        osmotic process, whereby differences in osmolyte concentrations on either side of
+        the membrane generate circumferential strains in a cell due to volume shrinkage
+        (case where c_effector < c_factor; c_process will be negative reflecting shrinkage
+        strain) or volume expansion (case where c_effector > c_factor; c_process will be
+        positive reflecting expansive strain). The functions return the strain rate for the
+        system, which is substituted into the system change vector.  In these expresions, all
+        parameters are normalized so that their values lay between 0 and 1 under most
+        circumstances.
+
+        gmod : GeneNetworkModel
+            An instance of gene network model in which to add the osmotic process equations.
+
+        c_effector : Symbol
+            Symbolic concentration from a node in the GRN network that represents the moles of
+            osmolyte inside the cell. This should correspond with an 'Effector' type node.
+
+        c_process : Symbol
+            Symbolic concentration from a node in the GRN network that represents the circumferential
+            strain of the cell membrane. Note when c_process < 0, the cell has shrunk and when
+            c_process is > 0, the cell has expanded from its equilibrium volume state.
+            This should correspond with a 'Process' type node.
+
+        c_factor : Symbol
+            Symbolic concentration from a node in the GRN network that represents the moles of
+            osmolyte outside the cell. This should correspond with a 'Factor' type node.
+
+        c_channel : Symbol|Indexed|None = None
+            Optional parameter allowing for use of a second effector, which controls the
+            expression of water channels.
+
+        '''
+        # FIXME: we need to put in the c_factors here for the environmental osmolytes
+
+        # Defining analytic equations for an osmotic cell volume change process:
+        A_s, R_s, T_s, ni_s, m_s, V_s, Vc_s, dm_s, mu_s, Y_s, r_s = sp.symbols('A, R, T, ni, m, V, V_c, d_m, mu, Y, r',
+                                                                               real=True)
+        # Normalized parameters:
+        Ap_s, mp_s, Ac_s, nc_s, epsilon_s = sp.symbols('A_p, m_p, A_c, n_c, epsilon', real=True)
+        if c_channel is not None:
+            # if c_channel is not None, then redefine the Normalized channel parameter so it
+            # corresponds with the supplied symbol:
+            Ap_s = c_channel
+
+        dVdt_0_s = A_s ** 2 * R_s * T_s * (ni_s - m_s * V_s) / (8 * dm_s * mu_s * V_s)
+        dVdt_1_s = (A_s ** 2 / (8 * dm_s * mu_s)) * (
+                R_s * T_s * ((ni_s / V_s) - m_s) - sp.Rational(4, 3) * ((Y_s * dm_s * (V_s - Vc_s) / (r_s * Vc_s))))
+
+        # Rate of change of Vp with respect to time for Vp < 1.0 is:
+        dVpdt_0_s = (dVdt_0_s.subs(
+            [(V_s, (c_process + 1) * Vc_s),
+             (A_s, Ap_s * Ac_s),
+             (ni_s, nc_s * c_effector), (m_s, c_factor * mp_s)]) / Vc_s).simplify()
+
+        # Rate of change of Vp with respect to time for Vp >= 1.0
+        dVpdt_1_s = (dVdt_1_s.subs(
+            [(V_s, (c_process + 1) * Vc_s), (A_s, Ap_s * Ac_s), (ni_s, nc_s * c_effector),
+             (m_s, c_factor * mp_s)]) / Vc_s).simplify()
+
+        # Volume change rates (which are the input into the sensor node) are:
+        dEdt_0_s = dVpdt_0_s
+        dEdt_1_s = dVpdt_1_s
+
+        # Piecewise function that defines this normalized-parameter osmotic cell volume change problem
+        # as a strain rate:
+        self.dEdt_s = sp.Piecewise((dEdt_0_s, c_process < 0.0), (dEdt_1_s, True))
+
+        # Go ahead and initialize some parameters for this process function: # FIXME these need to be
+        # made easier to input, vary and change:
+        # self.m_f = 0.8  # Normalized environmental osmolyte concentration (high)
+        self.A_f = 1.0  # Normalized water/glycerol channel area
+        self.R_f = 8.3145  # Ideal Gas constant
+        self.T_f = 310.0  # System temperature in K
+        self.Y_f = 100e6  # Young's modulus for membrane or wall
+        self.dm_f = 1.0e-6  # membrane or wall thickness
+        self.mu_f = 1.0e-3  # water viscosity
+        self.r_f = 10.0e-6  # Undeformed cell radius
+        self.Vc_f = 2 * np.pi * self.r_f ** 2  # undeformed cell volume
+        self.nc_f = 1000.0 * self.Vc_f  # osmolyte moles in the cell (near max)
+        self.mc_f = 1000.0  # osmolyte concentration in the environment (near max)
+        self.Ac_f = 0.12e6 * np.pi * 1.0e-9 ** 2  # normalizing total water channel area (near max)
+
+        self.Vp_min = 0.2  # minimum relative volume that can be achieved
+        self.Vp_max = 2.0  # maximum relative volume that can be achieved
+
+        # As strains (which is the format of the process parameter):
+        self.strain_min = self.Vp_min - 1.0
+        self.strain_max = self.Vp_max - 1.0
+
+
+        # symbolic parameters for the dV/dt process (these must be augmented onto the GRN parameters
+        # when lambdifying):
+
+        if c_channel is None:
+            self.process_params_s = (Ap_s, Vc_s, nc_s, mp_s, Ac_s, R_s, T_s, Y_s, dm_s, mu_s, r_s)
+            self.dEdt_f = sp.lambdify([c_process, c_effector, c_factor, self.process_params_s], self.dEdt_s)
+
+            # Numeric parameters for the dV/dt process (these must be augmented onto the GRN parameters
+            # when using numerical network equations):
+            self.process_params_f = (
+                self.A_f,
+                self.Vc_f,
+                self.nc_f,
+                self.mc_f,
+                self.Ac_f,
+                self.R_f,
+                self.T_f,
+                self.Y_f,
+                self.dm_f,
+                self.mu_f,
+                self.r_f)
+
+        else:
+            self.process_params_s = (Vc_s, nc_s, mp_s, Ac_s, R_s, T_s, Y_s, dm_s, mu_s, r_s)
+            self.dEdt_f = sp.lambdify([c_process, c_effector, c_channel, c_factor, self.process_params_s], self.dEdt_s)
+
+            # Numeric parameters for the dV/dt process (these must be augmented onto the GRN parameters
+            # when using numerical network equations):
+            self.process_params_f = (
+                self.Vc_f,
+                self.nc_f,
+                self.mc_f,
+                self.Ac_f,
+                self.R_f,
+                self.T_f,
+                self.Y_f,
+                self.dm_f,
+                self.mu_f,
+                self.r_f)
 
 
 
