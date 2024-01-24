@@ -642,7 +642,7 @@ class GeneNetworkModel(object):
 
         self.nonsignal_inds = np.setdiff1d(self.nodes_index, self.signal_inds)
 
-        c_s = sp.IndexedBase('c')
+        # c_s = sp.IndexedBase('c')
         B_s = sp.IndexedBase('beta')
         n_s = sp.IndexedBase('n')
         d_max_s = sp.IndexedBase('d_max')
@@ -651,7 +651,13 @@ class GeneNetworkModel(object):
         self.B_vect_s = [B_s[i] for i in range(self.N_edges)]
         self.n_vect_s = [n_s[i] for i in range(self.N_edges)]
         self.d_vect_s = [d_max_s[i] for i in self.nodes_index]
-        self.c_vect_s = [c_s[i] for i in self.nodes_index]
+        # self.c_vect_s = [c_s[i] for i in self.nodes_index]
+
+        if type(self.nodes_list[0]) is str:
+            self.c_vect_s = [sp.symbols(ndi) for ndi in self.nodes_list]
+        else:
+            c_s = sp.IndexedBase('c')
+            self.c_vect_s = [c_s[i] for i in self.nodes_index]
 
         efunc_add_growthterm_vect = [[] for i in self.nodes_index]
         efunc_mult_growthterm_vect = [[] for i in self.nodes_index]
@@ -661,17 +667,17 @@ class GeneNetworkModel(object):
                                                     self.add_edge_interaction_bools,
                                                     self.growth_interaction_bools)):
             if add_tag and gwth_tag:
-                efunc_add_growthterm_vect[j].append(fun_type(c_s[i], B_s[ei], n_s[ei]))
+                efunc_add_growthterm_vect[j].append(fun_type(self.c_vect_s[i], B_s[ei], n_s[ei]))
                 efunc_mult_growthterm_vect[j].append(None)
                 efunc_mult_decayterm_vect[j].append(None)
 
             elif not add_tag and gwth_tag:
-                efunc_mult_growthterm_vect[j].append(fun_type(c_s[i], B_s[ei], n_s[ei]))
+                efunc_mult_growthterm_vect[j].append(fun_type(self.c_vect_s[i], B_s[ei], n_s[ei]))
                 efunc_add_growthterm_vect[j].append(None)
                 efunc_mult_decayterm_vect[j].append(None)
 
             elif not add_tag and not gwth_tag:
-                efunc_mult_decayterm_vect[j].append(fun_type(c_s[i], B_s[ei], n_s[ei]))
+                efunc_mult_decayterm_vect[j].append(fun_type(self.c_vect_s[i], B_s[ei], n_s[ei]))
                 efunc_add_growthterm_vect[j].append(None)
                 efunc_mult_growthterm_vect[j].append(None)
             else:
@@ -723,7 +729,7 @@ class GeneNetworkModel(object):
             # if we're not dealing with a 'signal' node that's written externally:
             if ntype is not NodeType.signal:
                 dcdt_vect_s.append(d_max_s[nde_i]*efunc_mult_growthterm_vect[nde_i]*efunc_add_growthterm_vect[nde_i]
-                                   - c_s[nde_i] * d_max_s[nde_i] * efunc_mult_decayterm_vect[nde_i])
+                                   - self.c_vect_s[nde_i] * d_max_s[nde_i] * efunc_mult_decayterm_vect[nde_i])
             else:
                 dcdt_vect_s.append(0)
 
@@ -1384,12 +1390,39 @@ class GeneNetworkModel(object):
         return fig, ax
 
 
-    def set_analytic_process(self, c_effector: Symbol|Indexed, c_process: Symbol|Indexed):
+    def set_osmotic_process(self,
+                            c_effector: Symbol|Indexed,
+                            c_process: Symbol|Indexed,
+                            c_factor: Symbol|Indexed,
+                            c_channel: Symbol|Indexed|None = None):
         '''
+        This method generates the symbolic and numerical equations required to define an
+        osmotic process, whereby differences in osmolyte concentrations on either side of
+        the membrane generate circumferential strains in a cell due to volume shrinkage
+        (case where c_effector < c_factor; c_process will be negative reflecting shrinkage
+        strain) or volume expansion (case where c_effector > c_factor; c_process will be
+        positive reflecting expansive strain). The functions return the strain rate for the
+        system, which is substituted into the system change vector.  In these expresions, all
+        parameters are normalized so that their values lay between 0 and 1 under most
+        circumstances.
 
         c_effector : Symbol
             Symbolic concentration from a node in the GRN network that represents the moles of
-            osmolyte inside the cell.
+            osmolyte inside the cell. This should correspond with an 'Effector' type node.
+
+        c_process : Symbol
+            Symbolic concentration from a node in the GRN network that represents the circumferential
+            strain of the cell membrane. Note when c_process < 0, the cell has shrunk and when
+            c_process is > 0, the cell has expanded from its equilibrium volume state.
+            This should correspond with a 'Process' type node.
+
+        c_factor : Symbol
+            Symbolic concentration from a node in the GRN network that represents the moles of
+            osmolyte outside the cell. This should correspond with a 'Factor' type node.
+
+        c_channel : Symbol|Indexed|None = None
+            Optional parameter allowing for use of a second effector, which controls the
+            expression of water channels.
 
         '''
         # FIXME: we need to put in the c_factors here for the environmental osmolytes
@@ -1398,7 +1431,12 @@ class GeneNetworkModel(object):
         A_s, R_s, T_s, ni_s, m_s, V_s, Vc_s, dm_s, mu_s, Y_s, r_s = sp.symbols('A, R, T, ni, m, V, V_c, d_m, mu, Y, r',
                                                                               real=True)
         # Normalized parameters:
-        Ap_s, mp_s, Ac_s, nc_s, mc_s, epsilon_s = sp.symbols('A_p, m_p, A_c, n_c, m_c, epsilon', real=True)
+        Ap_s, mp_s, Ac_s, nc_s, epsilon_s = sp.symbols('A_p, m_p, A_c, n_c, epsilon', real=True)
+        if c_channel is not None:
+            # if c_channel is not None, then redefine the Normalized channel parameter so it
+            # corresponds with the supplied symbol:
+            Ap_s = c_channel
+
 
         dVdt_0_s = A_s ** 2 * R_s * T_s * (ni_s - m_s * V_s) / (8 * dm_s * mu_s * V_s)
         dVdt_1_s = (A_s ** 2 / (8 * dm_s * mu_s)) * (
@@ -1406,11 +1444,14 @@ class GeneNetworkModel(object):
 
         # Rate of change of Vp with respect to time for Vp < 1.0 is:
         dVpdt_0_s = (dVdt_0_s.subs(
-            [(V_s, c_process * Vc_s), (A_s, Ap_s * Ac_s), (ni_s, nc_s * c_effector), (m_s, mc_s * mp_s)]) / Vc_s).simplify()
+            [(V_s, (c_process +1) * Vc_s),
+             (A_s, Ap_s * Ac_s),
+             (ni_s, nc_s * c_effector), (m_s, c_factor * mp_s)]) / Vc_s).simplify()
 
         # Rate of change of Vp with respect to time for Vp >= 1.0
         dVpdt_1_s = (dVdt_1_s.subs(
-            [(V_s, c_process * Vc_s), (A_s, Ap_s * Ac_s), (ni_s, nc_s * c_effector), (m_s, mc_s * mp_s)]) / Vc_s).simplify()
+            [(V_s, (c_process +1) * Vc_s), (A_s, Ap_s * Ac_s), (ni_s, nc_s * c_effector),
+             (m_s, c_factor * mp_s)]) / Vc_s).simplify()
 
         # Volume change rates (which are the input into the sensor node) are:
         # FIXME: Substitute in expression for strain in terms of Vp here!
@@ -1419,11 +1460,11 @@ class GeneNetworkModel(object):
 
         # Piecewise function that defines this normalized-parameter osmotic cell volume change problem
         # as a strain rate:
-        self.dEdt_s = sp.Piecewise((dEdt_0_s, c_process < 1.0), (dEdt_1_s, True))
+        self.dEdt_s = sp.Piecewise((dEdt_0_s, c_process < 0.0), (dEdt_1_s, True))
 
         # Go ahead and initialize some parameters for this process function: # FIXME these need to be
         # made easier to input, vary and change:
-        self.m_f = 0.8  # Normalized environmental osmolyte concentration (high)
+        # self.m_f = 0.8  # Normalized environmental osmolyte concentration (high)
         self.A_f = 1.0  # Normalized water/glycerol channel area
         self.R_f = 8.3145  # Ideal Gas constant
         self.T_f = 310.0  # System temperature in K
@@ -1441,25 +1482,43 @@ class GeneNetworkModel(object):
 
         # symbolic parameters for the dV/dt process (these must be augmented onto the GRN parameters
         # when lambdifying):
-        self.process_params_s = (mp_s, Ap_s, Vc_s, nc_s, mc_s, Ac_s, R_s, T_s, Y_s, dm_s, mu_s, r_s)
 
-        self.dEdt_f = sp.lambdify([c_process, c_effector, self.process_params_s], self.dEdt_s)
+        if c_channel is None:
+            self.process_params_s = (Ap_s, Vc_s, nc_s, mp_s, Ac_s, R_s, T_s, Y_s, dm_s, mu_s, r_s)
+            self.dEdt_f = sp.lambdify([c_process, c_effector, c_factor, self.process_params_s], self.dEdt_s)
 
-        # Numeric parameters for the dV/dt process (these must be augmented onto the GRN parameters
-        # when using numerical network equations):
-        self.process_params_f = (
-                               self.m_f,
-                               self.A_f,
-                               self.Vc_f,
-                               self.nc_f,
-                               self.mc_f,
-                                self.Ac_f,
-                                self.R_f,
-                                self.T_f,
-                                self.Y_f,
-                                self.dm_f,
-                                self.mu_f,
-                                self.r_f)
+            # Numeric parameters for the dV/dt process (these must be augmented onto the GRN parameters
+            # when using numerical network equations):
+            self.process_params_f = (
+                                   self.A_f,
+                                   self.Vc_f,
+                                   self.nc_f,
+                                   self.mc_f,
+                                    self.Ac_f,
+                                    self.R_f,
+                                    self.T_f,
+                                    self.Y_f,
+                                    self.dm_f,
+                                    self.mu_f,
+                                    self.r_f)
+
+        else:
+            self.process_params_s = (Vc_s, nc_s, mp_s, Ac_s, R_s, T_s, Y_s, dm_s, mu_s, r_s)
+            self.dEdt_f = sp.lambdify([c_process, c_effector, c_channel, c_factor, self.process_params_s], self.dEdt_s)
+
+            # Numeric parameters for the dV/dt process (these must be augmented onto the GRN parameters
+            # when using numerical network equations):
+            self.process_params_f = (
+                                   self.Vc_f,
+                                   self.nc_f,
+                                   self.mc_f,
+                                    self.Ac_f,
+                                    self.R_f,
+                                    self.T_f,
+                                    self.Y_f,
+                                    self.dm_f,
+                                    self.mu_f,
+                                    self.r_f)
 
     def set_node_type_path(self,
                            root_i: int|None = None,
