@@ -24,10 +24,20 @@ from cellnition.science.gene_networks import GeneNetworkModel
 
 class GeneKnockout(object):
     '''
+    Given a network model, this class contains routines to perform gene-knockout
+    experiments (gene silencing) whereby individual genes are silenced and
+    the behaviour of the network re-assessed.
 
     '''
     def __init__(self, gmod: GeneNetworkModel):
         '''
+        Initialize the class.
+
+        Parameters
+        ----------
+        gmod : GeneNetworkModel
+            An instance of GeneNetworkModel with an analytical model built;
+            forms the basis of the knockout experiment.
 
         '''
         self._gmod = gmod # initialize the system
@@ -214,6 +224,9 @@ class GeneKnockout(object):
                                  dt: float,
                                  cvecti_o: ndarray|list,
                                  dt_samp: float|None = None):
+        '''
+
+        '''
 
         # Let's try knockouts as a time-sim thing:
         Nt = int(tend / dt)
@@ -252,7 +265,7 @@ class GeneKnockout(object):
             cvecti = cvecti_o.copy()  # reset nodes back to the supplied initial conditions
             c_vect_time = []
 
-            if i in gmod.nonsignal_inds:
+            if i in gmod.regular_node_inds:
 
                 for ti, tt in enumerate(tvect):
                     dcdt = gmod.dcdt_vect_f(cvecti, gmod.d_vect, gmod.B_vect, gmod.n_vect)

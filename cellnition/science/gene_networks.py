@@ -40,7 +40,7 @@ import sympy as sp
 from sympy.core.symbol import Symbol
 from sympy.tensor.indexed import Indexed
 from cellnition.science.network_enums import EdgeType, GraphType, NodeType
-from cellnition.science.node_functions import f_acti_s, f_inhi_s, f_neut_s
+from cellnition.science.interaction_functions import f_acti_s, f_inhi_s, f_neut_s
 import pygraphviz as pgv
 
 # TODO: allow system to build model with automatically substituting in P, S, F, E, etc
@@ -114,17 +114,6 @@ class GeneNetworkModel(object):
                     self.hier_node_level = np.zeros(self.N_nodes)
             self.hier_incoherence = 0.0
             self.dem_coeff = 0.0
-
-
-
-
-    Private Attributes
-    ------------------
-    _graph_type = graph_type
-    _reduced_dims = False # Indicate that model is full dimensions
-    _include_process = False # Indicate that model does not include the process by default
-    _solved_analytically = False # Indicate that the model does not have an analytical solution
-
 
     '''
 
@@ -575,7 +564,8 @@ class GeneNetworkModel(object):
                                prob_acti: float=0.5,
                                edge_types: list|ndarray|None=None,
                                node_type_dict: dict|None=None,
-                               add_interactions: bool=True):
+                               add_interactions: bool=True,
+                               pure_gene_edges_only: bool=False):
         '''
         Using the network to supply structure, this method constructs an
         analytical (symbolic) model of the regulatory network as a dynamic
@@ -604,6 +594,12 @@ class GeneNetworkModel(object):
             (equivalent to an "And" condition) or additive (equivalent to an "or condition). This
             bool specifies whether multiple interactions should be additive (True) or multiplicative (False).
 
+        pure_gene_edges_only : bool = False
+            In a network with mixed node types, setting this to true will ensure that only edges
+            that connect two nodes that are both NodeType.gene will be included in the model. If
+            it's set to "False", then NodeType.gene, NodeType.sensor, and NodeType.effector are all
+            included as valid edges.
+
         '''
 
         self._reduced_dims = False # always build models in full dimensions
@@ -616,10 +612,17 @@ class GeneNetworkModel(object):
 
         self.set_edge_types(self.edge_types, add_interactions)
 
-        # Now that indices are set, give nodes a type attribute:
-        node_types = [NodeType.gene for i in self.nodes_index]  # First set all nodes
-        # to the gene type
+        # Now that indices are set, give nodes a type attribute and classify node inds.
+        # First, initialize a dictionary to collect all node indices by their node type:
+        self.node_type_inds = {}
+        for nt in NodeType:
+            self.node_type_inds[nt.name] = []
 
+        # Next, set all nodes to the gene type by default:
+        node_types = [NodeType.gene for i in self.nodes_index]
+
+        # If there is a supplied node dictionary, go through it and
+        # override the default gene type with the user-specified type:
         if node_type_dict is not None:
             for ntag, ntype in node_type_dict.items():
                 for nde_i, nde_n in enumerate(self.nodes_list):
@@ -634,34 +637,75 @@ class GeneNetworkModel(object):
         self.node_types = node_types
         self.set_node_types(node_types)
 
-        # Determine the node indices of any signal nodes:
-        self.signal_inds = []
+        # Collect node indices by their type:
         for nde_i, nde_t in enumerate(self.node_types):
-            if nde_t is NodeType.signal:
-                self.signal_inds.append(nde_i)
+            self.node_type_inds[nde_t.name].append(nde_i)
 
-        self.nonsignal_inds = np.setdiff1d(self.nodes_index, self.signal_inds)
+        # Next, we need to distinguish edges based on their node type
+        # to separate out some node type interactions from the regular
+        # GRN-type interactions:
+        if pure_gene_edges_only: # if the user wants to consider only gene type nodes
+            type_tags = [NodeType.gene.name]
+        else: # Otherwise include all nodes that can form regular interaction edges:
+            type_tags = [NodeType.gene.name,
+                         NodeType.signal.name,
+                         NodeType.sensor.name,
+                         NodeType.effector.name]
 
-        # c_s = sp.IndexedBase('c')
-        B_s = sp.IndexedBase('beta')
-        n_s = sp.IndexedBase('n')
-        d_max_s = sp.IndexedBase('d_max')
+        self.regular_node_inds = []
+        for tt in type_tags:
+            self.regular_node_inds += self.node_type_inds[tt]
+
+        self.signal_node_inds = self.node_type_inds['signal']
+
+        # Next we want to distinguish a subset of edges that connect only "regular nodes":
+        self.regular_edges_index = []
+        for ei, (nde_i, nde_j) in enumerate(self.edges_index):
+            if nde_i in self.regular_node_inds and nde_j in self.regular_node_inds:
+                self.regular_edges_index.append((nde_i, nde_j))
+
+        # Next, create a process dict that organizes features required for
+        # constructing the heterogenous process:
+        self.processes_list = []
+        if len(self.node_type_inds['process']):
+            for pi in self.node_type_inds['process']:
+                process_dict = {'process_ind': pi}
+                # Allow for multiple effectors, sensors and factors:
+                process_dict[NodeType.effector.name] = []
+                process_dict[NodeType.sensor.name] = []
+                process_dict[NodeType.factor.name] = []
+                # set through all edges:
+                for ei, (nde_i, nde_j) in enumerate(self.edges_index):
+                    # Find an edge that connects to this process
+                    if pi == nde_i:
+                        process_dict[self.node_types[nde_j].name].append(nde_j)
+                    elif pi == nde_j:
+                        process_dict[self.node_types[nde_i].name].append(nde_i)
+
+                self.processes_list.append(process_dict)
+
+        B_s = sp.IndexedBase('beta') # Symbolic base Hill 'beta parameter' edge interaction
+        n_s = sp.IndexedBase('n') # Symbolic base Hill exponent for each edge interaction
+        d_max_s = sp.IndexedBase('d_max') # Symbolic base decay rate for each node
 
         # These are needed for lambdification of analytical models:
         self.B_vect_s = [B_s[i] for i in range(self.N_edges)]
         self.n_vect_s = [n_s[i] for i in range(self.N_edges)]
         self.d_vect_s = [d_max_s[i] for i in self.nodes_index]
-        # self.c_vect_s = [c_s[i] for i in self.nodes_index]
 
         if type(self.nodes_list[0]) is str:
+            # If nodes have string names, let the math reflect these:
             self.c_vect_s = [sp.symbols(ndi) for ndi in self.nodes_list]
         else:
+            # Otherwise, if nodes are just numbered, let it be a generic 'c' symbol
+            # to node number:
             c_s = sp.IndexedBase('c')
             self.c_vect_s = [c_s[i] for i in self.nodes_index]
 
         efunc_add_growthterm_vect = [[] for i in self.nodes_index]
         efunc_mult_growthterm_vect = [[] for i in self.nodes_index]
         efunc_mult_decayterm_vect = [[] for i in self.nodes_index]
+
         for ei, ((i, j), fun_type, add_tag, gwth_tag) in enumerate(zip(self.edges_index,
                                                     self.edge_funcs,
                                                     self.add_edge_interaction_bools,
@@ -928,7 +972,7 @@ class GeneNetworkModel(object):
 
                 # Create a set of signal node indices to the reduced c_vect array:
                 self.signal_reduced_inds = []
-                for si in self.signal_inds:
+                for si in self.signal_node_inds:
                     if si in self.c_master_i:
                         self.signal_reduced_inds.append(self.c_master_i.index(si))
 
@@ -1119,8 +1163,8 @@ class GeneNetworkModel(object):
             signal_inds = self.signal_reduced_inds
             nonsignal_inds = self.nonsignal_reduced_inds
         else:
-            signal_inds = self.signal_inds
-            nonsignal_inds = self.nonsignal_inds
+            signal_inds = self.signal_node_inds
+            nonsignal_inds = self.regular_node_inds
 
         if include_signals is False:
             # Create a c_vect sampled to the non-signal nodes:
@@ -1637,7 +1681,7 @@ class GeneNetworkModel(object):
 
             if c_signals is not None:
                 # manually set the signal node values:
-                cvecti[self.signal_inds] = c_signals[ti, self.signal_inds]
+                cvecti[self.signal_node_inds] = c_signals[ti, self.signal_node_inds]
 
             if dt_samp is None:
                 concs_time.append(cvecti * 1)
@@ -1714,9 +1758,9 @@ class GeneNetworkModel(object):
             cmap = 'magma'
 
         state_labels = [f'State {i +1}' for i in range(solsM.shape[1])]
-        gene_labels = np.asarray(self.nodes_list)[self.nonsignal_inds]
+        gene_labels = np.asarray(self.nodes_list)[self.regular_node_inds]
         fig, ax = plt.subplots()
-        im = ax.imshow(solsM[self.nonsignal_inds, :], cmap=cmap)
+        im = ax.imshow(solsM[self.regular_node_inds, :], cmap=cmap)
         # plt.colorbar(label='Expression Level')
         ax.set_xticks(np.arange(len(state_labels)), labels=state_labels)
         ax.set_yticks(np.arange(len(gene_labels)), labels=gene_labels)

@@ -6,6 +6,7 @@ import numpy as np
 from numpy import ndarray
 from cellnition.science.gene_networks import GeneNetworkModel
 
+# FIXME: we'd like to remove signal node edges and signal nodes from this search.
 
 def multistability_search(gmod: GeneNetworkModel,
                           N_multi: int = 1,

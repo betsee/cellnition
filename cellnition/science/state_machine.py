@@ -169,15 +169,15 @@ class StateMachine(object):
 
         G_states = MultiDiGraph()
 
-        signal_inds = [[sigi] for sigi in self._gmod.signal_inds]
+        signal_inds = [[sigi] for sigi in self._gmod.signal_node_inds]
 
         if do_combos:
             extended_sigs = []
-            for sigi in self._gmod.signal_inds:
-                for sigj in self._gmod.signal_inds:
+            for sigi in self._gmod.signal_node_inds:
+                for sigj in self._gmod.signal_node_inds:
                     if sigi != sigj:
                         extended_sigs.append([sigi, sigj])
-            extended_sigs.append(self._gmod.signal_inds) # append all of them as a list to do all at once
+            extended_sigs.append(self._gmod.signal_node_inds) # append all of them as a list to do all at once
             signal_inds.extend(extended_sigs)
 
         # Make string labels for each of the signals:

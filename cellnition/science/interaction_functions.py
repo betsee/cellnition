@@ -4,7 +4,8 @@
 # See "LICENSE" for further details.
 
 '''
-This module contains different functions that can be applied at the nodes when constructing an analytical
+This module contains different functions that can be applied as the influence of one node
+over another node (node-node interaction) when constructing an analytical
 model. These functions are intended to be used with symbolic computing (sympy).
 '''
 import csv
@@ -44,3 +45,9 @@ def f_neut_s(cc, kk, nn):
     there is neither an activation nor inhibition response.
     '''
     return 1
+
+def f_logi_s(cc, co, k):
+    '''
+
+    '''
+    return 1/(1 + sp.exp(-k*(cc - co)))
