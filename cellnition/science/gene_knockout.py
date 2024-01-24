@@ -36,9 +36,8 @@ class GeneKnockout(object):
                                Ns: int = 3,
                                cmin: float = 0.0,
                                cmax: float = 1.0,
-                               Ki: float | list = 0.5,
+                               Bi: float | list = 0.5,
                                ni: float | list = 3.0,
-                               ri: float | list = 1.0,
                                di: float | list = 1.0,
                                tol: float = 1.0e-6,
                                round_sol: int = 6,
@@ -72,13 +71,13 @@ class GeneKnockout(object):
             save_file_list.extend([None for i in range(self._gmod.N_nodes)])
 
         # Create parameter vectors for the model:
-        self._gmod.create_parameter_vects(Ki, ni, ri, di)
+        self._gmod.create_parameter_vects(Bi, ni, di)
 
         # Solve the system with all concentrations:
         sols_0 = self._gmod.optimized_phase_space_search(Ns=Ns,
                                                    cmax=cmax,
                                                    round_sol=round_sol,
-                                                   Ki=self._gmod.K_vect,
+                                                   Bi=self._gmod.B_vect,
                                                    di=self._gmod.d_vect,
                                                    ni=self._gmod.n_vect,
                                                    tol=tol,
@@ -119,18 +118,16 @@ class GeneKnockout(object):
             if self._gmod._include_process is False:
                 lambda_params = [c_vect_ko,
                                  c_ko_s,
-                                 self._gmod.r_vect_s,
                                  self._gmod.d_vect_s,
-                                 self._gmod.K_vect_s,
+                                 self._gmod.B_vect_s,
                                  self._gmod.n_vect_s,
                                  ]
 
             else:
                 lambda_params = [c_vect_ko,
                                  c_ko_s,
-                                 self._gmod.r_vect_s,
                                  self._gmod.d_vect_s,
-                                 self._gmod.K_vect_s,
+                                 self._gmod.B_vect_s,
                                  self._gmod.n_vect_s,
                                  self._gmod.process_params_s
                                  ]
@@ -143,9 +140,9 @@ class GeneKnockout(object):
             # Determine the set of additional arguments to the optimization function -- these are different each
             # time as the clamped concentration becomes an additional known parameter:
             if self._gmod._include_process is False:
-                function_args = (0.0, self._gmod.r_vect, self._gmod.d_vect, self._gmod.K_vect, self._gmod.n_vect)
+                function_args = (0.0, self._gmod.d_vect, self._gmod.B_vect, self._gmod.n_vect)
             else:
-                function_args = (0.0, self._gmod.r_vect, self._gmod.d_vect, self._gmod.K_vect, self._gmod.n_vect,
+                function_args = (0.0, self._gmod.d_vect, self._gmod.B_vect, self._gmod.n_vect,
                                  self._gmod.process_params_f)
 
             # Generate the points in state space to sample at:
@@ -243,7 +240,7 @@ class GeneKnockout(object):
             if i == 0:
                 for ti, tt in enumerate(tvect):
                     # for the first run, do a wild-type simulation
-                    dcdt = gmod.dcdt_vect_f(cvecti, gmod.r_vect, gmod.d_vect, gmod.K_vect, gmod.n_vect)
+                    dcdt = gmod.dcdt_vect_f(cvecti, gmod.d_vect, gmod.B_vect, gmod.n_vect)
                     cvecti += dt * dcdt
 
                     if tt in tvect_samp:
@@ -258,7 +255,7 @@ class GeneKnockout(object):
             if i in gmod.nonsignal_inds:
 
                 for ti, tt in enumerate(tvect):
-                    dcdt = gmod.dcdt_vect_f(cvecti, gmod.r_vect, gmod.d_vect, gmod.K_vect, gmod.n_vect)
+                    dcdt = gmod.dcdt_vect_f(cvecti, gmod.d_vect, gmod.B_vect, gmod.n_vect)
                     cvecti += dt * dcdt
 
                     if ti > int(Nt / 2):

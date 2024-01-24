@@ -49,9 +49,8 @@ class PhaseSpace(object):
                                 N_pts: int=15,
                                 cmin: float=0.0,
                                 cmax: float|list=1.0,
-                                Ki: float|list=0.5,
+                                Bi: float|list=2.0,
                                 ni:float|list=3.0,
-                                ri:float|list=1.0,
                                 di:float|list=1.0,
                                 zer_thresh: float=0.01,
                                 include_signals: bool = False
@@ -96,7 +95,7 @@ class PhaseSpace(object):
         '''
 
         # Create parameter vectors for the model:
-        self._gmod.create_parameter_vects(Ki, ni, ri, di)
+        self._gmod.create_parameter_vects(Bi, ni, di)
 
         if self._gmod._reduced_dims and self._gmod._solved_analytically is False:
             N_nodes = len(self._gmod.c_vect_reduced_s)
@@ -120,15 +119,13 @@ class PhaseSpace(object):
         for i, c_vecti in enumerate(c_vect_set):
             if self._gmod._include_process is False:
                 dcdt_i = dcdt_vect_f(c_vecti,
-                                     self._gmod.r_vect,
                                      self._gmod.d_vect,
-                                     self._gmod.K_vect,
+                                     self._gmod.B_vect,
                                      self._gmod.n_vect)
             else:
                 dcdt_i = dcdt_vect_f(c_vecti,
-                                     self._gmod.r_vect,
                                      self._gmod.d_vect,
-                                     self._gmod.K_vect,
+                                     self._gmod.B_vect,
                                      self._gmod.n_vect,
                                      self._gmod.process_params_f)
             dcdt_M[i] = dcdt_i * 1

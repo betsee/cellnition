@@ -7,6 +7,7 @@
 This module defines several types of study networks.
 '''
 from abc import ABCMeta, abstractmethod
+import numpy as np
 from cellnition.science.network_enums import EdgeType, GraphType, NodeType
 
 
@@ -48,17 +49,20 @@ class BinodeNetAdd(LibNet):
                       ]
 
         # Generates set of 4 nicely spaced attractors:
-        self.K_vect = [0.57857143, 1.43142857, 1.14714286, 0.57857143, 0.5, 0.5]
+        K_vect = [0.57857143, 1.43142857, 1.14714286, 0.57857143, 0.5, 0.5]
+        self.B_vect = (1/np.asarray(K_vect)).tolist()
         self.d_vect = 1.0
         self.n_vect = 3.0
         self.cmax = 4.0
 
-        self.K_vect_alt1 = [1.43142857, 0.57857143, 0.57857143, 1.14714286, 0.5, 0.5]
+        K_vect_alt1 = [1.43142857, 0.57857143, 0.57857143, 1.14714286, 0.5, 0.5]
+        self.B_vect_alt1 = (1 / np.asarray(K_vect_alt1)).tolist()
         self.d_vect_alt1 = 1.0
         self.n_vect_alt1 = 3.0
         self.cmax_alt1 = 4.0
 
-        self.K_vect_alt2 = 0.5
+        K_vect_alt2 = 0.5
+        self.B_vect_alt2 = (1/K_vect_alt2)
         self.d_vect_alt2 = 1.0
         self.n_vect_alt2 = 3.0
         self.cmax_alt2 = 4.0
@@ -93,22 +97,6 @@ class BasicBinodeNet(LibNet):
                       # EdgeType.A, EdgeType.A,
                       EdgeType.Is, EdgeType.Is
                       ]
-
-        # Generates set of 4 nicely spaced attractors:
-        # self.K_vect = [0.57857143, 1.43142857, 1.14714286, 0.57857143, 0.5, 0.5]
-        # self.d_vect = 1.0
-        # self.n_vect = 3.0
-        # self.cmax = 4.0
-        #
-        # self.K_vect_alt1 = [1.43142857, 0.57857143, 0.57857143, 1.14714286, 0.5, 0.5]
-        # self.d_vect_alt1 = 1.0
-        # self.n_vect_alt1 = 3.0
-        # self.cmax_alt1 = 4.0
-        #
-        # self.K_vect_alt2 = 0.5
-        # self.d_vect_alt2 = 1.0
-        # self.n_vect_alt2 = 3.0
-        # self.cmax_alt2 = 4.0
 
         self.node_type_dict = {'S': NodeType.signal}
         # self.node_type_dict = None
@@ -145,18 +133,21 @@ class TrinodeNetAdd(LibNet):
 
 
         # Penta-state, well spaced in all vectors on triangle (I, I, I)
-        self.K_vect = [0.45, 0.45, 0.1 , 0.45, 0.45, 0.1, 0.5, 0.5, 0.5]
+        K_vect = [0.45, 0.45, 0.1 , 0.45, 0.45, 0.1, 0.5, 0.5, 0.5]
+        self.B_vect = (1 / np.asarray(K_vect)).tolist()
         self.d_vect =  1.0
         self.n_vect = 3.0
         self.cmax = 4.0
 
         # Penta-state, well spaced in all vectors on triangle (I, I, I)
-        self.K_vect_alt1 = [0.45, 0.1, 0.45, 0.45, 0.45, 0.45, 0.5, 0.5, 0.5]
+        K_vect_alt1 = [0.45, 0.1, 0.45, 0.45, 0.45, 0.45, 0.5, 0.5, 0.5]
+        self.B_vect_alt1 = (1 / np.asarray(K_vect_alt1)).tolist()
         self.d_vect_alt1 =  1.0
         self.n_vect_alt1 = 3.0
         self.cmax_alt1 = 4.0
 
-        self.K_vect_alt2 = 0.5
+        K_vect_alt2 = 0.5
+        self.B_vect_alt2 = 1/K_vect_alt2
         self.d_vect_alt2 = 1.0
         self.n_vect_alt2 = 3.0
         self.cmax_alt2 = 4.0
@@ -190,18 +181,21 @@ class BasicTrinodeNet(LibNet):
 
 
         # Penta-state, well spaced in all vectors on triangle (I, I, I)
-        self.K_vect = [0.45, 0.45, 0.1 , 0.45, 0.45, 0.1, 0.5, 0.5, 0.5]
+        K_vect = [0.45, 0.45, 0.1 , 0.45, 0.45, 0.1, 0.5, 0.5, 0.5]
+        self.B_vect = (1 / np.asarray(K_vect)).tolist()
         self.d_vect =  1.0
         self.n_vect = 3.0
         self.cmax = 4.0
 
         # Penta-state, well spaced in all vectors on triangle (I, I, I)
-        self.K_vect_alt1 = [0.45, 0.1, 0.45, 0.45, 0.45, 0.45, 0.5, 0.5, 0.5]
+        K_vect_alt1 = [0.45, 0.1, 0.45, 0.45, 0.45, 0.45, 0.5, 0.5, 0.5]
+        self.B_vect_alt1 = (1 / np.asarray(K_vect_alt1)).tolist()
         self.d_vect_alt1 =  1.0
         self.n_vect_alt1 = 3.0
         self.cmax_alt1 = 4.0
 
-        self.K_vect_alt2 = 0.5
+        K_vect_alt2 = 0.5
+        self.B_vect_alt2 = 1/K_vect_alt2
         self.d_vect_alt2 = 1.0
         self.n_vect_alt2 = 3.0
         self.cmax_alt2 = 4.0
@@ -235,18 +229,21 @@ class PentanodeNetAdd(LibNet):
         self.add_interactions = True
 
         # 12 state net -- good:
-        self.K_vect = [0.05,  0.05,  0.5,  0.5,  0.5,  0.5,  0.5,  0.05,  0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
+        K_vect = [0.05,  0.05,  0.5,  0.5,  0.5,  0.5,  0.5,  0.05,  0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
+        self.B_vect = (1 / np.asarray(K_vect)).tolist()
         self.d_vect =  1.0
         self.n_vect = 3.0
         self.cmax = 4.0
 
         # 11 state net -- good:
-        self.K_vect_alt1 = [0.05,  0.05,  0.05,  0.05,  0.05,  0.5,  0.5,  0.5,  0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
+        K_vect_alt1 = [0.05,  0.05,  0.05,  0.05,  0.05,  0.5,  0.5,  0.5,  0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
+        self.B_vect_alt1 = (1 / np.asarray(K_vect_alt1)).tolist()
         self.d_vect_alt1 =  1.0
         self.n_vect_alt1 = 3.0
         self.cmax_alt1 = 4.0
 
-        self.K_vect_alt2 = 0.5
+        K_vect_alt2 = 0.5
+        self.B_vect_alt2 = 1 / K_vect_alt2
         self.d_vect_alt2 = 1.0
         self.n_vect_alt2 = 3.0
         self.cmax_alt2 = 4.0
@@ -282,18 +279,21 @@ class TrinodeNetLoaded(LibNet):
         self.add_interactions = True
 
         # OK hex-state
-        self.K_vect = [0.02, 0.02, 0.02, 0.31, 0.31, 0.6 , 0.31, 0.6 , 0.6, 0.5, 0.5, 0.5]
+        K_vect = [0.02, 0.02, 0.02, 0.31, 0.31, 0.6 , 0.31, 0.6 , 0.6, 0.5, 0.5, 0.5]
+        self.B_vect = (1 / np.asarray(K_vect)).tolist()
         self.d_vect =  1.0
         self.n_vect = 3.0
         self.cmax = 4.0
 
         # OK hex-state
-        self.K_vect_alt1 = [0.02, 0.02, 0.02, 0.31, 0.6 , 0.6 , 0.31, 0.31, 0.6, 0.5, 0.5, 0.5]
+        K_vect_alt1 = [0.02, 0.02, 0.02, 0.31, 0.6 , 0.6 , 0.31, 0.31, 0.6, 0.5, 0.5, 0.5]
+        self.B_vect_alt1 = (1 / np.asarray(K_vect_alt1)).tolist()
         self.d_vect_alt1 =  1.0
         self.n_vect_alt1 = 3.0
         self.cmax_alt1 = 6.0
 
-        self.K_vect_alt2 = 0.5
+        K_vect_alt2 = 0.5
+        self.B_vect_alt1 = 1 / K_vect_alt2
         self.d_vect_alt2 = 1.0
         self.n_vect_alt2 = 3.0
         self.cmax_alt2 = 4.0
@@ -421,13 +421,15 @@ class FullQuadStateNetAdd(LibNet):
                       ]
 
         # non-homogeneous K-vects to see more effect in satelite nodes:
-        self.K_vect = [0.5, 0.5, 0.5,
+        K_vect = [0.5, 0.5, 0.5,
                    0.5, 0.5, 0.5,
                    0.5, 0.5, 0.5,
                    0.25, 0.5, 1.0, 1.5, 0.5,
                    0.5, 0.5, 1.5,
                    0.5
                    ]
+
+        self.B_vect = (1 / np.asarray(K_vect)).tolist()
 
         self.node_type_dict = {'S': NodeType.signal}
 
@@ -469,15 +471,6 @@ class FullQuadStateControl(LibNet):
                       EdgeType.I, EdgeType.A, EdgeType.A,
                       # EdgeType.A, EdgeType.A, EdgeType.I,
                       ]
-
-        # non-homogeneous K-vects to see more effect in satelite nodes:
-        # self.K_vect = [0.5, 0.5, 0.5,
-        #            0.5, 0.5, 0.5,
-        #            0.5, 0.5, 0.5,
-        #            0.25, 0.5, 1.0, 1.5, 0.5,
-        #            0.5, 0.5, 1.5,
-        #            0.5
-        #            ]
 
         self.node_type_dict = {'S': NodeType.sensor, 'P': NodeType.process, 'F': NodeType.factor}
 

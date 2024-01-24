@@ -17,7 +17,7 @@ from numpy import ndarray
 from matplotlib import colors
 from matplotlib import colormaps
 import networkx as nx
-from networkx import DiGraph
+from networkx import MultiDiGraph
 from cellnition.science.gene_networks import GeneNetworkModel
 
 import pygraphviz as pgv
@@ -30,13 +30,17 @@ class StateMachine(object):
     a supplied matrix, and by temporarily triggering signal nodes in the
     network, it then looks to see if there is a new stable state for the
     system after the perturbation. The transitions between states are
-    recorded in a state transition diagram.
+    recorded in a state transition diagram, which is allowed to have parallel
+    edges. Due to complexity, self-loops are omitted.
 
     Public Attributes
     -----------------
-    G_states : DiGraph
+    G_states : MultiDiGraph
         State transition network, showing how each steady-state of the
-        network is reached through a signal transition.
+        network is reached through a signal transition. This is MultiDiGraph,
+        which means parallel edges (meaning it is possible for different signals to
+        transition the system between the same two states). For similicity, self-loops
+        are omitted.  
 
     Private Attributes
     ------------------
@@ -163,7 +167,7 @@ class StateMachine(object):
         # 'zero' or 'base' state:
         solsM_with0 = np.column_stack((c_zeros, self._solsM))
 
-        G_states = DiGraph()
+        G_states = MultiDiGraph()
 
         signal_inds = [[sigi] for sigi in self._gmod.signal_inds]
 

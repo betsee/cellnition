@@ -227,7 +227,7 @@ class NetworkWorkflow(object):
             sols_0 = gmod.optimized_phase_space_search(Ns=N_search_space,
                                                cmax=cmax,
                                                round_sol=N_round_sol,
-                                               Ki = gmod.K_vect,
+                                               Bi = gmod.B_vect,
                                                di = gmod.d_vect,
                                                ni = gmod.n_vect,
                                                tol=sol_search_tol,

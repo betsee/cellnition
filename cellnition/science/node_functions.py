@@ -5,7 +5,7 @@
 
 '''
 This module contains different functions that can be applied at the nodes when constructing an analytical
-model.
+model. These functions are intended to be used with symbolic computing (sympy).
 '''
 import csv
 import numpy as np
@@ -24,18 +24,18 @@ from cellnition.science.network_enums import EdgeType, GraphType, NodeType
 import pygraphviz as pgv
 
 
-def f_acti_s(cc, kk, nn):
+def f_acti_s(cc, beta, nn):
     '''
 
     '''
-    return ((cc / kk) ** nn) / (1 + (cc / kk) ** nn)
+    return ((cc * beta) ** nn) / (1 + (cc * beta) ** nn)
 
 
-def f_inhi_s(cc, kk, nn):
+def f_inhi_s(cc, beta, nn):
     '''
 
     '''
-    return 1 / (1 + (cc / kk) ** nn)
+    return 1 / (1 + (cc * beta) ** nn)
 
 
 def f_neut_s(cc, kk, nn):

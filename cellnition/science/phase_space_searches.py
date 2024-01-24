@@ -15,7 +15,7 @@ def multistability_search(gmod: GeneNetworkModel,
                           N_space: int = 3,
                           N_round_sol: int = 6,
                           N_round_unique_sol: int = 1,
-                          Ki: float | list = 0.5,
+                          Bi: float | list = 0.5,
                           ni: float | list = 3.0,
                           di: float | list = 1.0,
                           search_tol: float = 1.0e-15,
@@ -40,14 +40,11 @@ def multistability_search(gmod: GeneNetworkModel,
     N_space: int=3
         The number of points to consider along each axis of the state space search.
 
-    Ki: float|list = 0.5
-        The Hill coefficient.
+    Bi: float|list = 0.5
+        The beta coefficient for each edge.
 
     ni: float|list = 3.0
         The Hill exponent.
-
-    di: float|list = 0.5
-        If hold_d_const, this is the value to hold the maximum decay rate at.
 
     N_round_unique_sol: int = 1
         Digit to round solutions to prior to determining uniqueness.
@@ -96,7 +93,7 @@ def multistability_search(gmod: GeneNetworkModel,
         sols_0 = gmod.optimized_phase_space_search(Ns=N_space,
                                                    cmax=1.5 * np.max(gmod.in_degree_sequence),
                                                    round_sol=N_round_sol,
-                                                   Ki=Ki,
+                                                   Bi=Bi,
                                                    di=di,
                                                    ni=ni,
                                                    tol=search_tol,
@@ -128,20 +125,16 @@ def multistability_search(gmod: GeneNetworkModel,
 
 def param_space_search(gmod: GeneNetworkModel,
                        N_pts: int=3,
-                       ri: float = 1.0,
                        ni: float = 3.0,
-                       K_min: float = 0.1,
-                       K_max: float = 2.0,
-                       d_min: float = 0.5,
-                       d_max: float = 10.0,
+                       B_min: float = 2.0,
+                       B_max: float = 10.0,
                        sol_round: int = 1,
                        N_search: int = 3,
                        search_round_sol: int=6,
                        tol: float=1.0e-3,
                        cmax_multi: float=2.0,
                        verbose: bool=True,
-                       hold_d_const: bool=True,
-                       di: float=0.5) -> tuple[ndarray, list]:
+                       ) -> tuple[ndarray, list]:
     '''
     Search parameter space of a model to find parameter combinations that give different multistable
     states. This search only looks for changes in the Hill coefficient and the maximum decay rate,
@@ -161,17 +154,11 @@ def param_space_search(gmod: GeneNetworkModel,
     ni: float = 3.0
         The Hill exponent.
 
-    K_min: float = 0.1
-        The minimum value for the Hill coefficient of each reaction.
+    B_min: float = 0.1
+        The minimum value for the beta coefficient of each interaction edge.
 
-    K_max: float = 2.0
-        The maximum value for the Hill coefficient of each reaction.
-
-    d_min: float = 0.5
-        The minimum value for the max decay of each reaction.
-
-    d_max: float = 10.0
-        The maximum value for the max decay of each reaction.
+    B_max: float = 2.0
+        The maximum value for the beta coefficient of each interaction edge.
 
     sol_round: int = 1
         Digit to round solutions to prior to determining uniqueness.
@@ -193,17 +180,10 @@ def param_space_search(gmod: GeneNetworkModel,
     verbose: bool=True
         Output print messages (True)?
 
-    hold_d_const: bool=True
-        Hold the maximum rate of decay constant and only optimize for the Hill
-        coefficient (True)?
-
-    di: float=0.5
-        If hold_d_const, this is the value to hold the maximum decay rate at.
-
     Returns
     -------
     bif_space_M : ndarray
-        An array that has all Hill coefficients (K-constants), Hill decay constants, and the
+        An array that has all beta coefficients and the
         number of steady-state solutions packed into each row of the array.
 
     sols_space_M : list
@@ -211,24 +191,13 @@ def param_space_search(gmod: GeneNetworkModel,
 
     '''
 
-    if gmod._reduced_dims and gmod._solved_analytically is False:
-        N_nodes = len(gmod.c_vect_reduced_s)
-
-    else:
-        N_nodes = gmod.N_nodes
-
     # What we wish to create is a parameter space search, as this net is small enough to enable that.
-    Klin = np.linspace(K_min, K_max, N_pts)
-    dlin = np.linspace(d_min, d_max, N_pts)
+    Blin = np.linspace(B_min, B_max, N_pts)
 
     param_lin_set = []
 
     for edj_i in range(gmod.N_edges):
-        param_lin_set.append(Klin*1) # append the linear K-vector choices for each edge
-
-    if hold_d_const is False:
-        for nde_i in range(N_nodes):
-            param_lin_set.append(dlin*1)
+        param_lin_set.append(Blin*1) # append the linear K-vector choices for each edge
 
     # Create a set of matrices specifying the concentration grid for each
     # node of the network:
@@ -247,33 +216,35 @@ def param_space_search(gmod: GeneNetworkModel,
         print(f'Search cmax will be {cmax_multi * np.max(gmod.in_degree_sequence)}')
 
     for param_set_i in param_test_set:
-        kvecti = param_set_i[0:gmod.N_edges].tolist()
+        bvecti = param_set_i[0:gmod.N_edges].tolist()
 
-        if hold_d_const is False:
-            dvecti = param_set_i[gmod.N_edges:].tolist()
-        else:
-            dvecti = di
-
-        gmod.create_parameter_vects(Ki=kvecti, ni=ni, ri=ri, di=dvecti)
+        # Here we set di = 1.0, realizing the di value has no effect on the
+        # steady-state since it can be divided through the rate equation when
+        # solving for the root.
+        gmod.create_parameter_vects(Bi=bvecti, ni=ni, di=1.0)
 
         sols_0 = gmod.optimized_phase_space_search(Ns=N_search,
                                                    cmax=cmax_multi * np.max(gmod.in_degree_sequence),
                                                    round_sol=search_round_sol,
-                                                   Ki=gmod.K_vect,
+                                                   Bi=gmod.B_vect,
                                                    di=gmod.d_vect,
                                                    ni=gmod.n_vect,
-                                                   tol=1.0e-6,
+                                                   tol=1.0e-15,
                                                    method="Root"
                                                    )
 
-        solsM = gmod.find_attractor_sols(sols_0, tol=tol, verbose=False, unique_sols=True, sol_round=sol_round)
+        solsM = gmod.find_attractor_sols(sols_0,
+                                         tol=tol,
+                                         verbose=False,
+                                         unique_sols=True,
+                                         sol_round=sol_round)
 
         if len(solsM):
             num_sols = solsM.shape[1]
         else:
             num_sols = 0
 
-        bif_space_M.append([*gmod.K_vect, *gmod.d_vect, num_sols])
+        bif_space_M.append([*gmod.B_vect, num_sols])
         sols_space_M.append(solsM)
 
     return np.asarray(bif_space_M), sols_space_M
