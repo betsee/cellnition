@@ -96,9 +96,9 @@ class GeneKnockout(object):
 
         knockout_sol_set.append(solsM.copy()) # append the "wild-type" solution set
 
-        for i in self._gmod.regular_node_inds:  # Include only 'gene' nodes
+        for i in self._gmod.regular_node_inds:  # Include only 'gene' nodes as silenced
 
-            c_ko_s = self._gmod.c_vect_s[i]  # silence only genes
+            c_ko_s = self._gmod.c_vect_s[i]
             # Define a new change vector by substituting in the knockout value for the gene (c=0) and
             # clamping the gene at that level by setting its change rate to zero:
             dcdt_vect_ko_s = self._gmod.dcdt_vect_s.copy()  # make a copy of the symbolic change vector

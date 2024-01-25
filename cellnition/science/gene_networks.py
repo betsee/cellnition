@@ -680,7 +680,7 @@ class GeneNetworkModel(object):
         self.signal_node_inds = self.node_type_inds[NodeType.signal.name] + self.node_type_inds[NodeType.factor.name]
         self.sensor_node_inds = self.node_type_inds[NodeType.sensor.name]
         self.process_node_inds = self.node_type_inds[NodeType.process.name]
-        self.nonsignal_node_inds = np.setdiff1d(self.nodes_index, self.signal_node_inds)
+        self.nonsignal_node_inds = np.setdiff1d(self.nodes_index, self.signal_node_inds).tolist()
 
         # Next we want to distinguish a subset of edges that connect only "regular nodes":
         self.regular_edges_index = []
@@ -869,6 +869,7 @@ class GeneNetworkModel(object):
 
         # Generate the optimization "energy" function as well as jacobians and hessians for the system:
         self._generate_optimization_functions()
+
     def _generate_optimization_functions(self):
         '''
         Using the model equations, generate numerical optimization functions
@@ -926,6 +927,35 @@ class GeneNetworkModel(object):
             for ci, eqci in self.sol_cset_s.items():
                 c_ind = self.c_vect_s.index(ci)
                 self.sol_cset_f[c_ind] = sp.lambdify(lambda_params_r, eqci)
+
+    def generate_split_optimization_functions(self, signal_node_inds: int|list):
+        '''
+        Generates numerical optimization functions that are split such that nodes identified
+        in signal_node_inds become function arguments with values set by the user,
+        whereas the rest of the nodes are solved for.
+
+        '''
+        nonsignal_node_inds = np.setdiff1d(self.nodes_index, signal_node_inds).tolist()
+
+        self.c_vect_nosigs_s = self.c_vect_s[nonsignal_node_inds]
+        self.c_vect_sigs_s = self.c_vect_s[signal_node_inds]
+        # self.dcdt_vect_nosigs_s = self.dcdt_vect_s[nonsignal_node_inds, :]
+
+        # obtain symbolic parameters to work with the split system:
+        lambda_params = self._fetch_lambda_params_s(self.c_vect_nosigs_s, self.c_vect_sigs_s)
+
+        # Re-lambdify the change vector with the new parameter arrangements:
+        flatten_f = np.asarray([fs for fs in self.dcdt_vect_s])
+        self.dcdt_vect_nosigs_f = sp.lambdify(lambda_params, flatten_f)
+
+        # Optimization function for solving the problem (defined in terms of reduced dimensions):
+        opti_s = (self.dcdt_vect_s.T*self.dcdt_vect_s)[0]
+        opti_jac_s = sp.Array([self.opti_s.diff(ci) for ci in self.c_vect_s])
+        opti_hess_s = sp.Matrix(self.opti_jac_s).jacobian(self.c_vect_s)
+
+        self.opti_nosigs_f = sp.lambdify(lambda_params, opti_s)
+        self.opti_jac_nosigs_f = sp.lambdify(lambda_params, opti_jac_s)
+        self.opti_hess_nosigs_f = sp.lambdify(lambda_params, opti_hess_s)
 
     def reduce_model_dimensions(self):
         '''
@@ -1116,7 +1146,7 @@ class GeneNetworkModel(object):
         if len(self.process_params_s):
             self.extra_params_f.extend(self.process_params_f)
 
-    def _fetch_lambda_params_s(self, cvect_s: list, cko_s: Symbol|Indexed|None = None) -> tuple:
+    def _fetch_lambda_params_s(self, cvect_s: list, cko_s: Symbol|Indexed|list|None = None) -> tuple:
         '''
         Obtain the correct set of parameters to use
         when creating numerical lambda functions from
@@ -1139,7 +1169,7 @@ class GeneNetworkModel(object):
 
         return tuple(lambda_params)
 
-    def _fetch_function_args_f(self, cko: float | None = None) -> tuple:
+    def _fetch_function_args_f(self, cko: float|list|None = None) -> tuple:
         '''
         Obtain the correct set of auxiliary parameters (arguments) to use
         when evaluating numerical lambda functions created
@@ -1354,6 +1384,140 @@ class GeneNetworkModel(object):
                                                          cmin=cmin,
                                                          cmax=cmax,
                                                          include_signals=include_signals)
+
+            if c_bounds is None:
+                c_bounds = [(cmin, cmax) for i in range(N_nodes)]
+
+                if len(self.process_node_inds):
+                    if self._reduced_dims is False:
+                        for ip in self.process_node_inds:
+                            c_bounds[ip] = (self.strain_min, self.strain_max)
+                else:
+                    for ip in self.process_node_inds:
+                        if self.c_vect_s[ip] in self.c_vect_reduced_s:
+                            i = self.c_vect_reduced_s.index(self.c_vect_s[ip])
+                            c_bounds[i] = (self.strain_min, self.strain_max)
+
+            self._c_bounds = c_bounds # save for inspection later
+
+            for c_vecti in c_test_set:
+                if method == 'Powell' or method == 'trust-constr':
+                    if method == 'Powell':
+                        jac = None
+                        hess = None
+                    else:
+                        jac = self.opti_jac_f
+                        hess = self.opti_hess_f
+
+                    sol0 = minimize(self.opti_f,
+                                    c_vecti,
+                                    args=function_args,
+                                    method=method,
+                                    jac=jac,
+                                    hess=hess,
+                                    bounds=c_bounds,
+                                    tol=tol,
+                                    callback=None,
+                                    options=None)
+
+                    mins_found.append(sol0.x)
+
+                else:
+                    sol_root = fsolve(dcdt_funk, c_vecti, args=function_args, xtol=tol)
+                    if len(self.process_node_inds) == 0:
+                        # If we're not using the process, constrain all concs to be above zero
+                        if (np.all(np.asarray(sol_root) >= 0.0)):
+                            mins_found.append(sol_root)
+                    else:
+                        # get the nodes that must be constrained above zero:
+                        conc_nodes = np.setdiff1d(self.nodes_index, self.process_node_inds)
+                        # Then, only the nodes that are gene products must be above zero
+                        if (np.all(np.asarray(sol_root)[conc_nodes] >= 0.0)):
+                            mins_found.append(sol_root)
+
+            if self._reduced_dims is False:
+                self.mins_found = mins_found
+
+            else: # we need to piece together the full solution as the minimum will only be a subset of all
+                # concentrations
+                full_mins_found = []
+                for mins_foundi in list(mins_found): # for each set of unique minima found
+                    mins_foundo = [[] for i in range(self.N_nodes)]
+                    for cmi, mi in zip(self.c_master_i, mins_foundi):
+                        for ii, eqi in self.sol_cset_f.items():
+                            mins_foundo[ii] = eqi(mins_foundi, *function_args) # compute the sol for this conc.
+                        # also add-in the minima for the master concentrations to the full list
+                        mins_foundo[cmi] = mi
+                    # We've redefined the mins list so it now includes the full set of concentrations;
+                    # flatten the list and add it to the new set:
+                    full_mins_found.append(mins_foundo)
+
+                # Redefine the mins_found set for the full concentrations
+                mins_found = full_mins_found
+
+        # ensure the list is unique:
+        mins_found = np.round(mins_found, round_sol)
+        mins_found = np.unique(mins_found, axis=0).tolist()
+
+        return mins_found
+
+    def constrained_phase_space_search(self,
+                                       c_vals: list[float], # values of nodes that are constrained
+                                       c_inds: list[int], # indices of nodes that are constrained
+                                       Ns: int=3,
+                                       cmin: float=0.0,
+                                       cmax: float=1.0,
+                                       c_bounds: list|None = None,
+                                       tol:float = 1.0e-15,
+                                       round_sol: int=6, # decimals to round solutions to prevent duplicates
+                                       method: str='Root', # Solve by finding the roots of the dc/dt equation
+                                     ):
+        '''
+        Search the phase space for equilibrium solutions while using
+        simple constraints on sensors and factors that are input by
+        the user and substituted into the split optimization function
+        as arguments rather than variables.
+
+        '''
+        # generate new optimization functions that have the ability to set fixed values to c_inds:
+        self.generate_split_optimization_functions(c_inds)
+
+        if self.dcdt_vect_f is None:
+            raise Exception("Must use the method build_analytical_model to generate attributes"
+                            "to use this function.")
+
+        # Determine the set of additional arguments to the optimization function:
+        function_args = self._fetch_function_args_f()
+
+        # Initialize the equillibrium point solutions to be a set:
+        mins_found = []
+
+        # If it's already been solved analytically, we can simply plug in the variables to obtain the solution
+        # at the minimum rate:
+        if self._solved_analytically:
+            mins_foundo = [[] for i in range(self.N_nodes)]
+            for ii, eqi in self.sol_cset_f.items():
+                mins_foundo[ii] = eqi(*function_args)
+
+            mins_found.append(mins_foundo)
+
+        else: # if we don't have an explicit solution:
+            # Otherwise, we need to go through the whole optimization:
+            if self._reduced_dims:
+                N_nodes = len(self.c_vect_reduced_s)
+                c_vect_s = self.c_vect_reduced_s
+                dcdt_funk = self.dcdt_vect_reduced_f
+            else:
+                N_nodes = self.N_nodes
+                c_vect_s = self.c_vect_s
+                dcdt_funk = self.dcdt_vect_f
+
+            # Generate the points in state space to sample at:
+            c_test_set, _, _ = self.generate_state_space(c_vect_s,
+                                                         Ns=Ns,
+                                                         cmin=cmin,
+                                                         cmax=cmax,
+                                                         include_signals=True)
 
             if c_bounds is None:
                 c_bounds = [(cmin, cmax) for i in range(N_nodes)]
