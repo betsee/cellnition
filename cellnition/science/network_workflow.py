@@ -85,9 +85,11 @@ class NetworkWorkflow(object):
                    verbose: bool=True,
                    graph_type: GraphType = GraphType.scale_free,
                    reduce_dims: bool = False,
-                   Ki: float|list = 0.5,
+                   Bi: float | list = 2.0,
                    ni: float|list = 3.0,
                    di: float|list = 1.0,
+                   coi: float|list = 0.0,
+                   ki: float|list = 10.0,
                    add_interactions: bool = True,
                    edge_type_search: bool = True,
                    N_edge_search: int = 5,
@@ -124,7 +126,8 @@ class NetworkWorkflow(object):
             edge_types = gmod.get_edge_types(p_acti=0.5)
 
         else:
-            numsols, multisols = multistability_search(1,
+            gmod.create_parameter_vects(Bi=Bi, ni=ni, di=di, co=coi, ki=ki)
+            numsols, multisols = multistability_search(gmod, 1,
                                                             tol=sol_unique_tol,
                                                             N_iter=N_edge_search,
                                                             verbose=False,
@@ -193,6 +196,8 @@ class NetworkWorkflow(object):
                                         node_type_dict=None
                                         )
 
+            gmod.create_parameter_vects(Bi=Bi, ni=ni, di=di, co=coi, ki=ki)
+
             if reduce_dims:  # If reduce dimensions then perform this calculation
                 gmod.reduce_model_dimensions()
 
@@ -217,8 +222,6 @@ class NetworkWorkflow(object):
 
             gmod.save_model_equations(save_eqn_render, save_eqn_renderr, save_eqn_net)
 
-            gmod.create_parameter_vects(Ki=Ki, ni=ni, ri=1.0, di=di)
-
             if add_interactions is True:
                 cmax = 1.5*np.max(gmod.in_degree_sequence)
             else:
@@ -227,9 +230,6 @@ class NetworkWorkflow(object):
             sols_0 = gmod.optimized_phase_space_search(Ns=N_search_space,
                                                cmax=cmax,
                                                round_sol=N_round_sol,
-                                               Bi = gmod.B_vect,
-                                               di = gmod.d_vect,
-                                               ni = gmod.n_vect,
                                                tol=sol_search_tol,
                                                method="Root"
                                               )
@@ -266,10 +266,6 @@ class NetworkWorkflow(object):
                                                                            Ns=N_search_space,
                                                                        cmin=0.0,
                                                                        cmax=cmax,
-                                                                       Ki=0.5,
-                                                                       ni=3.0,
-                                                                       ri=1.0,
-                                                                       di=1.0,
                                                                        tol=sol_search_tol,
                                                                        round_sol=N_round_sol,
                                                                        round_unique_sol=N_round_unique_sol,

@@ -16,9 +16,6 @@ def multistability_search(gmod: GeneNetworkModel,
                           N_space: int = 3,
                           N_round_sol: int = 6,
                           N_round_unique_sol: int = 1,
-                          Bi: float | list = 0.5,
-                          ni: float | list = 3.0,
-                          di: float | list = 1.0,
                           search_tol: float = 1.0e-15,
                           add_interactions: bool = True,
                           unique_sols: bool = True
@@ -40,12 +37,6 @@ def multistability_search(gmod: GeneNetworkModel,
 
     N_space: int=3
         The number of points to consider along each axis of the state space search.
-
-    Bi: float|list = 0.5
-        The beta coefficient for each edge.
-
-    ni: float|list = 3.0
-        The Hill exponent.
 
     N_round_unique_sol: int = 1
         Digit to round solutions to prior to determining uniqueness.
@@ -94,9 +85,6 @@ def multistability_search(gmod: GeneNetworkModel,
         sols_0 = gmod.optimized_phase_space_search(Ns=N_space,
                                                    cmax=1.5 * np.max(gmod.in_degree_sequence),
                                                    round_sol=N_round_sol,
-                                                   Bi=Bi,
-                                                   di=di,
-                                                   ni=ni,
                                                    tol=search_tol,
                                                    method="Root"
                                                    )
@@ -126,7 +114,7 @@ def multistability_search(gmod: GeneNetworkModel,
 
 def param_space_search(gmod: GeneNetworkModel,
                        N_pts: int=3,
-                       ni: float = 3.0,
+                       ni: float|list = 3.0,
                        B_min: float = 2.0,
                        B_max: float = 10.0,
                        sol_round: int = 1,
@@ -135,6 +123,8 @@ def param_space_search(gmod: GeneNetworkModel,
                        tol: float=1.0e-3,
                        cmax_multi: float=2.0,
                        verbose: bool=True,
+                       coi: float|list = 0.0,
+                       ki: float|list = 10.0
                        ) -> tuple[ndarray, list]:
     '''
     Search parameter space of a model to find parameter combinations that give different multistable
@@ -149,11 +139,8 @@ def param_space_search(gmod: GeneNetworkModel,
     N_pts: int=3
         The number of points to consider along each axis of the parameter space.
 
-    ri: float = 1.0
-        The maximum growth rate.
-
-    ni: float = 3.0
-        The Hill exponent.
+    ni: float|list = 3.0
+        The Hill exponent (held constant).
 
     B_min: float = 0.1
         The minimum value for the beta coefficient of each interaction edge.
@@ -181,6 +168,12 @@ def param_space_search(gmod: GeneNetworkModel,
     verbose: bool=True
         Output print messages (True)?
 
+    coi: float|list = 0.0
+        The centre of any sensor's logistic functions (held constant).
+
+    ki: float|list = 10.0
+        The rate of rise of any sensor's logistic functions (held constant).
+
     Returns
     -------
     bif_space_M : ndarray
@@ -197,7 +190,7 @@ def param_space_search(gmod: GeneNetworkModel,
 
     param_lin_set = []
 
-    for edj_i in range(gmod.N_edges):
+    for edj_i in range(gmod.regular_edges_index):
         param_lin_set.append(Blin*1) # append the linear K-vector choices for each edge
 
     # Create a set of matrices specifying the concentration grid for each
@@ -222,14 +215,11 @@ def param_space_search(gmod: GeneNetworkModel,
         # Here we set di = 1.0, realizing the di value has no effect on the
         # steady-state since it can be divided through the rate equation when
         # solving for the root.
-        gmod.create_parameter_vects(Bi=bvecti, ni=ni, di=1.0)
+        gmod.create_parameter_vects(Bi=bvecti, ni=ni, di=1.0, co=coi, ki=ki)
 
         sols_0 = gmod.optimized_phase_space_search(Ns=N_search,
                                                    cmax=cmax_multi * np.max(gmod.in_degree_sequence),
                                                    round_sol=search_round_sol,
-                                                   Bi=gmod.B_vect,
-                                                   di=gmod.d_vect,
-                                                   ni=gmod.n_vect,
                                                    tol=1.0e-15,
                                                    method="Root"
                                                    )

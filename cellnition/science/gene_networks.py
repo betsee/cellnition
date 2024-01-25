@@ -43,9 +43,10 @@ from cellnition.science.network_enums import EdgeType, GraphType, NodeType
 from cellnition.science.interaction_functions import f_acti_s, f_inhi_s, f_neut_s, f_logi_s
 import pygraphviz as pgv
 
-# TODO: allow system to build model with automatically substituting in P, S, F, E, etc
 # TODO: Add in stochasticity
 # TODO: In time sims, remember to deal separately with any sensor nodes
+# TODO: In edgetype and param space searches, remember that the network may now have a greatly
+# reduced set of parameters to work with and fit.
 
 class GeneNetworkModel(object):
     '''
@@ -194,11 +195,10 @@ class GeneNetworkModel(object):
         # Calculate key characteristics of the graph
         self.characterize_graph()
 
-
+        # Initialize some object state variables:
         self._reduced_dims = False # Indicate that model is full dimensions
-        self._include_process = False # Indicate that model does not include the process by default
         self._solved_analytically = False # Indicate that the model does not have an analytical solution
-        self.dcdt_vect_reduced_s = None
+        self.dcdt_vect_reduced_s = None # Initialize this to None
 
     def generate_network(self,
                          beta: float=0.15,
@@ -277,6 +277,27 @@ class GeneNetworkModel(object):
 
         self.nodes_list = np.arange(self.N_nodes).tolist()
         self.GG = GG
+
+    def _make_node_edge_indices(self):
+        '''
+        Especially important for the case where node names are strings,
+        this method creates numerical (int) indices for the nodes and
+        stores them in a nodes_index. It does the same for nodes in edges,
+        storing them in an edges_index object.
+
+        '''
+        # For this case the user may provide string names for
+        # nodes, so we need to make numerical node and edge listings:
+        self.nodes_index = []
+        for nde_i, nn in enumerate(self.nodes_list):
+            self.nodes_index.append(nde_i)
+
+        self.edges_index = []
+        for ei, (nni, nnj) in enumerate(self.edges_list):
+            nde_i = self.nodes_list.index(nni)
+            nde_j = self.nodes_list.index(nnj)
+            self.edges_index.append((nde_i, nde_j))
+        # self.nodes_list = np.arange(self.N_nodes)
 
     def characterize_graph(self):
         '''
@@ -654,9 +675,12 @@ class GeneNetworkModel(object):
             self.regular_node_inds += self.node_type_inds[tt]
 
         # aliases for convenience:
-        self.signal_node_inds = self.node_type_inds[NodeType.signal.name]
+        # combine signals with factors as they have a similar 'setability' condition
+        # from the outside
+        self.signal_node_inds = self.node_type_inds[NodeType.signal.name] + self.node_type_inds[NodeType.factor.name]
         self.sensor_node_inds = self.node_type_inds[NodeType.sensor.name]
         self.process_node_inds = self.node_type_inds[NodeType.process.name]
+        self.nonsignal_node_inds = np.setdiff1d(self.nodes_index, self.signal_node_inds)
 
         # Next we want to distinguish a subset of edges that connect only "regular nodes":
         self.regular_edges_index = []
@@ -845,28 +869,6 @@ class GeneNetworkModel(object):
 
         # Generate the optimization "energy" function as well as jacobians and hessians for the system:
         self._generate_optimization_functions()
-
-    def _make_node_edge_indices(self):
-        '''
-        Especially important for the case where node names are strings,
-        this method creates numerical (int) indices for the nodes and
-        stores them in a nodes_index. It does the same for nodes in edges,
-        storing them in an edges_index object.
-
-        '''
-        # For this case the user may provide string names for
-        # nodes, so we need to make numerical node and edge listings:
-        self.nodes_index = []
-        for nde_i, nn in enumerate(self.nodes_list):
-            self.nodes_index.append(nde_i)
-
-        self.edges_index = []
-        for ei, (nni, nnj) in enumerate(self.edges_list):
-            nde_i = self.nodes_list.index(nni)
-            nde_j = self.nodes_list.index(nnj)
-            self.edges_index.append((nde_i, nde_j))
-        # self.nodes_list = np.arange(self.N_nodes)
-
     def _generate_optimization_functions(self):
         '''
         Using the model equations, generate numerical optimization functions
@@ -881,20 +883,8 @@ class GeneNetworkModel(object):
             dcdt_vect_s = self.dcdt_vect_s
             c_vect_s = self.c_vect_s
 
-        lambda_params = [self.c_vect_s,
-                         self.d_vect_s,
-                         self.B_vect_s,
-                         self.n_vect_s,
-                         ]
-
-        lambda_params_r = [c_vect_s,
-                           self.d_vect_s,
-                           self.B_vect_s,
-                           self.n_vect_s]
-
-        if len(self.process_node_inds) or len(self.sensor_node_inds):
-            lambda_params.append(self.extra_params_s)
-            lambda_params_r.append(self.extra_params_s)
+        lambda_params = self._fetch_lambda_params_s(self.c_vect_s)
+        lambda_params_r = self._fetch_lambda_params_s(c_vect_s)
 
         # Create a Jacobian for the whole system
         self.jac_s = self.dcdt_vect_s.jacobian(sp.Matrix(self.c_vect_s))
@@ -1025,7 +1015,8 @@ class GeneNetworkModel(object):
                     if si in self.c_master_i:
                         self.signal_reduced_inds.append(self.c_master_i.index(si))
 
-                self.nonsignal_reduced_inds = np.setdiff1d(np.arange(len(self.c_master_i)), self.signal_reduced_inds)
+                self.nonsignal_reduced_inds = np.setdiff1d(np.arange(len(self.c_master_i)),
+                                                           self.signal_reduced_inds)
 
             else:
                 # Set most reduced system attributes to None:
@@ -1044,11 +1035,11 @@ class GeneNetworkModel(object):
                 self.sol_cset_s = sol_cset
 
                 # The sol_cset exists and can be lambdified for full solutions. Here we lambdify it without the c_vect:
-                if self._include_process:
+                if len(self.process_node_inds):
                     lambda_params_r = [self.d_vect_s,
                                        self.B_vect_s,
                                        self.n_vect_s,
-                                       self.process_params_s]
+                                       self.extra_params_s]
 
                 else:
                     lambda_params_r = [self.d_vect_s,
@@ -1124,6 +1115,50 @@ class GeneNetworkModel(object):
 
         if len(self.process_params_s):
             self.extra_params_f.extend(self.process_params_f)
+
+    def _fetch_lambda_params_s(self, cvect_s: list, cko_s: Symbol|Indexed|None = None) -> tuple:
+        '''
+        Obtain the correct set of parameters to use
+        when creating numerical lambda functions from
+        sympy analytical functions.
+        '''
+        if cko_s is None:
+            lambda_params = [cvect_s,
+                               self.d_vect_s,
+                               self.B_vect_s,
+                               self.n_vect_s]
+        else:
+            lambda_params = [cvect_s,
+                             cko_s,
+                               self.d_vect_s,
+                               self.B_vect_s,
+                               self.n_vect_s]
+
+        if len(self.process_node_inds) or len(self.sensor_node_inds):
+            lambda_params.append(self.extra_params_s)
+
+        return tuple(lambda_params)
+
+    def _fetch_function_args_f(self, cko: float | None = None) -> tuple:
+        '''
+        Obtain the correct set of auxiliary parameters (arguments) to use
+        when evaluating numerical lambda functions created
+        from sympy analytical functions in optimization functions.
+        '''
+        if cko is None:
+            lambda_params = [self.d_vect,
+                             self.B_vect,
+                             self.n_vect]
+        else:
+            lambda_params = [cko,
+                             self.d_vect,
+                             self.B_vect,
+                             self.n_vect]
+
+        if len(self.process_node_inds) or len(self.sensor_node_inds):
+            lambda_params.append(self.extra_params_f)
+
+        return tuple(lambda_params)
 
     def read_edge_info_from_graph(self):
         '''
@@ -1238,7 +1273,7 @@ class GeneNetworkModel(object):
             nonsignal_inds = self.nonsignal_reduced_inds
         else:
             signal_inds = self.signal_node_inds
-            nonsignal_inds = self.regular_node_inds
+            nonsignal_inds = self.nonsignal_node_inds
 
         if include_signals is False:
             # Create a c_vect sampled to the non-signal nodes:
@@ -1248,11 +1283,11 @@ class GeneNetworkModel(object):
             c_vect = c_vect_s # otherwise use the whole vector
 
         for nd_i, ci in enumerate(c_vect):
-                i = c_vect.index(ci)
-                if self._include_process is True and i == self._process_i:
-                    c_test_lin_set.append(np.linspace(self.Vp_min, self.Vp_max, Ns))
-                else:
-                    c_test_lin_set.append(np.linspace(cmin, cmax, Ns))
+            i = c_vect.index(ci)
+            if i in self.process_node_inds:
+                c_test_lin_set.append(np.linspace(self.strain_min, self.strain_max, Ns))
+            else:
+                c_test_lin_set.append(np.linspace(cmin, cmax, Ns))
 
         # Create a set of matrices specifying the concentration grid for each
         # node of the network:
@@ -1273,9 +1308,6 @@ class GeneNetworkModel(object):
                                      Ns: int=3,
                                      cmin: float=0.0,
                                      cmax: float=1.0,
-                                     Bi: float | list = 2.0,
-                                     ni: float | list = 3.0,
-                                     di: float | list = 1.0,
                                      c_bounds: list|None = None,
                                      tol:float = 1.0e-15,
                                      round_sol: int=6, # decimals to round solutions to prevent duplicates
@@ -1290,15 +1322,8 @@ class GeneNetworkModel(object):
             raise Exception("Must use the method build_analytical_model to generate attributes"
                             "to use this function.")
 
-        # Create parameter vectors for the model:
-        self.create_parameter_vects(Bi, ni, di)
-
         # Determine the set of additional arguments to the optimization function:
-        if self._include_process is False:
-            function_args = (self.d_vect, self.B_vect, self.n_vect)
-        else:
-            function_args = (self.d_vect, self.B_vect, self.n_vect,
-                             self.process_params_f)
+        function_args = self._fetch_function_args_f()
 
         # Initialize the equillibrium point solutions to be a set:
         mins_found = []
@@ -1333,13 +1358,17 @@ class GeneNetworkModel(object):
             if c_bounds is None:
                 c_bounds = [(cmin, cmax) for i in range(N_nodes)]
 
-                if self._include_process:
+                if len(self.process_node_inds):
                     if self._reduced_dims is False:
-                        c_bounds[self._process_i] = (self.Vp_min, self.Vp_max)
-                    else:
-                        if self.c_vect_s[self._process_i] in self.c_vect_reduced_s:
-                            i = self.c_vect_reduced_s.index(self.c_vect_s[self._process_i])
-                            c_bounds[i] = (self.Vp_min, self.Vp_max)
+                        for ip in self.process_node_inds:
+                            c_bounds[ip] = (self.strain_min, self.strain_max)
+                else:
+                    for ip in self.process_node_inds:
+                        if self.c_vect_s[ip] in self.c_vect_reduced_s:
+                            i = self.c_vect_reduced_s.index(self.c_vect_s[ip])
+                            c_bounds[i] = (self.strain_min, self.strain_max)
+
+            self._c_bounds = c_bounds # save for inspection later
 
             for c_vecti in c_test_set:
                 if method == 'Powell' or method == 'trust-constr':
@@ -1365,12 +1394,13 @@ class GeneNetworkModel(object):
 
                 else:
                     sol_root = fsolve(dcdt_funk, c_vecti, args=function_args, xtol=tol)
-                    if self._include_process is False: # If we're not using the process, constrain all concs to be above zero
+                    if len(self.process_node_inds) == 0:
+                        # If we're not using the process, constrain all concs to be above zero
                         if (np.all(np.asarray(sol_root) >= 0.0)):
                             mins_found.append(sol_root)
                     else:
                         # get the nodes that must be constrained above zero:
-                        conc_nodes = np.setdiff1d(self.nodes_index, self._process_i)
+                        conc_nodes = np.setdiff1d(self.nodes_index, self.process_node_inds)
                         # Then, only the nodes that are gene products must be above zero
                         if (np.all(np.asarray(sol_root)[conc_nodes] >= 0.0)):
                             mins_found.append(sol_root)
@@ -1421,18 +1451,13 @@ class GeneNetworkModel(object):
 
             cmins = np.asarray(cminso) + eps # add the small amount here, before calculating the jacobian
 
-            if self._include_process is False:
-                func_args = (cmins, self.d_vect, self.B_vect, self.n_vect)
-
-            else:
-                func_args = (cmins, self.d_vect, self.B_vect, self.n_vect,
-                             self.process_params_f)
+            func_args = self._fetch_function_args_f()
 
             # print(f'dcdt at min: {self.dcdt_vect_f(cmins, r_vect, d_vect, K_vect, n_vect)}')
 
-            solution_dict['Change at Minima'] = self.dcdt_vect_f(*func_args)
+            solution_dict['Change at Minima'] = self.dcdt_vect_f(cmins, *func_args)
 
-            jac = self.jac_f(*func_args)
+            jac = self.jac_f(cmins, *func_args)
 
            # get the eigenvalues of the jacobian at this equillibrium point:
             eig_valso, eig_vects = np.linalg.eig(jac)
@@ -1506,39 +1531,6 @@ class GeneNetworkModel(object):
         ax[1].set_title('Out-Degree Distribution')
 
         return fig, ax
-
-    def set_node_type_path(self,
-                           root_i: int|None = None,
-                           effector_i: int|None=None):
-        '''
-
-        '''
-
-        # Set indices of root and effector nodes to the highest and lowest degree nodes when none are specified:
-        if root_i is None:
-            root_i = self.nodes_by_out_degree[0]
-
-        if effector_i is None:
-            effector_i = self.nodes_by_out_degree[-1]
-
-        # See if there are paths connecting the hub and effector node:
-        try:
-            paths_i = sorted(nx.shortest_simple_paths(self.GG, root_i, effector_i), reverse=True)
-        except:
-            paths_i = []
-
-        node_types = [NodeType.gene for i in self.nodes_index]  # Set all nodes to the gene type
-        # Add any nodes on the path:
-        for path_i in paths_i:
-            for nde_i in path_i:
-                node_types[nde_i] = NodeType.path
-        # Add the path endpoint node highlights:
-        node_types[root_i] = NodeType.root
-        node_types[effector_i] = NodeType.effector
-
-        # Set node types to the graph:
-        self.node_types = node_types
-        self.set_node_types(node_types)
 
     def pulses(self,
                tvect: list|ndarray,
@@ -1618,9 +1610,17 @@ class GeneNetworkModel(object):
             tvect_samp = None
             tvectr = tvect
 
+        # make a time-step update vector so we can update any sensors as
+        # an absolute reading (dt = 1.0) while treating the kinetics of the
+        # other node types:
+        dtv = 1.0e-3 * np.ones(self.N_nodes)
+        dtv[self.sensor_node_inds] = 1.0
+
+        function_args = self._fetch_function_args_f()
+
         for ti, tt in enumerate(tvect):
-            dcdt = self.dcdt_vect_f(cvecti, self.d_vect, self.B_vect, self.n_vect)
-            cvecti += dt * dcdt
+            dcdt = self.dcdt_vect_f(cvecti, *function_args)
+            cvecti += dtv * dcdt
 
             if c_signals is not None:
                 # manually set the signal node values:
