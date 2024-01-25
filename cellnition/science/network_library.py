@@ -22,7 +22,7 @@ class LibNet(object, metaclass=ABCMeta):
 
         pass
 
-class BinodeNetAdd(LibNet):
+class BinodeNet(LibNet):
 
     def __init__(self):
         '''
@@ -34,10 +34,9 @@ class BinodeNetAdd(LibNet):
         # Initialize the superclass:
         super().__init__()
 
-        self.name = 'BinodeNet_AddInteract'
-        self.short_name = 'BinodeNet_Add'
+        self.name = 'BinodeNet'
 
-        self.N_nodes = 2
+        self.N_nodes = 4
         self.edges = [('H0', 'H1'), ('H1', 'H0'),
                  ('H0', 'H0'), ('H1', 'H1'),
                  ('S0', 'H0'), ('S1', 'H1')
@@ -84,12 +83,10 @@ class BasicBinodeNet(LibNet):
         # Initialize the superclass:
         super().__init__()
 
-        self.name = 'BinodeNet_Simple'
-        self.short_name = 'SimpleBinodeNet'
+        self.name = 'BasicBinodeNet'
 
         self.N_nodes = 4
         self.edges = [('H0', 'H1'), ('H1', 'H0'),
-                 # ('H0', 'H0'), ('H1', 'H1'),
                  ('S0', 'H0'), ('S1', 'H1')
                  ]
 
@@ -103,7 +100,7 @@ class BasicBinodeNet(LibNet):
 
         self.add_interactions = True
 
-class TrinodeNetAdd(LibNet):
+class TrinodeNet(LibNet):
 
     def __init__(self):
         '''
@@ -112,8 +109,7 @@ class TrinodeNetAdd(LibNet):
         # Initialize the superclass:
         super().__init__()
 
-        self.name = 'TrinodeNet_AddInteract'
-        self.short_name = 'TrinodeNet_Add'
+        self.name = 'TrinodeNet'
 
         self.N_nodes = 3
         self.edges = [('H0', 'H1'), ('H1', 'H2'), ('H2', 'H0'),
@@ -161,21 +157,19 @@ class BasicTrinodeNet(LibNet):
         # Initialize the superclass:
         super().__init__()
 
-        self.name = 'TrinodeNet_Simple'
-        self.short_name = 'SimpleTrinodeNet'
+        self.name = 'BasicTrinodeNet'
 
         self.N_nodes = 3
-        self.edges = [('C0', 'C1'), ('C1', 'C2'), ('C2', 'C0'),
-                 # ('S0', 'H0'), ('S1', 'H1'), ('S2', 'H2')
+        self.edges = [('H0', 'H1'), ('H1', 'H2'), ('H2', 'H0'),
+                 ('S0', 'H0'), ('S1', 'H1'), ('S2', 'H2')
                  ]
 
         self.edge_types = [EdgeType.I, EdgeType.A, EdgeType.I,
                       # EdgeType.A, EdgeType.A, EdgeType.A,
-                      # EdgeType.Is, EdgeType.Is, EdgeType.Is,
+                      EdgeType.Is, EdgeType.Is, EdgeType.Is,
                       ]
 
         self.node_type_dict = {'S': NodeType.signal}
-        self.node_type_dict = None
 
         self.add_interactions = True
 
@@ -200,7 +194,7 @@ class BasicTrinodeNet(LibNet):
         self.n_vect_alt2 = 3.0
         self.cmax_alt2 = 4.0
 
-class PentanodeNetAdd(LibNet):
+class PentanodeNet(LibNet):
 
     def __init__(self):
         '''
@@ -209,10 +203,9 @@ class PentanodeNetAdd(LibNet):
         # Initialize the superclass:
         super().__init__()
 
-        self.name = 'PentanodeNet_AddInteract'
-        self.short_name = 'PentanodeNet_Add'
+        self.name = 'PentanodeNet'
 
-        self.N_nodes = 5
+        self.N_nodes = 10
         self.edges = [('H0', 'H1'), ('H1', 'H2'), ('H2', 'H3'), ('H3', 'H4'), ('H4', 'H0'),
                  ('H0', 'H0'), ('H1', 'H1'), ('H2', 'H2'), ('H3', 'H3'), ('H4', 'H4'),
                  ('S0', 'H0'), ('S1', 'H1'), ('S2', 'H2'), ('S3', 'H3'), ('S4', 'H4')
@@ -257,10 +250,9 @@ class TrinodeNetLoaded(LibNet):
         # Initialize the superclass:
         super().__init__()
 
-        self.name = 'TrinodeNet_AddInteract_Loaded'
-        self.short_name = 'TrinodeNet_Loaded'
+        self.name = 'TrinodeNet_Loaded'
 
-        self.N_nodes = 3
+        self.N_nodes = 6
         self.edges = [('H0', 'H1'), ('H1', 'H2'), ('H2', 'H0'),
                       ('H1', 'H0'), ('H2', 'H1'), ('H0', 'H2'),
                       ('H0', 'H0'), ('H2', 'H2'), ('H1', 'H1'),
@@ -298,7 +290,7 @@ class TrinodeNetLoaded(LibNet):
         self.n_vect_alt2 = 3.0
         self.cmax_alt2 = 4.0
 
-class QuadStateNetAdd(LibNet):
+class QuadStateNet(LibNet):
 
     def __init__(self):
         '''
@@ -307,8 +299,7 @@ class QuadStateNetAdd(LibNet):
         # Initialize the superclass:
         super().__init__()
 
-        self.name = 'QuadStateNet_AddInteract'
-        self.short_name = 'QuadState_Add'
+        self.name = 'QuadStateNet'
 
         self.N_nodes = 6
         self.edges = [('H0', 'H1'), ('H1', 'H2'), ('H2', 'H0'),
@@ -336,9 +327,8 @@ class QuadStateChain(LibNet):
         super().__init__()
 
         self.name = 'QuadStateChain'
-        self.short_name = 'QuadStateChain'
 
-        self.N_nodes = 9
+        self.N_nodes = 12
         self.edges = [('H0', 'H1'), ('H1', 'H2'), ('H2', 'H0'),
                  ('H0', 'H0'), ('H2', 'H2'), ('H1', 'H1'),
                  ('S0', 'H0'), ('S1', 'H1'), ('S2', 'H2'),
@@ -358,11 +348,10 @@ class QuadStateChain(LibNet):
                       ]
 
         self.node_type_dict = {'S': NodeType.signal}
-        # self.node_type_dict = None
 
         self.add_interactions = True
 
-class QuadStateNetMult(LibNet):
+class FullQuadStateNet(LibNet):
 
     def __init__(self):
         '''
@@ -371,35 +360,7 @@ class QuadStateNetMult(LibNet):
         # Initialize the superclass:
         super().__init__()
 
-        self.name = 'QuadStateNet_MultInteract'
-        self.short_name = 'QuadState_Mult'
-
-        self.N_nodes = 6
-        self.edges = [('H0', 'H1'), ('H1', 'H2'), ('H2', 'H0'),
-                      ('H0', 'H0'), ('H2', 'H2'), ('H1', 'H1'),
-                      ('S0', 'H0'), ('S1', 'H1'), ('S2', 'H2')
-                      ]
-
-        self.edge_types = [EdgeType.I, EdgeType.I, EdgeType.I,
-                           EdgeType.A, EdgeType.A, EdgeType.A,
-                           EdgeType.As, EdgeType.As, EdgeType.As,
-                           ]
-
-        self.node_type_dict = {'S': NodeType.signal}
-
-        self.add_interactions = False
-
-class FullQuadStateNetAdd(LibNet):
-
-    def __init__(self):
-        '''
-
-        '''
-        # Initialize the superclass:
-        super().__init__()
-
-        self.name = 'FullQuadStateNet_AddInteract'
-        self.short_name = 'FullQuadState_Add'
+        self.name = 'FullQuadStateNet'
 
         # CASE TYPE QUADSTABLE with sensors and auxillary nodes in scale-free configuration:
         # Core is triangle loop with all auto-nodes edges:
@@ -445,7 +406,6 @@ class FullQuadStateControl(LibNet):
         super().__init__()
 
         self.name = 'FullQuadStateControl'
-        self.short_name = 'FullQuadStateControl'
 
         # CASE TYPE QUADSTABLE with sensors and auxillary nodes in scale-free configuration:
         # Core is triangle loop with all auto-nodes edges:
@@ -476,7 +436,7 @@ class FullQuadStateControl(LibNet):
 
         self.add_interactions = True
 
-class SimpleMonoControlLoop(LibNet):
+class MonoControlNet(LibNet):
 
     def __init__(self):
         '''
@@ -485,8 +445,7 @@ class SimpleMonoControlLoop(LibNet):
         # Initialize the superclass:
         super().__init__()
 
-        self.name = 'Simple Mono Control Loop'
-        self.short_name = 'Simple_Mono_Control'
+        self.name = 'MonoControlNet'
 
         self.N_nodes = 5
         self.edges = [('S0', 'H0'), ('H0', 'E0'), ('E0', 'P0'), ('P0', 'S0'), ('F0', 'P0')]

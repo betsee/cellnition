@@ -18,7 +18,6 @@ from cellnition.science.phase_space_searches import multistability_search
 
 # FIXME: allow a workframe to run off of a set of loaded graphs
 # FIXME: make this more modularized in terms of functions performs (like an FSM)
-# TODO: Allow knockout to be time-simmed or total steady-state
 
 class NetworkWorkflow(object):
     '''
