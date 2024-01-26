@@ -270,3 +270,33 @@ def test_grn_workflow_readfromfile(tmp_path) -> None:
                                                        build_analytical=True,
                                                        i=0)
 
+def test_network_library() -> None:
+    '''
+    Test the :mod:`cellnition.science.network_library` submodule.
+    '''
+
+    # Defer test-specific imports.
+    from cellnition.science import network_library
+    from cellnition.science.network_library import LibNet
+    from cellnition.science.gene_networks import GeneNetworkModel
+    from cellnition.science.network_enums import GraphType
+
+    # Tuple of all "LibNet" subclasses, defined as the tuple comprehension of...
+    LIB_NETS: tuple[type[LibNet]] = tuple(
+        attr_value
+        # For the value of each attribute defined by this submodule...
+        for attr_value in network_library.__dict__.values()
+        # If this attribute that is a "LibNet" subclass.
+        if (
+            isinstance(attr_value, type) and
+            issubclass(attr_value, LibNet) and
+            attr_value is not LibNet
+        )
+    )
+
+    for lib_net in LIB_NETS:
+        libn = lib_net()
+        gmod = GeneNetworkModel(libn.N_nodes,
+                            edges=libn.edges,
+                            graph_type=GraphType.user
+                            )

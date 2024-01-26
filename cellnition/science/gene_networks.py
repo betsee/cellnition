@@ -40,7 +40,11 @@ import sympy as sp
 from sympy.core.symbol import Symbol
 from sympy.tensor.indexed import Indexed
 from cellnition.science.network_enums import EdgeType, GraphType, NodeType
-from cellnition.science.interaction_functions import f_acti_s, f_inhi_s, f_neut_s, f_logi_s
+from cellnition.science.interaction_functions import (f_acti_hill_s,
+                                                      f_inhi_hill_s,
+                                                      f_neut_s,
+                                                      f_acti_logi_s,
+                                                      f_inhi_logi_s)
 import pygraphviz as pgv
 
 # TODO: Add in stochasticity
@@ -164,6 +168,10 @@ class GeneNetworkModel(object):
 
 
         '''
+        # build using Hill equations:
+        self._f_acti_s = f_acti_hill_s
+        self._f_inhi_s = f_inhi_hill_s
+
         self.N_nodes = N_nodes # number of nodes in the network (as defined by user initially)
         self._graph_type = graph_type
 
@@ -521,11 +529,11 @@ class GeneNetworkModel(object):
 
         for et in self.edge_types:
             if et is EdgeType.A:
-                self.edge_funcs.append(f_acti_s)
+                self.edge_funcs.append(self._f_acti_s)
                 self.add_edge_interaction_bools.append(add_interactions)
                 self.growth_interaction_bools.append(True) # interact with growth component of reaction
             elif et is EdgeType.I:
-                self.edge_funcs.append(f_inhi_s)
+                self.edge_funcs.append(self._f_inhi_s)
                 self.add_edge_interaction_bools.append(add_interactions)
                 self.growth_interaction_bools.append(True)  # interact with growth component of reaction
             elif et is EdgeType.N:
@@ -536,11 +544,11 @@ class GeneNetworkModel(object):
                 # self.edge_funcs.append(self.f_acti_s) # activate
                 # self.add_edge_interaction_bools.append(True) # add
                 # self.growth_interaction_bools.append(True)  # interact with growth component of reaction
-                self.edge_funcs.append(f_inhi_s) # inhibit
+                self.edge_funcs.append(self._f_inhi_s) # inhibit
                 self.add_edge_interaction_bools.append(False) # multiply
                 self.growth_interaction_bools.append(False)  # interact with decay component of reaction
             else:
-                self.edge_funcs.append(f_inhi_s) # inhibit
+                self.edge_funcs.append(self._f_inhi_s) # inhibit
                 self.add_edge_interaction_bools.append(False) # multiply
                 self.growth_interaction_bools.append(True)  # interact with growth component of reaction
 
@@ -872,7 +880,7 @@ class GeneNetworkModel(object):
                 # Finally, we need an 'auxillary' equation that represents the value of the
                 # sensor in terms of the process, but equals zero (so we can include it in
                 # optimization root finding):
-                eq_c_vect_s[i_sens] = -self.c_vect_s[i_sens] + f_logi_s(c_proc,
+                eq_c_vect_s[i_sens] = -self.c_vect_s[i_sens] + f_acti_logi_s(c_proc,
                                                                        self.sensor_params_s[i_sens][0],
                                                                        self.sensor_params_s[i_sens][1])
 
