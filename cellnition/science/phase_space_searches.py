@@ -6,6 +6,7 @@ import numpy as np
 from numpy import ndarray
 from cellnition.science.gene_networks import GeneNetworkModel
 
+#FIXME allow these to run with constraints on signals or nodes
 # FIXME: we'd like to remove signal node edges and signal nodes from this search.
 
 def multistability_search(gmod: GeneNetworkModel,
@@ -18,7 +19,9 @@ def multistability_search(gmod: GeneNetworkModel,
                           N_round_unique_sol: int = 1,
                           search_tol: float = 1.0e-15,
                           add_interactions: bool = True,
-                          unique_sols: bool = True
+                          unique_sols: bool = True,
+                          constraint_vals: list[float]|None = None,
+                          constraint_inds: list[int]|None = None
                           ) -> tuple[list, list]:
     '''
     By randomly generating sets of different edge interaction types (i.e. activator or inhibitor), find
@@ -64,6 +67,16 @@ def multistability_search(gmod: GeneNetworkModel,
     unique_sols : bool = True
         Record only unique steady-state solutions (True)?
 
+    constraint_vals : list[float]|None = None
+        Values for nodes that are to be constrained in the optimization problem. Must be
+        same length as constraint_inds. If either constraint_vals or constraint_inds are
+        None neither will be used.
+
+    constraint_int : list[int]|None = None
+        Indices of nodes that are to be constrained in the optimization problem. Must be
+        same length as constraint_vals. If either constraint_vals or constraint_inds are
+        None neither will be used.
+
     Returns
     -------
     numsol_list : list
@@ -78,16 +91,33 @@ def multistability_search(gmod: GeneNetworkModel,
     multisol_edges = []
     numsol_list = []
 
+    if constraint_vals is not None and constraint_inds is not None:
+        if len(constraint_vals) != len(constraint_inds):
+            raise Exception("Node constraint values must be same length as constrained node indices!")
+
     for i in range(N_iter):
         edge_types = gmod.get_edge_types(p_acti=0.5)
         gmod.build_analytical_model(edge_types=edge_types,
                                     add_interactions=add_interactions)
-        sols_0 = gmod.optimized_phase_space_search(Ns=N_space,
-                                                   cmax=1.5 * np.max(gmod.in_degree_sequence),
-                                                   round_sol=N_round_sol,
-                                                   tol=search_tol,
-                                                   method="Root"
-                                                   )
+
+        if constraint_vals is None or constraint_inds is None:
+            sols_0 = gmod.optimized_phase_space_search(Ns=N_space,
+                                                       cmax=1.5 * np.max(gmod.in_degree_sequence),
+                                                       round_sol=N_round_sol,
+                                                       tol=search_tol,
+                                                       method="Root"
+                                                       )
+
+        else:
+            sols_0 = gmod.constrained_phase_space_search(constraint_vals,
+                                                               constraint_inds,
+                                                               Ns=N_space,
+                                                               cmin=0.0,
+                                                               cmax=1.5 * np.max(gmod.in_degree_sequence),
+                                                               tol=search_tol,
+                                                               round_sol=N_round_sol,
+                                                               method='Root'
+                                                               )
 
         solsM = gmod.find_attractor_sols(sols_0,
                                          tol=tol,
@@ -124,7 +154,9 @@ def param_space_search(gmod: GeneNetworkModel,
                        cmax_multi: float=2.0,
                        verbose: bool=True,
                        coi: float|list = 0.0,
-                       ki: float|list = 10.0
+                       ki: float|list = 10.0,
+                       constraint_vals: list[float] | None = None,
+                       constraint_inds: list[int] | None = None
                        ) -> tuple[ndarray, list]:
     '''
     Search parameter space of a model to find parameter combinations that give different multistable
@@ -174,6 +206,16 @@ def param_space_search(gmod: GeneNetworkModel,
     ki: float|list = 10.0
         The rate of rise of any sensor's logistic functions (held constant).
 
+    constraint_vals : list[float]|None = None
+        Values for nodes that are to be constrained in the optimization problem. Must be
+        same length as constraint_inds. If either constraint_vals or constraint_inds are
+        None neither will be used.
+
+    constraint_int : list[int]|None = None
+        Indices of nodes that are to be constrained in the optimization problem. Must be
+        same length as constraint_vals. If either constraint_vals or constraint_inds are
+        None neither will be used.
+
     Returns
     -------
     bif_space_M : ndarray
@@ -184,6 +226,10 @@ def param_space_search(gmod: GeneNetworkModel,
         An array that has all steady-state solutions stacked into the list.
 
     '''
+
+    if constraint_vals is not None and constraint_inds is not None:
+        if len(constraint_vals) != len(constraint_inds):
+            raise Exception("Node constraint values must be same length as constrained node indices!")
 
     # What we wish to create is a parameter space search, as this net is small enough to enable that.
     Blin = np.linspace(B_min, B_max, N_pts)
@@ -217,12 +263,25 @@ def param_space_search(gmod: GeneNetworkModel,
         # solving for the root.
         gmod.create_parameter_vects(Bi=bvecti, ni=ni, di=1.0, co=coi, ki=ki)
 
-        sols_0 = gmod.optimized_phase_space_search(Ns=N_search,
-                                                   cmax=cmax_multi * np.max(gmod.in_degree_sequence),
-                                                   round_sol=search_round_sol,
-                                                   tol=1.0e-15,
-                                                   method="Root"
-                                                   )
+        if constraint_vals is None or constraint_inds is None:
+
+            sols_0 = gmod.optimized_phase_space_search(Ns=N_search,
+                                                       cmax=cmax_multi * np.max(gmod.in_degree_sequence),
+                                                       round_sol=search_round_sol,
+                                                       tol=1.0e-15,
+                                                       method="Root"
+                                                       )
+
+        else:
+            sols_0 = gmod.constrained_phase_space_search(constraint_vals,
+                                                               constraint_inds,
+                                                               Ns=N_search,
+                                                               cmin=0.0,
+                                                               cmax=cmax_multi * np.max(gmod.in_degree_sequence),
+                                                               tol=1.0e-15,
+                                                               round_sol=search_round_sol,
+                                                               method='Root'
+                                                               )
 
         solsM = gmod.find_attractor_sols(sols_0,
                                          tol=tol,

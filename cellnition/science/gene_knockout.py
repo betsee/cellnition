@@ -18,7 +18,6 @@ from cellnition.science.network_enums import EdgeType, GraphType, NodeType
 from cellnition.science.gene_networks import GeneNetworkModel
 
 # FIXME: DOCUMENT THROUGHOUT
-# FIXME: Implement state-grabbing from the time-sim
 
 class GeneKnockout(object):
     '''
@@ -44,13 +43,16 @@ class GeneKnockout(object):
                                Ns: int = 3,
                                cmin: float = 0.0,
                                cmax: float = 1.0,
-                               tol: float = 1.0e-6,
+                               tol: float = 1.0e-15,
                                round_sol: int = 6,
                                round_unique_sol: int = 2,
                                unique_sols: bool = True,
-                               sol_tol: float = 1.0e-3,
+                               sol_tol: float = 1.0e-1,
                                verbose: bool = True,
-                               save_file_basename: str | None = None
+                               save_file_basename: str | None = None,
+                               constraint_vals: list[float]|None = None,
+                               constraint_inds: list[int]|None = None,
+                               solver_method: str = 'Root'
                                ):
         '''
         Performs a sequential knockout of all genes in the network, computing all possible steady-state
@@ -58,14 +60,17 @@ class GeneKnockout(object):
         as the knockouts aren't a temporary perturbation, but a long-term silencing.
 
         '''
+        print("Knockout Experiments-----")
 
         if self._gmod.dcdt_vect_s is None:
             raise Exception("Must use the method build_analytical_model in GeneNetworkModel "
                             "to generate attributes required to run gene knockout sims.")
 
+        if constraint_vals is not None and constraint_inds is not None:
+            if len(constraint_vals) != len(constraint_inds):
+                raise Exception("Node constraint values must be same length as constrained node indices!")
+
         knockout_sol_set = []
-        # knockout_dcdt_s_set = []
-        # knockout_dcdt_f_set = []
 
         if save_file_basename is not None:
             save_file_list = [f'{save_file_basename}_allc.csv']
@@ -75,13 +80,26 @@ class GeneKnockout(object):
             save_file_list = [None]
             save_file_list.extend([None for i in range(self._gmod.N_nodes)])
 
-        # Solve the system with all concentrations:
-        sols_0 = self._gmod.optimized_phase_space_search(Ns=Ns,
-                                                   cmax=cmax,
-                                                   round_sol=round_sol,
-                                                   tol=tol,
-                                                   method="Root"
-                                                   )
+        if constraint_vals is None or constraint_inds is None:
+            # Solve the system with all concentrations:
+            sols_0 = self._gmod.optimized_phase_space_search(Ns=Ns,
+                                                             cmin=cmin,
+                                                             cmax=cmax,
+                                                             round_sol=round_sol,
+                                                             tol=tol,
+                                                             method=solver_method
+                                                             )
+
+        else:
+            sols_0 = self._gmod.constrained_phase_space_search(constraint_vals,
+                                                               constraint_inds,
+                                                               Ns=Ns,
+                                                               cmin=cmin,
+                                                               cmax=cmax,
+                                                               tol=tol,
+                                                               round_sol=round_sol,
+                                                               method=solver_method
+                                                               )
 
         # Screen only for attractor solutions:
         solsM = self._gmod.find_attractor_sols(sols_0,
@@ -98,71 +116,27 @@ class GeneKnockout(object):
 
         for i in self._gmod.regular_node_inds:  # Include only 'gene' nodes as silenced
 
-            c_ko_s = self._gmod.c_vect_s[i]
-            # Define a new change vector by substituting in the knockout value for the gene (c=0) and
-            # clamping the gene at that level by setting its change rate to zero:
-            dcdt_vect_ko_s = self._gmod.dcdt_vect_s.copy()  # make a copy of the symbolic change vector
-            # dcdt_vect_ko_s = dcdt_vect_ko_s.subs(c_ko_s, 0)
-            dcdt_vect_ko_s.row_del(i)  # Now we have to remove the row for this concentration
+            if constraint_vals is None or constraint_inds is None:
+                # Gene knockout is the only constraint:
+                cvals = [0.0]
+                cinds = [i]
 
-            # create a new symbolic concentration vector that has the silenced gene removed:
-            c_vect_ko = self._gmod.c_vect_s.copy()
-            c_vect_ko.remove(c_ko_s)
+            else: # add the gene knockout as a final constraint:
+                cvals = constraint_vals + [0.0]
+                cinds = constraint_inds + [i]
 
-            # do a similar thing for conc. indices so we can reconstruct solutions easily:
-            nodes_ko = self._gmod.nodes_index.copy()
-            del nodes_ko[i]  # delete the ith index
-
-            # knockout_dcdt_s_set.append(dcdt_vect_ko_s) # Store for later
-            lambda_params = self._gmod._fetch_lambda_params_s(c_vect_ko, c_ko_s)
-            function_args = self._gmod._fetch_function_args_f(0.0)
-
-            flatten_f = np.asarray([fs for fs in dcdt_vect_ko_s])
-            dcdt_vect_ko_f = sp.lambdify(lambda_params, flatten_f)
-
-            # knockout_dcdt_f_set.append(dcdt_vect_ko_f) # store for later use
-
-            # Determine the set of additional arguments to the optimization function -- these are different each
-            # time as the clamped concentration becomes an additional known parameter:
-
-            # Generate the points in state space to sample at:
-            c_test_set, _, _ = self._gmod.generate_state_space(c_vect_ko,
+            sols_1 = self._gmod.constrained_phase_space_search(cvals,
+                                                               cinds,
                                                                Ns=Ns,
                                                                cmin=cmin,
                                                                cmax=cmax,
-                                                               include_signals=True)
-
-            # Initialize the equillibrium point solutions to be a set:
-            mins_found = []
-
-            for c_vecti in c_test_set:
-
-                sol_rooto = fsolve(dcdt_vect_ko_f, c_vecti, args=function_args, xtol=tol)
-
-                # reconstruct a full-length concentration vector:
-                sol_root = np.zeros(self._gmod.N_nodes)
-                # the solution is defined at the remaining nodes; the unspecified value is the silenced gene
-                sol_root[nodes_ko] = sol_rooto
-
-                if len(self._gmod.process_node_inds):
-                    # get the nodes that must be constrained above zero:
-                    conc_nodes = np.setdiff1d(self._gmod.nodes_index, self._gmod.process_node_inds)
-                    # Then, only the nodes that are gene products must be above zero
-                    if (np.all(np.asarray(sol_root)[conc_nodes] >= 0.0)):
-                        mins_found.append(sol_root)
-
-                else:  # If we're not using the process, constrain all concs to be above zero
-                    if (np.all(np.asarray(sol_root) >= 0.0)):
-                        mins_found.append(sol_root)
-
-                mins_found = np.round(mins_found, round_sol)
-                mins_found = np.unique(mins_found, axis=0).tolist()
-
-            if verbose:
-                print(f'Steady-state solutions for {self._gmod.c_vect_s[i].name} knockout:')
+                                                               tol=tol,
+                                                               round_sol=round_sol,
+                                                               method=solver_method
+                                                               )
 
             # Screen only for attractor solutions:
-            solsM = self._gmod.find_attractor_sols(mins_found,
+            solsM = self._gmod.find_attractor_sols(sols_1,
                                              tol=sol_tol,
                                              verbose=verbose,
                                              unique_sols=unique_sols,

@@ -44,6 +44,7 @@ from cellnition.science.interaction_functions import f_acti_s, f_inhi_s, f_neut_
 import pygraphviz as pgv
 
 # TODO: Add in stochasticity
+# TODO: Time signals should be able to do flipped case (from 1 to zero)
 
 class GeneNetworkModel(object):
     '''
@@ -115,7 +116,7 @@ class GeneNetworkModel(object):
     def __init__(self,
                  N_nodes: int,
                  edges: list|ndarray|None = None,
-                 graph_type: GraphType = GraphType.scale_free,
+                 graph_type: GraphType = GraphType.user,
                  beta: float = 0.20,
                  gamma: float=0.75,
                  delta_in: float=0.0,
@@ -164,6 +165,14 @@ class GeneNetworkModel(object):
 
         '''
         self.N_nodes = N_nodes # number of nodes in the network (as defined by user initially)
+        self._graph_type = graph_type
+
+        # Save all the construction parameters to file:
+        self._beta = beta
+        self._gamma = gamma
+        self._delta_in = delta_in
+        self._delta_out = delta_out
+        self._p_edge = p_edge
         self._graph_type = graph_type
 
         # Depending on whether edges are supplied by user, generate
@@ -1798,7 +1807,7 @@ class GeneNetworkModel(object):
         sol_char_error = []
         i = 0
         for sol_dic in sol_char_0:
-            error = np.sum(sol_dic['Change at Minima'])**2
+            error = np.sum(sol_dic['Change at Minima']**2)
             char = sol_dic['Stability Characteristic']
             sols = sol_dic['Minima Values']
 

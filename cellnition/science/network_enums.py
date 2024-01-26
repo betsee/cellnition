@@ -31,6 +31,7 @@ class NodeType(Enum):
 class GraphType(Enum):
     scale_free = 'Scale Free'
     random = 'Random'
+    user = 'User Defined'
 
 class EquilibriumType(Enum):
     attractor = 'Stable Attractor'
