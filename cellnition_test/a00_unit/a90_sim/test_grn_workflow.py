@@ -194,3 +194,79 @@ def test_grn_workflow_sfgraph(tmp_path) -> None:
                                 solver_method='Root',  # * 'Powell'
                                 extra_verbose=True
                                 )
+
+def test_grn_workflow_readfromfile(tmp_path) -> None:
+    '''
+
+    '''
+    import os
+    from cellnition.science.network_workflow import NetworkWorkflow
+    from cellnition.science.network_enums import GraphType
+    from cellnition.science.network_library import QuadStateNet
+    from cellnition.science.gene_networks import GeneNetworkModel
+
+    # Absolute or relative dirname of a test-specific temporary directory to
+    # which "NetworkWorkflow" will emit GraphML and other files.
+    save_path = str(tmp_path)
+
+    # libg = QuadStateNet()
+    # libg = FullQuadStateNet()
+    libg = QuadStateNet()
+
+    gmod = GeneNetworkModel(libg.N_nodes,
+                            edges=libg.edges,
+                            graph_type=GraphType.user
+                            )  # This will be a straight-up GRN model
+
+    fname_base = libg.name
+
+    gmod.build_analytical_model(
+        edge_types=libg.edge_types,
+        add_interactions=libg.add_interactions,
+        node_type_dict=libg.node_type_dict,
+        pure_gene_edges_only=False
+    )
+
+    sim = NetworkWorkflow(save_path)
+
+    graph_data = sim.work_frame(gmod,
+                                save_path,
+                                fname_base,
+                                i_frame=0,
+                                verbose=True,
+                                reduce_dims=False,  # * True
+                                Bi=2.0,  # * also use vector
+                                ni=3.0,
+                                di=1.0,
+                                coi=0.0,
+                                ki=10.0,
+                                add_interactions=True,  # * False
+                                edge_types=libg.edge_types,  # None
+                                edge_type_search=False,  # * True
+                                N_edge_search=3,
+                                find_solutions=False,  # * False
+                                knockout_experiments=False,  # *True
+                                sol_search_tol=1.0e-15,
+                                N_search_space=2,
+                                N_round_sol=6,
+                                N_round_unique_sol=1,
+                                sol_unique_tol=1.0e-1,
+                                sol_ko_tol=1.0e-1,
+                                constraint_vals=[0.0, 0.0, 0.0],  # *signal vals
+                                constraint_inds=gmod.signal_node_inds.copy(),  # * signal inds
+                                update_string=None,  # * with string
+                                pure_gene_edges_only=False,  # * True
+                                node_type_dict=libg.node_type_dict,  # * None
+                                solver_method='Root',  # * 'Powell'
+                                extra_verbose=True
+                                )
+
+
+
+    filename = os.path.join(save_path, 'network_QuadStateNet.gml')
+
+    gmod, updatestr, fnbase = sim.read_graph_from_file(filename,
+                                                       add_interactions=True,
+                                                       build_analytical=True,
+                                                       i=0)
+

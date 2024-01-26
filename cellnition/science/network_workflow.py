@@ -103,42 +103,28 @@ class NetworkWorkflow(object):
         for ei, et in edge_data.items():
             # append the edge to the list:
             edges_list.append(ei)
-
-            if et == 'Activator':
-                edge_types.append(EdgeType.A)
-            elif et == 'Inhibitor':
-                edge_types.append(EdgeType.I)
-            elif et == 'Normal':
-                edge_types.append(EdgeType.N)
-            else:
-                raise Exception("Edge type not found.")
+            edge_types.append(EdgeType[et])
 
         node_types = []
 
         # get data stored on node type key:
         node_data = nx.get_node_attributes(GG, "node_type")
 
+        node_type_dict = {}
+
         for nde_i, nde_t in node_data.items():
-            if nde_t == 'Gene':
-                node_types.append(NodeType.gene)
-            elif nde_t == 'Process':
-                node_types.append(NodeType.process)
-            elif nde_t == 'Sensor':
-                node_types.append(NodeType.sensor)
-            elif nde_t == 'Effector':
-                node_types.append(NodeType.effector)
-            elif nde_t == 'Root Hub':
-                node_types.append(NodeType.root)
-            elif nde_t == 'Path':
-                node_types.append(NodeType.path)
+            if type(nde_i) == str:
+                node_type_dict[nde_i[0]] = NodeType[nde_t]
             else:
-                raise Exception("Node type not found.")
+                node_type_dict[nde_i] = NodeType[nde_t]
+
+            node_types.append(NodeType[nde_t])
 
         # Build a gene network with the properties read from the file:
         gmod = GeneNetworkModel(N_nodes, edges=edges_list)
 
         # Assign node types to the network model:
-        gmod.set_node_types(node_types)
+        gmod.set_node_types(node_type_dict=node_type_dict)
 
         if build_analytical:
             # Build an analytical model using the edge_type and node_type assignments:
@@ -213,8 +199,7 @@ class NetworkWorkflow(object):
             # print(update_string)
 
         # set node types to the network:
-        gmod.node_types = [NodeType.gene for i in gmod.nodes_index]  # First set all nodes
-        gmod.set_node_types(gmod.node_types)
+        gmod.set_node_types(node_type_dict=node_type_dict, pure_gene_edges_only=pure_gene_edges_only)
 
         if edge_types is None:
             if edge_type_search is False:
@@ -222,13 +207,6 @@ class NetworkWorkflow(object):
                 edge_types = gmod.get_edge_types(p_acti=0.5)
 
             else:
-                # FIXME: this is absurd that we need to make edge types and
-                #  build a model before using multistability search due to how
-                #  the node classification is done in analytical model -- fix it!
-                edge_types = gmod.get_edge_types(p_acti=0.5)
-                gmod.build_analytical_model(edge_types=edge_types,
-                                            add_interactions=add_interactions,
-                                            node_type_dict=node_type_dict)
                 gmod.create_parameter_vects(Bi=Bi, ni=ni, di=di, co=coi, ki=ki)
                 numsols, multisols = multistability_search(gmod, 1,
                                                                 tol=sol_unique_tol,

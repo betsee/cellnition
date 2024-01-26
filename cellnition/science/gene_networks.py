@@ -205,6 +205,7 @@ class GeneNetworkModel(object):
         self._reduced_dims = False # Indicate that model is full dimensions
         self._solved_analytically = False # Indicate that the model does not have an analytical solution
         self.dcdt_vect_reduced_s = None # Initialize this to None
+        self.process_params_s = []  # initialize this to be an empty list
 
     def generate_network(self,
                          beta: float=0.15,
@@ -510,7 +511,7 @@ class GeneNetworkModel(object):
         # assign the edge types to the graph in case we decide to save the network:
         edge_attr_dict = {}
         for ei, et in zip(self.edges_list, edge_types):
-            edge_attr_dict[ei] = {"edge_type": et.value}
+            edge_attr_dict[ei] = {"edge_type": et.name}
 
         nx.set_edge_attributes(self.GG, edge_attr_dict)
 
@@ -543,7 +544,7 @@ class GeneNetworkModel(object):
                 self.add_edge_interaction_bools.append(False) # multiply
                 self.growth_interaction_bools.append(True)  # interact with growth component of reaction
 
-    def set_node_types(self, node_types: list|ndarray):
+    def set_node_types(self, node_type_dict: dict|None = None, pure_gene_edges_only: bool = False):
         '''
         Assign node types to the graph.
 
@@ -552,13 +553,63 @@ class GeneNetworkModel(object):
         node_types : list
             A list of node type enumerations for each node of the network.
         '''
+
+        # Now that indices are set, give nodes a type attribute and classify node inds.
+        # First, initialize a dictionary to collect all node indices by their node type:
+        self.node_type_inds = {}
+        for nt in NodeType:
+            self.node_type_inds[nt.name] = []
+
+        # Next, set all nodes to the gene type by default:
+        node_types = [NodeType.gene for i in self.nodes_index]
+
+        # If there is a supplied node dictionary, go through it and
+        # override the default gene type with the user-specified type:
+        if node_type_dict is not None:
+            for ntag, ntype in node_type_dict.items():
+                for nde_i, nde_n in enumerate(self.nodes_list):
+                    if type(nde_n) is str:
+                        if nde_n.startswith(ntag):
+                            node_types[nde_i] = ntype
+                    else:
+                        if nde_n == ntag:
+                            node_types[nde_i] = ntype
+
+        # Set node types to the graph:
         self.node_types = node_types
         # Set node type as graph node attribute:
         node_attr_dict = {}
-        for nde_i, nde_t in zip(self.nodes_index, node_types):
-            node_attr_dict[nde_i] = {"node_type": nde_t.value}
+        for nde_i, nde_t in zip(self.nodes_list, node_types):
+            node_attr_dict[nde_i] = {"node_type": nde_t.name}
 
         nx.set_node_attributes(self.GG, node_attr_dict)
+
+        # Collect node indices by their type:
+        for nde_i, nde_t in enumerate(self.node_types):
+            self.node_type_inds[nde_t.name].append(nde_i)
+
+        # Next, we need to distinguish edges based on their node type
+        # to separate out some node type interactions from the regular
+        # GRN-type interactions:
+        if pure_gene_edges_only:  # if the user wants to consider only gene type nodes
+            type_tags = [NodeType.gene.name]
+        else:  # Otherwise include all nodes that can form regular interaction edges:
+            type_tags = [NodeType.gene.name,
+                         NodeType.signal.name,
+                         NodeType.sensor.name,
+                         NodeType.effector.name]
+
+        self.regular_node_inds = []
+        for tt in type_tags:
+            self.regular_node_inds.extend(self.node_type_inds[tt])
+
+        # aliases for convenience:
+        # combine signals with factors as they have a similar 'setability' condition
+        # from the outside
+        self.signal_node_inds = self.node_type_inds[NodeType.signal.name] + self.node_type_inds[NodeType.factor.name]
+        self.sensor_node_inds = self.node_type_inds[NodeType.sensor.name]
+        self.process_node_inds = self.node_type_inds[NodeType.process.name]
+        self.nonsignal_node_inds = np.setdiff1d(self.nodes_index, self.signal_node_inds).tolist()
 
     def edges_from_path(self, path_nodes: list|ndarray) -> list:
         '''
@@ -636,57 +687,30 @@ class GeneNetworkModel(object):
 
         self.set_edge_types(self.edge_types, add_interactions)
 
-        # Now that indices are set, give nodes a type attribute and classify node inds.
-        # First, initialize a dictionary to collect all node indices by their node type:
-        self.node_type_inds = {}
-        for nt in NodeType:
-            self.node_type_inds[nt.name] = []
-
-        # Next, set all nodes to the gene type by default:
-        node_types = [NodeType.gene for i in self.nodes_index]
-
-        # If there is a supplied node dictionary, go through it and
-        # override the default gene type with the user-specified type:
-        if node_type_dict is not None:
-            for ntag, ntype in node_type_dict.items():
-                for nde_i, nde_n in enumerate(self.nodes_list):
-                    if type(nde_n) is str:
-                        if nde_n.startswith(ntag):
-                            node_types[nde_i] = ntype
-                    else:
-                        if nde_n == ntag:
-                            node_types[nde_i] = ntype
-
-        # Set node types to the graph:
-        self.node_types = node_types
-        self.set_node_types(node_types)
-
-        # Collect node indices by their type:
-        for nde_i, nde_t in enumerate(self.node_types):
-            self.node_type_inds[nde_t.name].append(nde_i)
-
-        # Next, we need to distinguish edges based on their node type
-        # to separate out some node type interactions from the regular
-        # GRN-type interactions:
-        if pure_gene_edges_only: # if the user wants to consider only gene type nodes
-            type_tags = [NodeType.gene.name]
-        else: # Otherwise include all nodes that can form regular interaction edges:
-            type_tags = [NodeType.gene.name,
-                         NodeType.signal.name,
-                         NodeType.sensor.name,
-                         NodeType.effector.name]
-
-        self.regular_node_inds = []
-        for tt in type_tags:
-            self.regular_node_inds.extend(self.node_type_inds[tt])
-
-        # aliases for convenience:
-        # combine signals with factors as they have a similar 'setability' condition
-        # from the outside
-        self.signal_node_inds = self.node_type_inds[NodeType.signal.name] + self.node_type_inds[NodeType.factor.name]
-        self.sensor_node_inds = self.node_type_inds[NodeType.sensor.name]
-        self.process_node_inds = self.node_type_inds[NodeType.process.name]
-        self.nonsignal_node_inds = np.setdiff1d(self.nodes_index, self.signal_node_inds).tolist()
+        # # Now that indices are set, give nodes a type attribute and classify node inds.
+        # # First, initialize a dictionary to collect all node indices by their node type:
+        # self.node_type_inds = {}
+        # for nt in NodeType:
+        #     self.node_type_inds[nt.name] = []
+        #
+        # # Next, set all nodes to the gene type by default:
+        # node_types = [NodeType.gene for i in self.nodes_index]
+        #
+        # # If there is a supplied node dictionary, go through it and
+        # # override the default gene type with the user-specified type:
+        # if node_type_dict is not None:
+        #     for ntag, ntype in node_type_dict.items():
+        #         for nde_i, nde_n in enumerate(self.nodes_list):
+        #             if type(nde_n) is str:
+        #                 if nde_n.startswith(ntag):
+        #                     node_types[nde_i] = ntype
+        #             else:
+        #                 if nde_n == ntag:
+        #                     node_types[nde_i] = ntype
+        #
+        # # Set node types to the graph:
+        # self.node_types = node_types
+        self.set_node_types(node_type_dict=node_type_dict, pure_gene_edges_only=pure_gene_edges_only)
 
         # Next we want to distinguish a subset of edges that connect only "regular nodes":
         self.regular_edges_index = []
@@ -742,8 +766,6 @@ class GeneNetworkModel(object):
                 self.sensor_params_s[sens_i] = (co_s[ii], k_s[ii])
         else:
             self.sensor_params_s = {}
-
-        self.process_params_s = [] # initialize this to be an empty list
 
         efunc_add_growthterm_vect = [[] for i in self.nodes_index]
         efunc_mult_growthterm_vect = [[] for i in self.nodes_index]
