@@ -222,6 +222,13 @@ class NetworkWorkflow(object):
                 edge_types = gmod.get_edge_types(p_acti=0.5)
 
             else:
+                # FIXME: this is absurd that we need to make edge types and
+                #  build a model before using multistability search due to how
+                #  the node classification is done in analytical model -- fix it!
+                edge_types = gmod.get_edge_types(p_acti=0.5)
+                gmod.build_analytical_model(edge_types=edge_types,
+                                            add_interactions=add_interactions,
+                                            node_type_dict=node_type_dict)
                 gmod.create_parameter_vects(Bi=Bi, ni=ni, di=di, co=coi, ki=ki)
                 numsols, multisols = multistability_search(gmod, 1,
                                                                 tol=sol_unique_tol,
@@ -231,7 +238,9 @@ class NetworkWorkflow(object):
                                                                 N_round_unique_sol=N_round_unique_sol,
                                                                 unique_sols=True,
                                                                 constraint_vals=constraint_vals,
-                                                                constraint_inds=constraint_inds)
+                                                                constraint_inds=constraint_inds,
+                                                                node_type_dict=node_type_dict
+                                                           )
 
                 i_max = (np.asarray(numsols) == np.max(numsols)).nonzero()[0]
 

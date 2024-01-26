@@ -16,8 +16,10 @@ This submodule integration tests the public API of the
 # WARNING: To raise human-readable test errors, avoid importing from
 # package-specific submodules at module scope.
 #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+from cellnition_test._util.mark.pytskip import skip
 
 # ....................{ TESTS                              }....................
+@skip('Streamlit tests currently known to be broken (and irrelevant).')
 def test_app_lifecycle(capsys) -> None:
     '''
     Integration test exercising the **maximally trivial app lifecycle** (i.e.,

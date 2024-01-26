@@ -21,7 +21,8 @@ def multistability_search(gmod: GeneNetworkModel,
                           add_interactions: bool = True,
                           unique_sols: bool = True,
                           constraint_vals: list[float]|None = None,
-                          constraint_inds: list[int]|None = None
+                          constraint_inds: list[int]|None = None,
+                          node_type_dict: dict|None = None,
                           ) -> tuple[list, list]:
     '''
     By randomly generating sets of different edge interaction types (i.e. activator or inhibitor), find
@@ -98,7 +99,8 @@ def multistability_search(gmod: GeneNetworkModel,
     for i in range(N_iter):
         edge_types = gmod.get_edge_types(p_acti=0.5)
         gmod.build_analytical_model(edge_types=edge_types,
-                                    add_interactions=add_interactions)
+                                    add_interactions=add_interactions,
+                                    node_type_dict=node_type_dict)
 
         if constraint_vals is None or constraint_inds is None:
             sols_0 = gmod.optimized_phase_space_search(Ns=N_space,
@@ -112,7 +114,6 @@ def multistability_search(gmod: GeneNetworkModel,
             sols_0 = gmod.constrained_phase_space_search(constraint_vals,
                                                                constraint_inds,
                                                                Ns=N_space,
-                                                               cmin=0.0,
                                                                cmax=1.5 * np.max(gmod.in_degree_sequence),
                                                                tol=search_tol,
                                                                round_sol=N_round_sol,
