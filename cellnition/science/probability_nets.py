@@ -123,19 +123,29 @@ class ProbabilityNet(object):
                     self.M_k[nde_i, nde_j] = -k_base
 
     def create_numerical_dpdt(self,
-                              constraint_inds: list|None = None,
-                              constraint_vals: list|None = None):
+                              constrained_inds: list | None = None,
+                              constrained_vals: list | None = None):
         '''
 
         '''
         # First, lambdify the change vector in a way that supports any constraints:
-        if constraint_inds is None or constraint_vals is None:
+        if constrained_inds is None or constrained_vals is None:
+            # Compute the symbolic Jacobian:
+            dpdt_jac_s = sp.Matrix(self.dpdt_vect_s).jacobian(self.p_vect_s) # analytical Jacobian
+
             if self._inter_funk_type is InterFuncType.hill:
                 dpdt_vect_f = sp.lambdify((self.p_vect_s,
                                            np.asarray(self.M_n_s),
                                            np.asarray(self.M_beta_s),
                                            self.d_vect_s),
                                           self.dpdt_vect_s)
+
+                dpdt_jac_f = sp.lambdify((self.p_vect_s,
+                                          np.asarray(self.M_n_s),
+                                          np.asarray(self.M_beta_s),
+                                          self.d_vect_s),
+                                         dpdt_jac_s)
+
             elif self._inter_funk_type is InterFuncType.logistic:
                 dpdt_vect_f = sp.lambdify((self.p_vect_s,
                                            np.asarray(self.M_k_s),
@@ -143,12 +153,23 @@ class ProbabilityNet(object):
                                            self.d_vect_s),
                                           self.dpdt_vect_s)
 
+                dpdt_jac_f = sp.lambdify((self.p_vect_s,
+                                          np.asarray(self.M_k_s),
+                                          np.asarray(self.M_mu_s),
+                                          self.d_vect_s),
+                                         dpdt_jac_s)
+
             else:
                 raise Exception("Only InterFuncType hill and logistic are supported.")
+
 
         else: # If there are constraints split the p-vals into an arguments and to-solve set:
-            p_vect_args = np.asarray(self.p_vect_s)[constraint_inds]
-            p_vect_solve = np.setdiff1d(self.p_vect_s, p_vect_args)
+            p_vect_args = (np.asarray(self.p_vect_s)[constrained_inds]).tolist()
+            unconstrained_inds = np.setdiff1d(self._gmod.N_nodes, constrained_inds)
+            p_vect_solve = (np.asarray(self.p_vect_s)[unconstrained_inds]).tolist()
+
+            # Compute the symbolic Jacobian:
+            dpdt_jac_s = sp.Matrix(self.dpdt_vect_s).jacobian(p_vect_solve) # analytical Jacobian
 
             if self._inter_funk_type is InterFuncType.hill:
                 dpdt_vect_f = sp.lambdify((p_vect_solve,
@@ -158,6 +179,13 @@ class ProbabilityNet(object):
                                            self.d_vect_s),
                                           self.dpdt_vect_s)
 
+                dpdt_jac_f = sp.lambdify((p_vect_solve,
+                                          p_vect_args,
+                                          np.asarray(self.M_n_s),
+                                          np.asarray(self.M_beta_s),
+                                          self.d_vect_s),
+                                         dpdt_jac_s)
+
             elif self._inter_funk_type is InterFuncType.logistic:
                 dpdt_vect_f = sp.lambdify((p_vect_solve,
                                            p_vect_args,
@@ -166,10 +194,18 @@ class ProbabilityNet(object):
                                            self.d_vect_s),
                                           self.dpdt_vect_s)
 
+                dpdt_jac_f = sp.lambdify((p_vect_solve,
+                                          p_vect_args,
+                                          np.asarray(self.M_k_s),
+                                          np.asarray(self.M_mu_s),
+                                          self.d_vect_s),
+                                         dpdt_jac_s)
+
             else:
                 raise Exception("Only InterFuncType hill and logistic are supported.")
 
-        return dpdt_vect_f
+
+        return dpdt_vect_f, dpdt_jac_f
 
     def get_function_args(self, constraint_vals: list|None=None):
         '''
@@ -230,14 +266,15 @@ class ProbabilityNet(object):
                                 pmin: float=1.0e-25,
                                 tol: float=1.0e-15,
                                 N_round_sol: int = 2,
+                                jac_derivatives_cols: bool=True,
                                 ):
         '''
         Solve for the equilibrium points of gene product probabilities in
         terms of a given set of numerical parameters.
         '''
 
-        dpdt_vect_f = self.create_numerical_dpdt(constraint_inds=constrained_inds,
-                                                 constraint_vals=constrained_vals)
+        dpdt_vect_f, dpdt_jac_f = self.create_numerical_dpdt(constrained_inds=constrained_inds,
+                                                 constrained_vals=constrained_vals)
 
         self.make_numerical_params(d_base=d_base,
                                    n_base=n_base,
@@ -254,13 +291,18 @@ class ProbabilityNet(object):
 
         sol_Mo = []
 
+        function_args = self.get_function_args(constraint_vals=constrained_vals)
+
         for pvecto in M_pstates: # for each test vector:
             p_vect_sol = pvecto[unconstrained_inds] # get values for the genes we're solving for...
 
-            # function_args = (constraint_vals, self.M_n, self.M_beta, self.d_vect)
-            function_args = self.get_function_args(constraint_vals=constrained_vals)
-
-            sol_roots = fsolve(dpdt_vect_f, p_vect_sol, args=function_args, xtol=tol)
+            sol_roots = fsolve(dpdt_vect_f,
+                               p_vect_sol,
+                               args=function_args,
+                               xtol=tol,
+                               fprime=dpdt_jac_f,
+                               col_deriv=jac_derivatives_cols
+                               )
 
             p_eqms = np.zeros(self._gmod.N_nodes)
             p_eqms[unconstrained_inds] = sol_roots
@@ -274,6 +316,137 @@ class ProbabilityNet(object):
 
         sol_M = np.asarray(sol_Mo)[unique_inds]
 
-        return sol_M
+        stable_sol_M, sol_M_char = self.find_attractor_sols(sol_M,
+                                                             dpdt_vect_f,
+                                                             dpdt_jac_f,
+                                                             function_args,
+                                                             tol= 1.0e-1,
+                                                             verbose = True,
+                                                             unique_sols = True,
+                                                             sol_round = 1,
+                                                             save_file = None)
+
+        return stable_sol_M, sol_M_char, sol_M
+
+    def find_attractor_sols(self,
+                            sols_0: list|ndarray,
+                            dpdt_vect_f,
+                            jac_f,
+                            func_args,
+                            tol: float=1.0e-1,
+                            verbose: bool=True,
+                            unique_sols: bool = True,
+                            sol_round: int = 1,
+                            save_file: str|None = None
+                            ):
+        '''
+
+        '''
+
+        eps = 1.0e-25  # we need a small value to add to avoid dividing by zero
+
+        sol_dicts_list = []
+        # in some Jacobians
+        for pminso in sols_0:
+
+            solution_dict = {}
+
+            # print(f'min vals: {cminso}')
+            solution_dict['Minima Values'] = pminso
+
+            pmins = np.asarray(pminso) + eps  # add the small amount here, before calculating the jacobian
+
+            solution_dict['Change at Minima'] = dpdt_vect_f(pmins, *func_args)
+
+            jac = jac_f(pmins, *func_args)
+
+            # get the eigenvalues of the jacobian at this equillibrium point:
+            eig_valso, eig_vects = np.linalg.eig(jac)
+
+            # round the eigenvalues so we don't have issue with small imaginary components
+            eig_vals = np.round(np.real(eig_valso), 1) + np.round(np.imag(eig_valso), 1) * 1j
+
+            solution_dict['Jacobian Eigenvalues'] = eig_vals
+
+            # get the indices of eigenvalues that have only real components:
+            real_eig_inds = (np.imag(eig_vals) == 0.0).nonzero()[0]
+
+            # If all eigenvalues are real and they're all negative:
+            if len(real_eig_inds) == len(eig_vals) and np.all(np.real(eig_vals) <= 0.0):
+                # print('Stable Attractor')
+                char_tag = 'Stable Attractor'
+
+            # If all eigenvalues are real and they're all positive:
+            elif len(real_eig_inds) == len(eig_vals) and np.all(np.real(eig_vals) > 0.0):
+                # print('Stable Repellor')
+                char_tag = 'Stable Repellor'
+
+            # If there are no real eigenvalues we only know its a limit cycle but can't say
+            # anything certain about stability:
+            elif len(real_eig_inds) == 0 and np.all(np.real(eig_vals) <= 0.0):
+                # print('Stable Limit cycle')
+                char_tag = 'Stable Limit Cycle'
+
+            # If there are no real eigenvalues and a mix of real component sign, we only know its a limit cycle but can't say
+            # anything certain about stability:
+            elif len(real_eig_inds) == 0 and np.any(np.real(eig_vals) > 0.0):
+                # print('Limit cycle')
+                char_tag = 'Limit Cycle'
+
+            elif np.all(np.real(eig_vals[real_eig_inds]) <= 0.0):
+                # print('Stable Limit Cycle')
+                char_tag = 'Stable Limit Cycle'
+
+            elif np.any(np.real(eig_vals[real_eig_inds] > 0.0)):
+                # print('Saddle Point')
+                char_tag = 'Saddle Point'
+            else:
+                # print('Undetermined Stability Status')
+                char_tag = 'Undetermined'
+
+            solution_dict['Stability Characteristic'] = char_tag
+
+            sol_dicts_list.append(solution_dict)
+
+        solsM = []
+        sol_char_list = []
+        sol_char_error = []
+        i = 0
+        for sol_dic in sol_dicts_list:
+            error = np.sum(np.asarray(sol_dic['Change at Minima'])**2)
+            char = sol_dic['Stability Characteristic']
+            sols = sol_dic['Minima Values']
+
+            if char != 'Saddle Point' and error <= tol:
+                i += 1
+                if verbose and unique_sols is False:
+                    print(f'Soln {i}, {char}, {sols}, {np.round(error, sol_round)}')
+                solsM.append(sols)
+                sol_char_list.append(char)
+                sol_char_error.append(error)
+
+        solsM_return = np.asarray(solsM).T
+
+        if unique_sols and len(solsM) != 0:
+            # round the sols to avoid degenerates and return indices to the unique solutions:
+            solsy, inds_solsy = np.unique(np.round(solsM, sol_round), axis=0, return_index=True)
+            if verbose:
+                for i, si in enumerate(inds_solsy):
+                    print(f'Soln {i}: {sol_char_list[si]}, {solsM[si]}, error: {sol_char_error[si]}')
+
+            solsM_return = np.asarray(solsM)[inds_solsy].T
+
+        # if save_file is not None:
+        #     solsMi = np.asarray(solsM)
+        #     header = [f'State {i}' for i in range(solsMi.shape[0])]
+        #     with open(save_file, 'w', newline="") as file:
+        #         csvwriter = csv.writer(file)  # create a csvwriter object
+        #         csvwriter.writerow(header)  # write the header
+        #         csvwriter.writerow(sol_char_error)  # write the root error at steady-state
+        #         csvwriter.writerow(sol_char_list)  # write the attractor characterization
+        #         for si in solsMi.T:
+        #             csvwriter.writerow(si)  # write the soln data rows for each gene
+
+        return solsM_return, sol_dicts_list
 
 
