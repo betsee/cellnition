@@ -66,11 +66,7 @@ def test_grn_workflow_libgraph(tmp_path) -> None:
     '''
     from cellnition.science.gene_networks import GeneNetworkModel
     from cellnition.science.network_enums import EdgeType, GraphType, NodeType
-    from cellnition.science.network_library import (BasicTrinodeNet,
-        QuadStateNet,
-        FullQuadStateNet,
-        MonoControlNet
-    )
+    from cellnition.science.network_library import BasicTrinodeNet
     from cellnition.science.network_workflow import NetworkWorkflow
     from cellnition.science.phase_space_searches import param_space_search
 
@@ -78,8 +74,6 @@ def test_grn_workflow_libgraph(tmp_path) -> None:
     # which "NetworkWorkflow" will emit GraphML and other files.
     save_path = str(tmp_path)
 
-    # libg = QuadStateNet()
-    # libg = FullQuadStateNet()
     libg = BasicTrinodeNet()
 
     gmod = GeneNetworkModel(libg.N_nodes,

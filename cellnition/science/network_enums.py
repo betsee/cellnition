@@ -25,8 +25,8 @@ class NodeType(Enum):
     sensor = 'Sensor'
     effector = 'Effector'
     root = 'Root Hub'
-    path = 'Path'
     factor = 'Factor'
+    cycle = 'Cycle'
 
 class GraphType(Enum):
     scale_free = 'Scale Free'
@@ -40,3 +40,12 @@ class EquilibriumType(Enum):
     cycle = 'Limit Cycle'
     saddle = 'Saddle Attractor'
     undetermined = 'Undetermined'
+
+class InterFuncType(Enum):
+    logistic = 'Logistic'
+    hill = 'Hill'
+
+class CouplingType(Enum):
+    additive = 'additive'
+    multiplicative = 'multiplicative'
+    mixed = 'mixed'

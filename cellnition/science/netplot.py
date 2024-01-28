@@ -72,7 +72,7 @@ def plot_network(nodes_list: list|ndarray,
     'outline_color': 'Black'
     }
 
-    node_dict_path = {
+    node_dict_cycle = {
     'node_font_color': 'Black',
     'node_color': 'PaleTurquoise',
     'node_shape': 'ellipse',
@@ -120,7 +120,7 @@ def plot_network(nodes_list: list|ndarray,
                       NodeType.process.value: node_dict_process,
                       NodeType.effector.value: node_dict_effector,
                       NodeType.root.value: node_dict_root,
-                      NodeType.path.value: node_dict_path,
+                      NodeType.cycle.value: node_dict_cycle,
                       NodeType.factor.value: node_dict_factor}
 
     for ni, (nn, nt) in enumerate(zip(nodes_list, nodes_type)):

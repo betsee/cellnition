@@ -317,6 +317,33 @@ class QuadStateNet(LibNet):
 
         self.add_interactions = True
 
+class PureQuadStateNet(LibNet):
+
+    def __init__(self):
+        '''
+
+        '''
+        # Initialize the superclass:
+        super().__init__()
+
+        self.name = 'QuadStateNet'
+
+        self.N_nodes = 3
+        self.edges = [('H0', 'H1'), ('H1', 'H2'), ('H2', 'H0'),
+                 ('H0', 'H0'), ('H2', 'H2'), ('H1', 'H1'),
+                 # ('S0', 'H0'), ('S1', 'H1'), ('S2', 'H2')
+                 ]
+
+        self.edge_types = [EdgeType.I, EdgeType.A, EdgeType.I,
+                      EdgeType.A, EdgeType.A, EdgeType.A,
+                      # EdgeType.Is, EdgeType.Is, EdgeType.Is,
+                      ]
+
+        # self.node_type_dict = {'S': NodeType.signal}
+        self.node_type_dict = None
+
+        self.add_interactions = True
+
 class QuadStateChain(LibNet):
 
     def __init__(self):
