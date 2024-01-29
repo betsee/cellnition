@@ -4,7 +4,7 @@
 # See "LICENSE" for further details.
 
 '''
-This module defines
+This module defines enumerations used in Cellnition.
 '''
 
 
@@ -13,9 +13,9 @@ from enum import Enum
 class EdgeType(Enum):
     A = 'Activator'
     I = 'Inhibitor'
-    N = 'Normal'
-    As = 'Signal Activation'
-    Is = 'Signal Inhibition'
+    N = 'Neutral'
+    As = 'Multiplicative Activation'
+    Is = 'Multiplicative Inhibition'
 
 
 class NodeType(Enum):

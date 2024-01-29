@@ -40,6 +40,7 @@ class ProbabilityNet(object):
         '''
 
         '''
+        self._N_nodes = gmod.N_nodes
         self._gmod = gmod
         self._inter_funk_type = inter_func_type
 
@@ -111,50 +112,101 @@ class ProbabilityNet(object):
         '''
 
         '''
-        M_inter_mult = np.zeros((self._gmod.N_nodes, self._gmod.N_nodes))
-        M_inter_add = np.zeros((self._gmod.N_nodes, self._gmod.N_nodes))
 
-        # If 'coupling type' is 'specified' the user specifies multiplicative interactions using As and Is edges
-        if coupling_type is CouplingType.specified:
-            for ei, ((nde_i, nde_j), edge_type) in enumerate(zip(self._gmod.edges_index, self._gmod.edge_types)):
-                if edge_type is EdgeType.A or edge_type is EdgeType.I:
-                    M_inter_add[nde_i, nde_j] = 1
-                elif edge_type is EdgeType.Is or edge_type is EdgeType.As:
-                    M_inter_mult[nde_i, nde_j] = 1
+        N_nodes = self._N_nodes
 
-        # 'mixed' coupling means any inhibitor is multiplicative, all activators and no-regulation is additive
-        # this is convention in standard Boolean networks:
-        elif coupling_type is CouplingType.mixed:
-            for ei, ((nde_i, nde_j), edge_type) in enumerate(zip(self._gmod.edges_index, self._gmod.edge_types)):
-                if edge_type is EdgeType.A or edge_type is EdgeType.As:
-                    M_inter_add[nde_i, nde_j] = 1
-                elif edge_type is EdgeType.I or edge_type is EdgeType.Is:
-                    M_inter_mult[nde_i, nde_j] = 1
+        M_n_so = sp.MatrixSymbol('M_n', N_nodes, N_nodes)
 
-        # if 'additive', all couplings are additive
-        elif coupling_type is CouplingType.additive:
-            for ei, ((nde_i, nde_j), edge_type) in enumerate(zip(self._gmod.edges_index, self._gmod.edge_types)):
-                M_inter_add[nde_i, nde_j] = 1
+        ones_vect = sp.ones(N_nodes, 1)
 
-        # if 'multiplicative', all couplings are multiplicative (except zero-regulated nodes are constitutive expressed)
+        if coupling_type is CouplingType.additive:
+            # Out-adjacency matrix based on conditions on the Hill exponent:
+            # Suitable for pure additive or pure multiplicative interactions:
+            A_add_s = sp.Matrix(M_n_so.rows, M_n_so.cols,
+                                lambda i, j: sp.Piecewise((1, M_n_so[i, j] < 0), (1, M_n_so[i, j] > 0), (0, True))
+                                )
+
+            A_mul_s = sp.ones(N_nodes, N_nodes)
+
         elif coupling_type is CouplingType.multiplicative:
-            for ei, ((nde_i, nde_j), edge_type) in enumerate(zip(self._gmod.edges_index, self._gmod.edge_types)):
-                M_inter_mult[nde_i, nde_j] = 1
+            A_mul_s = sp.Matrix(M_n_so.rows, M_n_so.cols,
+                                lambda i, j: sp.Piecewise((1, M_n_so[i, j] < 0), (1, M_n_so[i, j] > 0), (0, True)))
 
-        else:
-            raise Exception("This CouplingType is not supported.")
+            A_add_s = sp.ones(N_nodes, N_nodes)
 
-        # By default, we want non-edges to be "additive" so select them this way:
-        # inds_add = (M_inter_add - M_inter_mult >= 0).nonzero()
+        elif coupling_type is CouplingType.mixed:
+            # Mixed interaction type:
+            # Inhibitors are multiplicative; activators are additive
+            A_add_s = sp.Matrix(M_n_so.rows, M_n_so.cols,
+                                lambda i, j: sp.Piecewise((1, M_n_so[i, j] > 0), (0, True)))
+
+            A_mul_s = sp.Matrix(M_n_so.rows, M_n_so.cols,
+                                lambda i, j: sp.Piecewise((1, M_n_so[i, j] < 0), (0, True)))
+
+        else: # else if coupling type is specified:
+            pass #FIXME code this up by stepping through edge types
+
+        n_s = sp.IndexedBase('n', shape=(N_nodes, N_nodes))
+
+        # Create a matrix out of the n_s symbols:
+        M_n_s = sp.Matrix(N_nodes, N_nodes,
+                          lambda i, j: n_s[i, j])
+
+        # Substitute it into our expression for the adjacency matrices to obtain the
+        # edge count vectors essential for proper normalization of the problem:
+        N_edge_vect_add = A_add_s.subs(M_n_so, sp.Matrix(M_n_s)) * ones_vect
+        N_noedge_vect_add = N_nodes * sp.ones(N_nodes, 1) - N_edge_vect_add
+
+        N_edge_vect_mul = A_mul_s.subs(M_n_so, sp.Matrix(M_n_s)) * ones_vect
+        N_noedge_vect_mul = N_nodes * sp.ones(N_nodes, 1) - N_edge_vect_mul
+
+        return N_edge_vect_add, N_edge_vect_mul, N_noedge_vect_add, N_noedge_vect_mul
+
+
+        # M_inter_mult = np.zeros((self._gmod.N_nodes, self._gmod.N_nodes))
+        # M_inter_add = np.zeros((self._gmod.N_nodes, self._gmod.N_nodes))
+        #
+        # # If 'coupling type' is 'specified' the user specifies multiplicative interactions using As and Is edges
+        # if coupling_type is CouplingType.specified:
+        #     for ei, ((nde_i, nde_j), edge_type) in enumerate(zip(self._gmod.edges_index, self._gmod.edge_types)):
+        #         if edge_type is EdgeType.A or edge_type is EdgeType.I:
+        #             M_inter_add[nde_i, nde_j] = 1
+        #         elif edge_type is EdgeType.Is or edge_type is EdgeType.As:
+        #             M_inter_mult[nde_i, nde_j] = 1
+        #
+        # # 'mixed' coupling means any inhibitor is multiplicative, all activators and no-regulation is additive
+        # # this is convention in standard Boolean networks:
+        # elif coupling_type is CouplingType.mixed:
+        #     for ei, ((nde_i, nde_j), edge_type) in enumerate(zip(self._gmod.edges_index, self._gmod.edge_types)):
+        #         if edge_type is EdgeType.A or edge_type is EdgeType.As:
+        #             M_inter_add[nde_i, nde_j] = 1
+        #         elif edge_type is EdgeType.I or edge_type is EdgeType.Is:
+        #             M_inter_mult[nde_i, nde_j] = 1
+        #
+        # # if 'additive', all couplings are additive
+        # elif coupling_type is CouplingType.additive:
+        #     for ei, ((nde_i, nde_j), edge_type) in enumerate(zip(self._gmod.edges_index, self._gmod.edge_types)):
+        #         M_inter_add[nde_i, nde_j] = 1
+        #
+        # # if 'multiplicative', all couplings are multiplicative (except zero-regulated nodes are constitutive expressed)
+        # elif coupling_type is CouplingType.multiplicative:
+        #     for ei, ((nde_i, nde_j), edge_type) in enumerate(zip(self._gmod.edges_index, self._gmod.edge_types)):
+        #         M_inter_mult[nde_i, nde_j] = 1
+        #
+        # else:
+        #     raise Exception("This CouplingType is not supported.")
+        #
+        # # By default, we want non-edges to be "additive" so select them this way:
+        # # inds_add = (M_inter_add - M_inter_mult >= 0).nonzero()
+        # # inds_mult = (M_inter_mult == 1).nonzero()
+        #
+        # inds_add = (M_inter_add == 1).nonzero()
         # inds_mult = (M_inter_mult == 1).nonzero()
+        #
+        # inds_edge_add = list(zip(inds_add[0], inds_add[1]))
+        # inds_edge_mult = list(zip(inds_mult[0], inds_mult[1]))
 
-        inds_add = (M_inter_add == 1).nonzero()
-        inds_mult = (M_inter_mult == 1).nonzero()
-
-        inds_edge_add = list(zip(inds_add[0], inds_add[1]))
-        inds_edge_mult = list(zip(inds_mult[0], inds_mult[1]))
-
-        return inds_edge_add, inds_edge_mult
+        # return inds_edge_add, inds_edge_mult
 
 
 
