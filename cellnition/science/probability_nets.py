@@ -43,8 +43,6 @@ class ProbabilityNet(object):
         self._gmod = gmod
         self._inter_funk_type = inter_func_type
 
-        # FIXME: Need to also consider coupling type
-
         d_s = sp.IndexedBase('d', shape=self._gmod.N_nodes)  # Maximum rate of decay
         p_s = sp.IndexedBase('p', shape=self._gmod.N_nodes)  # Probability of gene product
 
