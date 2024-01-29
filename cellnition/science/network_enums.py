@@ -49,3 +49,4 @@ class CouplingType(Enum):
     additive = 'additive'
     multiplicative = 'multiplicative'
     mixed = 'mixed'
+    specified = 'specified'

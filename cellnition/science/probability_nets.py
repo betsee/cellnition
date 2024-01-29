@@ -35,7 +35,8 @@ class ProbabilityNet(object):
 
     def __init__(self,
                  gmod: GeneNetworkModel,
-                 inter_func_type: InterFuncType = InterFuncType.hill):
+                 inter_func_type: InterFuncType = InterFuncType.hill,
+                 coupling_type: CouplingType = CouplingType.specified):
         '''
 
         '''
@@ -56,25 +57,108 @@ class ProbabilityNet(object):
         if self._inter_funk_type is InterFuncType.logistic:
             k_s = sp.IndexedBase('k', shape=(self._gmod.N_nodes, self._gmod.N_nodes))  # Logistic coupling parameter
             mu_s = sp.IndexedBase('mu', shape=(self._gmod.N_nodes, self._gmod.N_nodes))  # Logistic centre parameter
-            f_inter_ji = 1 / (1 + sp.exp(-k_s[j_s, i_s] * (p_s[j_s] - mu_s[j_s, i_s])))
+            f_inter_ij = 1 / (1 + sp.exp(-k_s[i_s, j_s] * (p_s[i_s] - mu_s[i_s, j_s])))
             self.M_k_s = sp.Array([[k_s[i, j] for j in range(self._gmod.N_nodes)] for i in range(self._gmod.N_nodes)])
             self.M_mu_s = sp.Array([[mu_s[i, j] for j in range(self._gmod.N_nodes)] for i in range(self._gmod.N_nodes)])
 
         else:
             beta_s = sp.IndexedBase('beta', shape=(self._gmod.N_nodes, self._gmod.N_nodes))  # Hill centre
             n_s = sp.IndexedBase('n', shape=(self._gmod.N_nodes, self._gmod.N_nodes))  # Hill coupling
-            f_inter_ji = 1 / (1 + (p_s[j_s] * beta_s[j_s, i_s]) ** (-n_s[j_s, i_s]))
+            f_inter_ij = 1 / (1 + (p_s[i_s] * beta_s[i_s, j_s]) ** (-n_s[i_s, j_s]))
             self.M_beta_s = sp.Array([[beta_s[i, j] for j in range(self._gmod.N_nodes)] for i in range(self._gmod.N_nodes)])
             self.M_n_s = sp.Array([[n_s[i, j] for j in range(self._gmod.N_nodes)] for i in range(self._gmod.N_nodes)])
 
-        f_inter_term = sp.summation(f_inter_ji, (j_s, 0, self._gmod.N_nodes-1))  # evaluated sum
+        # f_inter_term = sp.summation(f_inter_ji, (j_s, 0, self._gmod.N_nodes-1))  # evaluated sum
 
-        # This is the rate of change vector, roots are equilibrium points
-        self.dpdt_vect_s = [d_s[i]*sp.Rational(1, self._gmod.N_nodes)*f_inter_term.subs(i_s, i) - d_s[i] * p_s[i] for i in
-                       range(self._gmod.N_nodes)]
+        # Get edge node ind pairs for the specified coupling:
+        inds_edge_add, inds_edge_mult = self.set_coupling_type(coupling_type)
+
+        f_add_list = [[] for i in range(self._gmod.N_nodes)]
+        f_mult_list = [[] for i in range(self._gmod.N_nodes)]
+
+        for (nde_i, nde_j) in inds_edge_add:
+            f_add_list[nde_j].append(f_inter_ij.subs([(i_s, nde_i), (j_s, nde_j)]))
+
+        for (nde_i, nde_j) in inds_edge_mult:
+            f_mult_list[nde_j].append(f_inter_ij.subs([(i_s, nde_i), (j_s, nde_j)]))
+
+        N_f_add = [len(fadd) for fadd in f_add_list] # normalization constants
+
+        self.dpdt_vect_s = []
+        for i in range(self._gmod.N_nodes):
+            # This is the rate of change vector, roots are equilibrium points
+            mult_prod = np.prod(f_mult_list[i])
+            if mult_prod == 1.0:
+                mult_prod = 1 # try and keep rational numbers in analytic equation, if possible
+
+            add_prod = np.sum(f_add_list[i])
+            if add_prod == 0.0:
+                add_prod = 1
+                N_f_add[i] = 1
+
+            self.dpdt_vect_s.append(d_s[i]*sp.Rational(1, N_f_add[i])*add_prod*mult_prod - d_s[i]*p_s[i])
+
+            # print(f'Add prod {np.sum(f_add_list[i])} \n Mult prod {mult_prod}')
+            # print('--------')
+
+        # # This is the rate of change vector, roots are equilibrium points
+        # self.dpdt_vect_s = [d_s[i]*sp.Rational(1, self._gmod.N_nodes)*f_inter_term.subs(i_s, i) - d_s[i] * p_s[i] for i in
+        #                range(self._gmod.N_nodes)]
 
         # This is an "energy" function to be minimized at the equilibrium points:
         self.opti_s = (sp.Matrix(self.dpdt_vect_s).T * sp.Matrix(self.dpdt_vect_s))[0, 0]
+
+
+    def set_coupling_type(self, coupling_type: CouplingType):
+        '''
+
+        '''
+        M_inter_mult = np.zeros((self._gmod.N_nodes, self._gmod.N_nodes))
+        M_inter_add = np.zeros((self._gmod.N_nodes, self._gmod.N_nodes))
+
+        # If 'coupling type' is 'specified' the user specifies multiplicative interactions using As and Is edges
+        if coupling_type is CouplingType.specified:
+            for ei, ((nde_i, nde_j), edge_type) in enumerate(zip(self._gmod.edges_index, self._gmod.edge_types)):
+                if edge_type is EdgeType.A or edge_type is EdgeType.I:
+                    M_inter_add[nde_i, nde_j] = 1
+                elif edge_type is EdgeType.Is or edge_type is EdgeType.As:
+                    M_inter_mult[nde_i, nde_j] = 1
+
+        # 'mixed' coupling means any inhibitor is multiplicative, all activators and no-regulation is additive
+        # this is convention in standard Boolean networks:
+        elif coupling_type is CouplingType.mixed:
+            for ei, ((nde_i, nde_j), edge_type) in enumerate(zip(self._gmod.edges_index, self._gmod.edge_types)):
+                if edge_type is EdgeType.A or edge_type is EdgeType.As:
+                    M_inter_add[nde_i, nde_j] = 1
+                elif edge_type is EdgeType.I or edge_type is EdgeType.Is:
+                    M_inter_mult[nde_i, nde_j] = 1
+
+        # if 'additive', all couplings are additive
+        elif coupling_type is CouplingType.additive:
+            for ei, ((nde_i, nde_j), edge_type) in enumerate(zip(self._gmod.edges_index, self._gmod.edge_types)):
+                M_inter_add[nde_i, nde_j] = 1
+
+        # if 'multiplicative', all couplings are multiplicative (except zero-regulated nodes are constitutive expressed)
+        elif coupling_type is CouplingType.multiplicative:
+            for ei, ((nde_i, nde_j), edge_type) in enumerate(zip(self._gmod.edges_index, self._gmod.edge_types)):
+                M_inter_mult[nde_i, nde_j] = 1
+
+        else:
+            raise Exception("This CouplingType is not supported.")
+
+        # By default, we want non-edges to be "additive" so select them this way:
+        # inds_add = (M_inter_add - M_inter_mult >= 0).nonzero()
+        # inds_mult = (M_inter_mult == 1).nonzero()
+
+        inds_add = (M_inter_add == 1).nonzero()
+        inds_mult = (M_inter_mult == 1).nonzero()
+
+        inds_edge_add = list(zip(inds_add[0], inds_add[1]))
+        inds_edge_mult = list(zip(inds_mult[0], inds_mult[1]))
+
+        return inds_edge_add, inds_edge_mult
+
+
 
     def make_numerical_params(self,
                        d_base: float=1.0,
