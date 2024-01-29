@@ -11,6 +11,7 @@ interaction edges are +1 for activation, -1 for inhibition, and 0 for no connect
 
 '''
 import csv
+from collections.abc import Callable
 import numpy as np
 from numpy import ndarray
 import matplotlib.pyplot as plt
@@ -24,11 +25,6 @@ import sympy as sp
 from sympy.core.symbol import Symbol
 from sympy.tensor.indexed import Indexed
 from cellnition.science.network_enums import EdgeType, GraphType, NodeType, InterFuncType, CouplingType
-from cellnition.science.interaction_functions import (f_acti_hill_s,
-                                                      f_inhi_hill_s,
-                                                      f_neut_s,
-                                                      f_acti_logi_s,
-                                                      f_inhi_logi_s)
 from cellnition.science.gene_networks import GeneNetworkModel
 import pygraphviz as pgv
 
@@ -83,9 +79,9 @@ class ProbabilityNet(object):
     def make_numerical_params(self,
                        d_base: float=1.0,
                        n_base: float=3.0,
-                       beta_base: float=2.0,
+                       beta_base: float=4.0,
                        k_base: float = 10.0,
-                       mu_base: float=0.5) -> None:
+                       mu_base: float=0.25) -> None:
         '''
         Scrape the network for base parameters to initialize numerical parameters.
 
@@ -165,11 +161,14 @@ class ProbabilityNet(object):
 
         else: # If there are constraints split the p-vals into an arguments and to-solve set:
             p_vect_args = (np.asarray(self.p_vect_s)[constrained_inds]).tolist()
-            unconstrained_inds = np.setdiff1d(self._gmod.N_nodes, constrained_inds)
+            unconstrained_inds = np.setdiff1d(self._gmod.nodes_index, constrained_inds).tolist()
             p_vect_solve = (np.asarray(self.p_vect_s)[unconstrained_inds]).tolist()
 
+            # truncate the change vector to only be for unconstrained inds:
+            dpdt_vect_s = np.asarray(self.dpdt_vect_s)[unconstrained_inds].tolist()
+
             # Compute the symbolic Jacobian:
-            dpdt_jac_s = sp.Matrix(self.dpdt_vect_s).jacobian(p_vect_solve) # analytical Jacobian
+            dpdt_jac_s = sp.Matrix(dpdt_vect_s).jacobian(p_vect_solve) # analytical Jacobian
 
             if self._inter_funk_type is InterFuncType.hill:
                 dpdt_vect_f = sp.lambdify((p_vect_solve,
@@ -177,7 +176,7 @@ class ProbabilityNet(object):
                                            np.asarray(self.M_n_s),
                                            np.asarray(self.M_beta_s),
                                            self.d_vect_s),
-                                          self.dpdt_vect_s)
+                                          dpdt_vect_s)
 
                 dpdt_jac_f = sp.lambdify((p_vect_solve,
                                           p_vect_args,
@@ -192,7 +191,7 @@ class ProbabilityNet(object):
                                            np.asarray(self.M_k_s),
                                            np.asarray(self.M_mu_s),
                                            self.d_vect_s),
-                                          self.dpdt_vect_s)
+                                          dpdt_vect_s)
 
                 dpdt_jac_f = sp.lambdify((p_vect_solve,
                                           p_vect_args,
@@ -255,18 +254,18 @@ class ProbabilityNet(object):
         return pM
 
     def solve_probability_equms(self,
-                                constrained_inds: list | None = None,
-                                constrained_vals: list | None = None,
+                                constrained_inds: list|None = None,
+                                constrained_vals: list|None = None,
                                 d_base: float = 1.0,
                                 n_base: float = 3.0,
-                                beta_base: float = 2.0,
+                                beta_base: float = 4.0,
                                 k_base: float = 10.0,
-                                mu_base: float = 0.5,
+                                mu_base: float = 0.25,
                                 N_space: int = 2,
-                                pmin: float=1.0e-25,
+                                pmin: float=1.0e-9,
                                 tol: float=1.0e-15,
                                 N_round_sol: int = 2,
-                                jac_derivatives_cols: bool=True,
+                                jac_derivatives_cols: bool=False,
                                 ):
         '''
         Solve for the equilibrium points of gene product probabilities in
@@ -285,7 +284,7 @@ class ProbabilityNet(object):
         if constrained_inds is None or constrained_vals is None:
             unconstrained_inds = self._gmod.nodes_index
         else:
-            unconstrained_inds = np.setdiff1d(self._gmod.nodes_index, constrained_inds)
+            unconstrained_inds = np.setdiff1d(self._gmod.nodes_index, constrained_inds).tolist()
 
         M_pstates = self.generate_state_space(unconstrained_inds, N_space, pmin)
 
@@ -320,6 +319,7 @@ class ProbabilityNet(object):
                                                              dpdt_vect_f,
                                                              dpdt_jac_f,
                                                              function_args,
+                                                             constrained_inds=constrained_inds,
                                                              tol= 1.0e-1,
                                                              verbose = True,
                                                              unique_sols = True,
@@ -330,9 +330,10 @@ class ProbabilityNet(object):
 
     def find_attractor_sols(self,
                             sols_0: list|ndarray,
-                            dpdt_vect_f,
-                            jac_f,
-                            func_args,
+                            dpdt_vect_f: Callable,
+                            jac_f: Callable,
+                            func_args: tuple|list,
+                            constrained_inds: list | None = None,
                             tol: float=1.0e-1,
                             verbose: bool=True,
                             unique_sols: bool = True,
@@ -346,19 +347,24 @@ class ProbabilityNet(object):
         eps = 1.0e-25  # we need a small value to add to avoid dividing by zero
 
         sol_dicts_list = []
-        # in some Jacobians
+
+        if constrained_inds is None:
+            unconstrained_inds = self._gmod.nodes_index
+
+        else:
+            unconstrained_inds = np.setdiff1d(self._gmod.nodes_index, constrained_inds)
+
         for pminso in sols_0:
 
             solution_dict = {}
 
-            # print(f'min vals: {cminso}')
             solution_dict['Minima Values'] = pminso
 
-            pmins = np.asarray(pminso) + eps  # add the small amount here, before calculating the jacobian
+            pmins = np.asarray(pminso) # add the small amount here, before calculating the jacobian
 
-            solution_dict['Change at Minima'] = dpdt_vect_f(pmins, *func_args)
+            solution_dict['Change at Minima'] = dpdt_vect_f(pmins[unconstrained_inds], *func_args)
 
-            jac = jac_f(pmins, *func_args)
+            jac = jac_f(pmins[unconstrained_inds], *func_args)
 
             # get the eigenvalues of the jacobian at this equillibrium point:
             eig_valso, eig_vects = np.linalg.eig(jac)
@@ -371,37 +377,31 @@ class ProbabilityNet(object):
             # get the indices of eigenvalues that have only real components:
             real_eig_inds = (np.imag(eig_vals) == 0.0).nonzero()[0]
 
+            # FIXME: this should be enumeration
             # If all eigenvalues are real and they're all negative:
             if len(real_eig_inds) == len(eig_vals) and np.all(np.real(eig_vals) <= 0.0):
-                # print('Stable Attractor')
                 char_tag = 'Stable Attractor'
 
             # If all eigenvalues are real and they're all positive:
             elif len(real_eig_inds) == len(eig_vals) and np.all(np.real(eig_vals) > 0.0):
-                # print('Stable Repellor')
                 char_tag = 'Stable Repellor'
 
             # If there are no real eigenvalues we only know its a limit cycle but can't say
             # anything certain about stability:
             elif len(real_eig_inds) == 0 and np.all(np.real(eig_vals) <= 0.0):
-                # print('Stable Limit cycle')
                 char_tag = 'Stable Limit Cycle'
 
             # If there are no real eigenvalues and a mix of real component sign, we only know its a limit cycle but can't say
             # anything certain about stability:
             elif len(real_eig_inds) == 0 and np.any(np.real(eig_vals) > 0.0):
-                # print('Limit cycle')
                 char_tag = 'Limit Cycle'
 
             elif np.all(np.real(eig_vals[real_eig_inds]) <= 0.0):
-                # print('Stable Limit Cycle')
                 char_tag = 'Stable Limit Cycle'
 
             elif np.any(np.real(eig_vals[real_eig_inds] > 0.0)):
-                # print('Saddle Point')
                 char_tag = 'Saddle Point'
             else:
-                # print('Undetermined Stability Status')
                 char_tag = 'Undetermined'
 
             solution_dict['Stability Characteristic'] = char_tag
