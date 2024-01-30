@@ -29,8 +29,8 @@ from cellnition.science.network_enums import EdgeType, GraphType, NodeType, Inte
 from cellnition.science.gene_networks import GeneNetworkModel
 import pygraphviz as pgv
 
-# FIXME: Do this so we can use user-specified edge types in the network construction
-# FIXME: Do this so we can build a network from the M_n matrix
+# FIXME: scrub parameters so we don't need to use empty-valued params
+# FIXME: I bet we can implement a node type via the same process
 
 class ProbabilityNet(object):
     '''
@@ -81,11 +81,11 @@ class ProbabilityNet(object):
         self._p_s = sp.IndexedBase('p', shape=self._N_nodes)  # Probability of gene product
 
         # Vectorized node-parameters and variables:
-        self._d_vect_s = sp.Matrix([self._d_s[i] for i in range(self._N_nodes)])  # maximum rate of decay for each node
-        self._p_vect_s = sp.Matrix([self._p_s[i] for i in range(self._N_nodes)])  # gene product probability for each node
+        self._d_vect_s = sp.Matrix([self._d_s[i] for i in range(self._N_nodes)], positive=True)  # maximum rate of decay for each node
+        self._p_vect_s = sp.Matrix([self._p_s[i] for i in range(self._N_nodes)], positive=True)  # gene product probability for each node
 
-        self._beta_s = sp.IndexedBase('beta', shape=(self._N_nodes, self._N_nodes))  # Hill centre
-        self._n_s = sp.IndexedBase('n', shape=(self._N_nodes, self._N_nodes))  # Hill coupling
+        self._beta_s = sp.IndexedBase('beta', shape=(self._N_nodes, self._N_nodes), positive=True)  # Hill centre
+        self._n_s = sp.IndexedBase('n', shape=(self._N_nodes, self._N_nodes), positive=True)  # Hill coupling
 
         # Create a matrix out of the n_s symbols:
         self._M_n_s = sp.Matrix(self._N_nodes, self._N_nodes,
@@ -123,28 +123,110 @@ class ProbabilityNet(object):
 
         for ei, ((nde_i, nde_j), etype) in enumerate(zip(edges_index, edge_types)):
             if coupling_type is CouplingType.specified:
-                if etype is EdgeType.I or etype is EdgeType.A:
+                if etype is EdgeType.I:
+                    A_add_s[nde_i, nde_j] = -1
+                elif etype is EdgeType.A:
                     A_add_s[nde_i, nde_j] = 1
-                else:
+                elif etype is EdgeType.Is:
+                    A_mul_s[nde_i, nde_j] = -1
+                elif etype is EdgeType.As:
                     A_mul_s[nde_i, nde_j] = 1
 
             elif coupling_type is CouplingType.additive:
-                A_add_s[nde_i, nde_j] = 1
+                if etype is EdgeType.I or etype is EdgeType.Is:
+                    A_add_s[nde_i, nde_j] = -1
+                elif etype is EdgeType.A or etype is EdgeType.As:
+                    A_add_s[nde_i, nde_j] = 1
 
             elif coupling_type is CouplingType.multiplicative:
-                A_mul_s[nde_i, nde_j] = 1
+                if etype is EdgeType.I or etype is EdgeType.Is:
+                    A_mul_s[nde_i, nde_j] = -1
+                elif etype is EdgeType.A or etype is EdgeType.As:
+                    A_mul_s[nde_i, nde_j] = 1
 
             elif coupling_type is CouplingType.mixed:
                 if etype is EdgeType.A or etype is EdgeType.As:
                     A_add_s[nde_i, nde_j] = 1
-                else:
-                    A_mul_s[nde_i, nde_j] = 1
+                elif etype is EdgeType.I or etype is EdgeType.Is:
+                    A_mul_s[nde_i, nde_j] = -1
 
         A_add_s = sp.Matrix(A_add_s)
         A_mul_s = sp.Matrix(A_mul_s)
         A_full_s = sp.Matrix(A_full_s)
 
         return A_add_s, A_mul_s, A_full_s
+
+    def get_adjacency_randomly(self, coupling_type: CouplingType=CouplingType.mixed):
+        '''
+        Return a randomly-generated full adjacency matrix.
+        '''
+        A_full_s = sp.Matrix(np.random.randint(-1, 2, size=(self._N_nodes, self._N_nodes)))
+
+        A_add_s, A_mul_s = self.process_full_adjacency(A_full_s, coupling_type=coupling_type)
+
+        return A_add_s, A_mul_s, A_full_s
+
+
+    def edges_from_adjacency(self, A_add_s: MutableDenseMatrix, A_mul_s: MutableDenseMatrix):
+        '''
+        Returns edge type and edge index from adjacency matrices.
+        '''
+        edges_type = []
+        edges_index = []
+
+        A_full_s = A_add_s + A_mul_s
+        for i in range(self._N_nodes):
+            for j in range(self._N_nodes):
+                afull_ij = A_full_s[i,j]
+                if afull_ij != 0:
+                    edges_index.append((i, j))
+                    if A_add_s[i,j] < 0:
+                        edges_type.append(EdgeType.I)
+                    elif A_add_s[i,j] > 0:
+                        edges_type.append(EdgeType.A)
+                    elif A_mul_s[i,j] < 0:
+                        edges_type.append(EdgeType.Is)
+                    elif A_mul_s[i,j] > 0:
+                        edges_type.append(EdgeType.As)
+                    else:
+                        edges_type.append(EdgeType.N)
+
+        return edges_index, edges_type
+
+
+    def process_full_adjacency(self, A_full_s: MutableDenseMatrix, coupling_type: CouplingType=CouplingType.mixed):
+        '''
+        Process a full adjacency matrix into additive and multiplicative components
+        based on a specified coupling type.
+
+        '''
+        A_add_s = np.zeros((self._N_nodes, self._N_nodes), dtype=int)
+        A_mul_s = np.zeros((self._N_nodes, self._N_nodes), dtype=int)
+
+        for i in range(self._N_nodes):
+            for j in range(self._N_nodes):
+                afull_ij = A_full_s[i,j]
+                if afull_ij == 1:
+                    if coupling_type is CouplingType.additive or coupling_type is CouplingType.mixed:
+                        A_add_s[i,j] = 1
+                    elif coupling_type is CouplingType.multiplicative:
+                        A_mul_s[i,j] = 1
+                    else:
+                        raise Exception('CouplingType.specified is not supported in this method.')
+
+                if afull_ij == -1:
+                    if coupling_type is CouplingType.additive:
+                        A_add_s[i,j] = -1
+                    elif coupling_type is CouplingType.multiplicative or coupling_type is CouplingType.mixed:
+                        A_mul_s[i,j] = -1
+                    else:
+                        raise Exception('CouplingType.specified is not supported in this method.')
+
+        A_add_s = sp.Matrix(A_add_s)
+        A_mul_s = sp.Matrix(A_mul_s)
+
+        return A_add_s, A_mul_s
+
 
     def build_analytical_model(self,
                  A_add_s: MutableDenseMatrix,
@@ -200,40 +282,6 @@ class ProbabilityNet(object):
 
         # This is an "energy" function to be minimized at the equilibrium points:
         self.opti_s = (sp.Matrix(self.dpdt_vect_s).T * sp.Matrix(self.dpdt_vect_s))[0, 0]
-
-
-
-    # def construct_dpdt_vect(self, nn: ndarray):
-    #     '''
-    #
-    #     '''
-    #     # substitute in real values for the Hill exponent, in order
-    #     # to solve the piecewise conditions:
-    #     subs_list = self.subs_matrix_vals(self._M_n_s, nn)
-    #     n_add_edges = self._n_add_edges.subs(subs_list)
-    #     add_terms = self._add_terms.subs(subs_list)
-    #     mul_terms = self._mul_terms.subs(subs_list)
-    #
-    #     self.dpdt_vect_s = []
-    #
-    #     for i in range(self._N_nodes):
-    #         # Fix a potential 0/0 issue:
-    #         if n_add_edges[i] == 0.0 and add_terms[i] == 0.0:
-    #             print('Divide by zero found')
-    #             n_add_edges[i] = 1
-    #
-    #         print(f'{i}: n_add_edges: {n_add_edges[i]} \n '
-    #               f'add_term: {add_terms[i]} \n '
-    #               f'mul_term: {mul_terms[i]}')
-    #
-    #         print('------')
-    #
-    #         self.dpdt_vect_s.append(self._d_vect_s[i] * mul_terms[i] * (1 / n_add_edges[i]) * add_terms[i] -
-    #                                 self._p_vect_s[i] * self._d_vect_s[i])
-    #
-    #     # This is an "energy" function to be minimized at the equilibrium points:
-    #     self.opti_s = (sp.Matrix(self.dpdt_vect_s).T * sp.Matrix(self.dpdt_vect_s))[0, 0]
-
 
     def subs_matrix_vals(self, M_s: MutableDenseMatrix, M_vals: MutableDenseMatrix|ndarray):
         '''
