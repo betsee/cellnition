@@ -24,191 +24,168 @@ from networkx import DiGraph
 import sympy as sp
 from sympy.core.symbol import Symbol
 from sympy.tensor.indexed import Indexed
+from sympy import MutableDenseMatrix
 from cellnition.science.network_enums import EdgeType, GraphType, NodeType, InterFuncType, CouplingType
 from cellnition.science.gene_networks import GeneNetworkModel
 import pygraphviz as pgv
 
+# FIXME: Do this so we can use user-specified edge types in the network construction
+# FIXME: Do this so we can build a network from the M_n matrix
 
 class ProbabilityNet(object):
     '''
     '''
-
     def __init__(self,
                  gmod: GeneNetworkModel,
-                 inter_func_type: InterFuncType = InterFuncType.hill,
                  coupling_type: CouplingType = CouplingType.specified):
         '''
 
         '''
         self._N_nodes = gmod.N_nodes
         self._gmod = gmod
-        self._inter_funk_type = inter_func_type
 
-        d_s = sp.IndexedBase('d', shape=self._gmod.N_nodes)  # Maximum rate of decay
-        p_s = sp.IndexedBase('p', shape=self._gmod.N_nodes)  # Probability of gene product
-
-        i_s, j_s = sp.symbols('i j', cls=sp.Idx)
+        d_s = sp.IndexedBase('d', shape=self._N_nodes)  # Maximum rate of decay
+        p_s = sp.IndexedBase('p', shape=self._N_nodes)  # Probability of gene product
 
         # Vectorized node-parameters and variables:
-        self.d_vect_s = [d_s[i] for i in range(self._gmod.N_nodes)]  # maximum rate of decay for each node
-        self.p_vect_s = [p_s[i] for i in range(self._gmod.N_nodes)]  # gene product probability for each node
+        self.d_vect_s = sp.Matrix([d_s[i] for i in range(self._N_nodes)])  # maximum rate of decay for each node
+        self.p_vect_s = sp.Matrix([p_s[i] for i in range(self._N_nodes)])  # gene product probability for each node
 
-        if self._inter_funk_type is InterFuncType.logistic:
-            k_s = sp.IndexedBase('k', shape=(self._gmod.N_nodes, self._gmod.N_nodes))  # Logistic coupling parameter
-            mu_s = sp.IndexedBase('mu', shape=(self._gmod.N_nodes, self._gmod.N_nodes))  # Logistic centre parameter
-            f_inter_ij = 1 / (1 + sp.exp(-k_s[i_s, j_s] * (p_s[i_s] - mu_s[i_s, j_s])))
-            self.M_k_s = sp.Array([[k_s[i, j] for j in range(self._gmod.N_nodes)] for i in range(self._gmod.N_nodes)])
-            self.M_mu_s = sp.Array([[mu_s[i, j] for j in range(self._gmod.N_nodes)] for i in range(self._gmod.N_nodes)])
+        beta_s = sp.IndexedBase('beta', shape=(self._gmod.N_nodes, self._gmod.N_nodes))  # Hill centre
+        n_s = sp.IndexedBase('n', shape=(self._gmod.N_nodes, self._gmod.N_nodes))  # Hill coupling
 
-        else:
-            beta_s = sp.IndexedBase('beta', shape=(self._gmod.N_nodes, self._gmod.N_nodes))  # Hill centre
-            n_s = sp.IndexedBase('n', shape=(self._gmod.N_nodes, self._gmod.N_nodes))  # Hill coupling
-            f_inter_ij = 1 / (1 + (p_s[i_s] * beta_s[i_s, j_s]) ** (-n_s[i_s, j_s]))
-            self.M_beta_s = sp.Array([[beta_s[i, j] for j in range(self._gmod.N_nodes)] for i in range(self._gmod.N_nodes)])
-            self.M_n_s = sp.Array([[n_s[i, j] for j in range(self._gmod.N_nodes)] for i in range(self._gmod.N_nodes)])
+        # Create a matrix out of the n_s symbols:
+        self.M_n_s = sp.Matrix(self._N_nodes, self._N_nodes,
+                          lambda i, j: n_s[i, j])
 
-        # f_inter_term = sp.summation(f_inter_ji, (j_s, 0, self._gmod.N_nodes-1))  # evaluated sum
 
-        # Get edge node ind pairs for the specified coupling:
-        inds_edge_add, inds_edge_mult = self.set_coupling_type(coupling_type)
+        self.M_beta_s = sp.Matrix(self._N_nodes, self._N_nodes,
+                             lambda i, j: beta_s[i, j])
 
-        f_add_list = [[] for i in range(self._gmod.N_nodes)]
-        f_mult_list = [[] for i in range(self._gmod.N_nodes)]
+        # Define vector of ones to use in matrix operations:
+        ones_vect = sp.ones(1, self._N_nodes)
 
-        for (nde_i, nde_j) in inds_edge_add:
-            f_add_list[nde_j].append(f_inter_ij.subs([(i_s, nde_i), (j_s, nde_j)]))
+        # Create a matrix that allows us to access the concentration vectors
+        # duplicated along columns:
+        M_p_s = self.p_vect_s * ones_vect
 
-        for (nde_i, nde_j) in inds_edge_mult:
-            f_mult_list[nde_j].append(f_inter_ij.subs([(i_s, nde_i), (j_s, nde_j)]))
+        # Matrix symbols to construct matrix equation bases:
+        M_n_so = sp.MatrixSymbol('M_n', self._N_nodes, self._N_nodes)
+        M_beta_so = sp.MatrixSymbol('M_beta', self._N_nodes, self._N_nodes)
+        M_p_so = sp.MatrixSymbol('M_p', self._N_nodes, self._N_nodes)
 
-        N_f_add = [len(fadd) for fadd in f_add_list] # normalization constants
+        if coupling_type is CouplingType.additive:
+            # If coupling type is pure additive (cooperation/competition
+            # between all activators and inhibitors):
+            M_funk_add_so = sp.Matrix(M_n_so.rows, M_n_so.cols,
+                                      lambda i, j: sp.Piecewise(((1 / (
+                                                  1 + (M_beta_so[j, i] * M_p_so[j, i]) ** (M_n_so[j, i]))),
+                                                                 M_n_so[j, i] < 0),
+                                                                ((1 / (1 + (M_beta_so[j, i] * M_p_so[j, i]) ** (
+                                                                M_n_so[j, i]))), M_n_so[j, i] > 0),
+                                                                (0, True)))
+
+            M_funk_mul_so = sp.ones(self._N_nodes, self._N_nodes)
+
+            # prepare an adjacency matrix for the addition portion
+            A_add_so = sp.Matrix(M_n_so.rows, M_n_so.cols,
+                                 lambda i, j: sp.Piecewise((1, M_n_so[j, i] < 0),
+                                                           (1, M_n_so[j, i] > 0), (0, True))
+                                 )
+
+        elif coupling_type is CouplingType.multiplicative:
+            # If coupling type is pure multiplicative:
+            M_funk_mul_so = sp.Matrix(M_n_so.rows, M_n_so.cols,
+                                      lambda i, j: sp.Piecewise(((1 / (
+                                                  1 + (M_beta_so[j, i] * M_p_so[j, i]) ** (M_n_so[j, i]))),
+                                                                 M_n_so[j, i] < 0),
+                                                                ((1/(1 + (M_beta_so[j, i]*M_p_so[j, i])**(
+                                                                M_n_so[j, i]))), M_n_so[j, i] > 0),
+                                                                (1, True)))
+
+            # When we know all additive interactions are None, prepare a split-prob matrix:
+            M_funk_add_so = sp.ones(self._N_nodes, self._N_nodes)
+
+            A_add_so = sp.ones(self._N_nodes, self._N_nodes)
+
+        elif coupling_type is CouplingType.mixed:
+            # If coupling type is mixed where inhibitors are dominant and activators cooperate:
+            M_funk_add_so = sp.Matrix(M_n_so.rows, M_n_so.cols,
+                                      lambda i, j: sp.Piecewise(
+                                          ((1 / (1 + (M_beta_so[j, i] * M_p_so[j, i]) ** (M_n_so[j, i]))),
+                                           M_n_so[j, i] > 0),
+                                          (0, True)))
+
+            M_funk_mul_so = sp.Matrix(M_n_so.rows, M_n_so.cols,
+                                      lambda i, j: sp.Piecewise(((1 / (
+                                                  1 + (M_beta_so[j, i] * M_p_so[j, i]) ** (M_n_so[j, i]))),
+                                                                 M_n_so[j, i] < 0),
+                                                                (1, True)))
+
+            A_add_so = sp.Matrix(M_n_so.rows, M_n_so.cols,
+                                 lambda i, j: sp.Piecewise((1, M_n_so[j, i] > 0), (0, True)))
+
+        else: # FIXME: add in specified
+            raise Exception("Only additive, multiplicative, and mixed couplings supported.")
+
+        M_funk_add_s = M_funk_add_so.subs([(M_p_so, M_p_s),
+                                           (M_beta_so, self.M_beta_s),
+                                           (M_n_so, self.M_n_s)
+                                           ]
+                                          )
+
+        M_funk_mul_s = M_funk_mul_so.subs([(M_p_so, M_p_s),
+                                           (M_beta_so, self.M_beta_s),
+                                           (M_n_so, self.M_n_s)])
+
+        A_add_s = A_add_so.subs(M_n_so, self.M_n_s)
+
+        self._n_add_edges = A_add_s * ones_vect.T
+        self._add_terms = M_funk_add_s * ones_vect.T
+        self._mul_terms = sp.Matrix(np.product(M_funk_mul_s, axis=1))
+
+    def construct_dpdt_vect(self, nn: ndarray):
+        '''
+
+        '''
+        # substitute in real values for the Hill exponent, in order
+        # to solve the piecewise conditions:
+        subs_list = self.subs_matrix_vals(self.M_n_s, nn)
+        n_add_edges = self._n_add_edges.subs(subs_list)
+        add_terms = self._add_terms.subs(subs_list)
+        mul_terms = self._mul_terms.subs(subs_list)
 
         self.dpdt_vect_s = []
-        for i in range(self._gmod.N_nodes):
-            # This is the rate of change vector, roots are equilibrium points
-            mult_prod = np.prod(f_mult_list[i])
-            if mult_prod == 1.0:
-                mult_prod = 1 # try and keep rational numbers in analytic equation, if possible
 
-            add_prod = np.sum(f_add_list[i])
-            if add_prod == 0.0:
-                add_prod = 1
-                N_f_add[i] = 1
+        for i in range(self._N_nodes):
+            # Fix a potential 0/0 issue:
+            if n_add_edges[i] == 0.0 and add_terms[i] == 0.0:
+                print('Divide by zero found')
+                n_add_edges[i] = 1
 
-            self.dpdt_vect_s.append(d_s[i]*sp.Rational(1, N_f_add[i])*add_prod*mult_prod - d_s[i]*p_s[i])
+            print(f'{i}: n_add_edges: {n_add_edges[i]} \n '
+                  f'add_term: {add_terms[i]} \n '
+                  f'mul_term: {mul_terms[i]}')
 
-            # print(f'Add prod {np.sum(f_add_list[i])} \n Mult prod {mult_prod}')
-            # print('--------')
+            print('------')
 
-        # # This is the rate of change vector, roots are equilibrium points
-        # self.dpdt_vect_s = [d_s[i]*sp.Rational(1, self._gmod.N_nodes)*f_inter_term.subs(i_s, i) - d_s[i] * p_s[i] for i in
-        #                range(self._gmod.N_nodes)]
+            self.dpdt_vect_s.append(self.d_vect_s[i]*mul_terms[i]*(1/n_add_edges[i])*add_terms[i] -
+                            self.p_vect_s[i]*self.d_vect_s[i])
 
         # This is an "energy" function to be minimized at the equilibrium points:
         self.opti_s = (sp.Matrix(self.dpdt_vect_s).T * sp.Matrix(self.dpdt_vect_s))[0, 0]
 
 
-    def set_coupling_type(self, coupling_type: CouplingType):
+    def subs_matrix_vals(self, M_s: MutableDenseMatrix, M_vals: MutableDenseMatrix|ndarray):
         '''
 
         '''
+        subs_list = []
+        for i in range(self._N_nodes):
+            for j in range(self._N_nodes):
+                subs_list.append((M_s[i, j], M_vals[i, j]))
 
-        N_nodes = self._N_nodes
-
-        M_n_so = sp.MatrixSymbol('M_n', N_nodes, N_nodes)
-
-        ones_vect = sp.ones(N_nodes, 1)
-
-        if coupling_type is CouplingType.additive:
-            # Out-adjacency matrix based on conditions on the Hill exponent:
-            # Suitable for pure additive or pure multiplicative interactions:
-            A_add_s = sp.Matrix(M_n_so.rows, M_n_so.cols,
-                                lambda i, j: sp.Piecewise((1, M_n_so[i, j] < 0), (1, M_n_so[i, j] > 0), (0, True))
-                                )
-
-            A_mul_s = sp.ones(N_nodes, N_nodes)
-
-        elif coupling_type is CouplingType.multiplicative:
-            A_mul_s = sp.Matrix(M_n_so.rows, M_n_so.cols,
-                                lambda i, j: sp.Piecewise((1, M_n_so[i, j] < 0), (1, M_n_so[i, j] > 0), (0, True)))
-
-            A_add_s = sp.ones(N_nodes, N_nodes)
-
-        elif coupling_type is CouplingType.mixed:
-            # Mixed interaction type:
-            # Inhibitors are multiplicative; activators are additive
-            A_add_s = sp.Matrix(M_n_so.rows, M_n_so.cols,
-                                lambda i, j: sp.Piecewise((1, M_n_so[i, j] > 0), (0, True)))
-
-            A_mul_s = sp.Matrix(M_n_so.rows, M_n_so.cols,
-                                lambda i, j: sp.Piecewise((1, M_n_so[i, j] < 0), (0, True)))
-
-        else: # else if coupling type is specified:
-            pass #FIXME code this up by stepping through edge types
-
-        n_s = sp.IndexedBase('n', shape=(N_nodes, N_nodes))
-
-        # Create a matrix out of the n_s symbols:
-        M_n_s = sp.Matrix(N_nodes, N_nodes,
-                          lambda i, j: n_s[i, j])
-
-        # Substitute it into our expression for the adjacency matrices to obtain the
-        # edge count vectors essential for proper normalization of the problem:
-        N_edge_vect_add = A_add_s.subs(M_n_so, sp.Matrix(M_n_s)) * ones_vect
-        N_noedge_vect_add = N_nodes * sp.ones(N_nodes, 1) - N_edge_vect_add
-
-        N_edge_vect_mul = A_mul_s.subs(M_n_so, sp.Matrix(M_n_s)) * ones_vect
-        N_noedge_vect_mul = N_nodes * sp.ones(N_nodes, 1) - N_edge_vect_mul
-
-        return N_edge_vect_add, N_edge_vect_mul, N_noedge_vect_add, N_noedge_vect_mul
-
-
-        # M_inter_mult = np.zeros((self._gmod.N_nodes, self._gmod.N_nodes))
-        # M_inter_add = np.zeros((self._gmod.N_nodes, self._gmod.N_nodes))
-        #
-        # # If 'coupling type' is 'specified' the user specifies multiplicative interactions using As and Is edges
-        # if coupling_type is CouplingType.specified:
-        #     for ei, ((nde_i, nde_j), edge_type) in enumerate(zip(self._gmod.edges_index, self._gmod.edge_types)):
-        #         if edge_type is EdgeType.A or edge_type is EdgeType.I:
-        #             M_inter_add[nde_i, nde_j] = 1
-        #         elif edge_type is EdgeType.Is or edge_type is EdgeType.As:
-        #             M_inter_mult[nde_i, nde_j] = 1
-        #
-        # # 'mixed' coupling means any inhibitor is multiplicative, all activators and no-regulation is additive
-        # # this is convention in standard Boolean networks:
-        # elif coupling_type is CouplingType.mixed:
-        #     for ei, ((nde_i, nde_j), edge_type) in enumerate(zip(self._gmod.edges_index, self._gmod.edge_types)):
-        #         if edge_type is EdgeType.A or edge_type is EdgeType.As:
-        #             M_inter_add[nde_i, nde_j] = 1
-        #         elif edge_type is EdgeType.I or edge_type is EdgeType.Is:
-        #             M_inter_mult[nde_i, nde_j] = 1
-        #
-        # # if 'additive', all couplings are additive
-        # elif coupling_type is CouplingType.additive:
-        #     for ei, ((nde_i, nde_j), edge_type) in enumerate(zip(self._gmod.edges_index, self._gmod.edge_types)):
-        #         M_inter_add[nde_i, nde_j] = 1
-        #
-        # # if 'multiplicative', all couplings are multiplicative (except zero-regulated nodes are constitutive expressed)
-        # elif coupling_type is CouplingType.multiplicative:
-        #     for ei, ((nde_i, nde_j), edge_type) in enumerate(zip(self._gmod.edges_index, self._gmod.edge_types)):
-        #         M_inter_mult[nde_i, nde_j] = 1
-        #
-        # else:
-        #     raise Exception("This CouplingType is not supported.")
-        #
-        # # By default, we want non-edges to be "additive" so select them this way:
-        # # inds_add = (M_inter_add - M_inter_mult >= 0).nonzero()
-        # # inds_mult = (M_inter_mult == 1).nonzero()
-        #
-        # inds_add = (M_inter_add == 1).nonzero()
-        # inds_mult = (M_inter_mult == 1).nonzero()
-        #
-        # inds_edge_add = list(zip(inds_add[0], inds_add[1]))
-        # inds_edge_mult = list(zip(inds_mult[0], inds_mult[1]))
-
-        # return inds_edge_add, inds_edge_mult
-
-
+        return subs_list
 
     def make_numerical_params(self,
                        d_base: float=1.0,
