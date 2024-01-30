@@ -36,144 +36,203 @@ class ProbabilityNet(object):
     '''
     '''
     def __init__(self,
-                 gmod: GeneNetworkModel,
-                 coupling_type: CouplingType = CouplingType.specified):
+                 N_nodes: int,
+                 interaction_function_type: InterFuncType = InterFuncType.hill):
         '''
 
         '''
-        self._N_nodes = gmod.N_nodes
-        self._gmod = gmod
+        self._N_nodes = N_nodes
+        self._inter_fun_type = interaction_function_type
 
-        d_s = sp.IndexedBase('d', shape=self._N_nodes)  # Maximum rate of decay
-        p_s = sp.IndexedBase('p', shape=self._N_nodes)  # Probability of gene product
+        # Matrix Equations:
+        # Matrix symbols to construct matrix equation bases:
+        self._M_n_so = sp.MatrixSymbol('M_n', self._N_nodes, self._N_nodes)
+        self._M_beta_so = sp.MatrixSymbol('M_beta', self._N_nodes, self._N_nodes)
+        self._M_p_so = sp.MatrixSymbol('M_p', self._N_nodes, self._N_nodes)
+
+        # Define symbolic adjacency matrices to use as masks in defining multi and add matrices:
+        self._A_add_so = sp.MatrixSymbol('A_add', N_nodes, N_nodes)
+        self._A_mul_so = sp.MatrixSymbol('A_mul', N_nodes, N_nodes)
+
+        # Now we can define symbolic matrices that use the add and mul adjacencies to mask which
+        # n-parameters to use:
+        M_n_add_so = sp.hadamard_product(self._A_add_so, self._M_n_so)
+        M_n_mul_so = sp.hadamard_product(self._A_mul_so, self._M_n_so)
+
+        # And functions can be plugged in as matrix equations; these are the fundamental
+        # model building functions:
+        if self._inter_fun_type is InterFuncType.hill:
+            # For Hill Functions:
+            self._M_funk_add_so = sp.Matrix(N_nodes, N_nodes,
+                                      lambda i, j: 1 / (1 + (self._M_beta_so[j, i] * self._M_p_so[j, i]) ** -M_n_add_so[j, i]))
+            self._M_funk_mul_so = sp.Matrix(N_nodes, N_nodes,
+                                      lambda i, j: 1 / (1 + (self._M_beta_so[j, i] * self._M_p_so[j, i]) ** -M_n_mul_so[j, i]))
+        else:
+            # For Logistic Functions:
+            self._M_funk_add_so = sp.Matrix(N_nodes, N_nodes,
+                                      lambda i, j: 1 / (1 + sp.exp(-M_n_add_so[j, i] * (self._M_p_so[j, i] -
+                                                                                        self._M_beta_so[j, i]))))
+            self._M_funk_mul_so = sp.Matrix(N_nodes, N_nodes,
+                                      lambda i, j: 1 / (1 + sp.exp(-M_n_mul_so[j, i] * (self._M_p_so[j, i] -
+                                                                                        self._M_beta_so[j, i]))))
+
+        # Symbolic model parameters:
+        self._d_s = sp.IndexedBase('d', shape=self._N_nodes)  # Maximum rate of decay
+        self._p_s = sp.IndexedBase('p', shape=self._N_nodes)  # Probability of gene product
 
         # Vectorized node-parameters and variables:
-        self.d_vect_s = sp.Matrix([d_s[i] for i in range(self._N_nodes)])  # maximum rate of decay for each node
-        self.p_vect_s = sp.Matrix([p_s[i] for i in range(self._N_nodes)])  # gene product probability for each node
+        self._d_vect_s = sp.Matrix([self._d_s[i] for i in range(self._N_nodes)])  # maximum rate of decay for each node
+        self._p_vect_s = sp.Matrix([self._p_s[i] for i in range(self._N_nodes)])  # gene product probability for each node
 
-        beta_s = sp.IndexedBase('beta', shape=(self._gmod.N_nodes, self._gmod.N_nodes))  # Hill centre
-        n_s = sp.IndexedBase('n', shape=(self._gmod.N_nodes, self._gmod.N_nodes))  # Hill coupling
+        self._beta_s = sp.IndexedBase('beta', shape=(self._N_nodes, self._N_nodes))  # Hill centre
+        self._n_s = sp.IndexedBase('n', shape=(self._N_nodes, self._N_nodes))  # Hill coupling
 
         # Create a matrix out of the n_s symbols:
-        self.M_n_s = sp.Matrix(self._N_nodes, self._N_nodes,
-                          lambda i, j: n_s[i, j])
+        self._M_n_s = sp.Matrix(self._N_nodes, self._N_nodes,
+                                lambda i, j: self._n_s[i, j])
 
-
-        self.M_beta_s = sp.Matrix(self._N_nodes, self._N_nodes,
-                             lambda i, j: beta_s[i, j])
+        self._M_beta_s = sp.Matrix(self._N_nodes, self._N_nodes,
+                                   lambda i, j: self._beta_s[i, j])
 
         # Define vector of ones to use in matrix operations:
-        ones_vect = sp.ones(1, self._N_nodes)
+        self._ones_vect = sp.ones(1, self._N_nodes)
 
         # Create a matrix that allows us to access the concentration vectors
         # duplicated along columns:
-        M_p_s = self.p_vect_s * ones_vect
+        self._M_p_s = self._p_vect_s * self._ones_vect
 
-        # Matrix symbols to construct matrix equation bases:
-        M_n_so = sp.MatrixSymbol('M_n', self._N_nodes, self._N_nodes)
-        M_beta_so = sp.MatrixSymbol('M_beta', self._N_nodes, self._N_nodes)
-        M_p_so = sp.MatrixSymbol('M_p', self._N_nodes, self._N_nodes)
+    def build_adjacency_from_edge_type_list(self,
+                        edge_types: list[EdgeType],
+                        edges_index: list[tuple[int,int]],
+                        coupling_type: CouplingType=CouplingType.specified):
+        '''
 
-        if coupling_type is CouplingType.additive:
-            # If coupling type is pure additive (cooperation/competition
-            # between all activators and inhibitors):
-            M_funk_add_so = sp.Matrix(M_n_so.rows, M_n_so.cols,
-                                      lambda i, j: sp.Piecewise(((1 / (
-                                                  1 + (M_beta_so[j, i] * M_p_so[j, i]) ** (M_n_so[j, i]))),
-                                                                 M_n_so[j, i] < 0),
-                                                                ((1 / (1 + (M_beta_so[j, i] * M_p_so[j, i]) ** (
-                                                                M_n_so[j, i]))), M_n_so[j, i] > 0),
-                                                                (0, True)))
+        '''
 
-            M_funk_mul_so = sp.ones(self._N_nodes, self._N_nodes)
+        A_full_s = np.zeros((self._N_nodes, self._N_nodes), dtype=int)
+        A_add_s = np.zeros((self._N_nodes, self._N_nodes), dtype=int)
+        A_mul_s = np.zeros((self._N_nodes, self._N_nodes), dtype=int)
 
-            # prepare an adjacency matrix for the addition portion
-            A_add_so = sp.Matrix(M_n_so.rows, M_n_so.cols,
-                                 lambda i, j: sp.Piecewise((1, M_n_so[j, i] < 0),
-                                                           (1, M_n_so[j, i] > 0), (0, True))
-                                 )
+        # Build A_full_s, an adjacency matrix that doesn't distinguish between additive
+        # and multiplicative interactions:
+        for ei, ((nde_i, nde_j), etype) in enumerate(zip(edges_index, edge_types)):
+            if etype is EdgeType.A or etype is EdgeType.As:
+                A_full_s[nde_i, nde_j] = 1
+            elif etype is EdgeType.I or etype is EdgeType.Is:
+                A_full_s[nde_i, nde_j] = -1
 
-        elif coupling_type is CouplingType.multiplicative:
-            # If coupling type is pure multiplicative:
-            M_funk_mul_so = sp.Matrix(M_n_so.rows, M_n_so.cols,
-                                      lambda i, j: sp.Piecewise(((1 / (
-                                                  1 + (M_beta_so[j, i] * M_p_so[j, i]) ** (M_n_so[j, i]))),
-                                                                 M_n_so[j, i] < 0),
-                                                                ((1/(1 + (M_beta_so[j, i]*M_p_so[j, i])**(
-                                                                M_n_so[j, i]))), M_n_so[j, i] > 0),
-                                                                (1, True)))
+        for ei, ((nde_i, nde_j), etype) in enumerate(zip(edges_index, edge_types)):
+            if coupling_type is CouplingType.specified:
+                if etype is EdgeType.I or etype is EdgeType.A:
+                    A_add_s[nde_i, nde_j] = 1
+                else:
+                    A_mul_s[nde_i, nde_j] = 1
 
-            # When we know all additive interactions are None, prepare a split-prob matrix:
-            M_funk_add_so = sp.ones(self._N_nodes, self._N_nodes)
+            elif coupling_type is CouplingType.additive:
+                A_add_s[nde_i, nde_j] = 1
 
-            A_add_so = sp.ones(self._N_nodes, self._N_nodes)
+            elif coupling_type is CouplingType.multiplicative:
+                A_mul_s[nde_i, nde_j] = 1
 
-        elif coupling_type is CouplingType.mixed:
-            # If coupling type is mixed where inhibitors are dominant and activators cooperate:
-            M_funk_add_so = sp.Matrix(M_n_so.rows, M_n_so.cols,
-                                      lambda i, j: sp.Piecewise(
-                                          ((1 / (1 + (M_beta_so[j, i] * M_p_so[j, i]) ** (M_n_so[j, i]))),
-                                           M_n_so[j, i] > 0),
-                                          (0, True)))
+            elif coupling_type is CouplingType.mixed:
+                if etype is EdgeType.A or etype is EdgeType.As:
+                    A_add_s[nde_i, nde_j] = 1
+                else:
+                    A_mul_s[nde_i, nde_j] = 1
 
-            M_funk_mul_so = sp.Matrix(M_n_so.rows, M_n_so.cols,
-                                      lambda i, j: sp.Piecewise(((1 / (
-                                                  1 + (M_beta_so[j, i] * M_p_so[j, i]) ** (M_n_so[j, i]))),
-                                                                 M_n_so[j, i] < 0),
-                                                                (1, True)))
+        A_add_s = sp.Matrix(A_add_s)
+        A_mul_s = sp.Matrix(A_mul_s)
+        A_full_s = sp.Matrix(A_full_s)
 
-            A_add_so = sp.Matrix(M_n_so.rows, M_n_so.cols,
-                                 lambda i, j: sp.Piecewise((1, M_n_so[j, i] > 0), (0, True)))
+        return A_add_s, A_mul_s, A_full_s
 
-        else: # FIXME: add in specified
-            raise Exception("Only additive, multiplicative, and mixed couplings supported.")
+    def build_analytical_model(self,
+                 A_add_s: MutableDenseMatrix,
+                 A_mul_s: MutableDenseMatrix
+                               ):
+        '''
 
-        M_funk_add_s = M_funk_add_so.subs([(M_p_so, M_p_s),
-                                           (M_beta_so, self.M_beta_s),
-                                           (M_n_so, self.M_n_s)
-                                           ]
-                                          )
+        '''
 
-        M_funk_mul_s = M_funk_mul_so.subs([(M_p_so, M_p_s),
-                                           (M_beta_so, self.M_beta_s),
-                                           (M_n_so, self.M_n_s)])
+        if A_add_s.shape != (self._N_nodes, self._N_nodes):
+            raise Exception("Shape of A_add_s is not in terms of network node number!")
 
-        A_add_s = A_add_so.subs(M_n_so, self.M_n_s)
+        if A_mul_s.shape != (self._N_nodes, self._N_nodes):
+            raise Exception("Shape of A_add_s is not in terms of network node number!")
 
-        self._n_add_edges = A_add_s * ones_vect.T
-        self._add_terms = M_funk_add_s * ones_vect.T
+        M_funk_add_si = self._M_funk_add_so.subs(
+            [(self._M_p_so, self._M_p_s),
+             (self._M_n_so, self._M_n_s),
+             (self._M_beta_so, self._M_beta_s),
+             (self._A_add_so, A_add_s)])
+
+        M_funk_mul_si = self._M_funk_mul_so.subs(
+            [(self._M_p_so, self._M_p_s),
+             (self._M_n_so, self._M_n_s),
+             (self._M_beta_so, self._M_beta_s),
+             (self._A_mul_so, A_mul_s)])
+
+        # Filter out the 1/2 terms and set to 0 (addiditive) or 1 (multiplicative):
+        M_funk_add_s = sp.Matrix(self._N_nodes, self._N_nodes, lambda i, j: sp.Piecewise(
+            (M_funk_add_si[i, j], M_funk_add_si[i, j] != sp.Rational(1, 2)),
+            (0, True)))
+
+        M_funk_mul_s = sp.Matrix(self._N_nodes, self._N_nodes, lambda i, j: sp.Piecewise(
+            (M_funk_mul_si[i, j], M_funk_mul_si[i, j] != sp.Rational(1, 2)),
+            (1, True)))
+
+
+        n_add_edges_i = A_add_s * self._ones_vect.T
+        # Correct for any zeros in the n_add_edges and create a normalization object:
+        self._n_add_edges = sp.Matrix(self._N_nodes, 1,
+                                lambda i, j: sp.Piecewise((sp.Rational(1, n_add_edges_i[i, j]), n_add_edges_i[i, j] != 0),
+                                                          (1, True)))
+        add_terms_i = M_funk_add_s * self._ones_vect.T
+
+        # The add_terms need to be normalized to keep concentrations between 0 and 1:
+        self._add_terms = sp.hadamard_product(self._n_add_edges, add_terms_i)
+
         self._mul_terms = sp.Matrix(np.product(M_funk_mul_s, axis=1))
 
-    def construct_dpdt_vect(self, nn: ndarray):
-        '''
-
-        '''
-        # substitute in real values for the Hill exponent, in order
-        # to solve the piecewise conditions:
-        subs_list = self.subs_matrix_vals(self.M_n_s, nn)
-        n_add_edges = self._n_add_edges.subs(subs_list)
-        add_terms = self._add_terms.subs(subs_list)
-        mul_terms = self._mul_terms.subs(subs_list)
-
-        self.dpdt_vect_s = []
-
-        for i in range(self._N_nodes):
-            # Fix a potential 0/0 issue:
-            if n_add_edges[i] == 0.0 and add_terms[i] == 0.0:
-                print('Divide by zero found')
-                n_add_edges[i] = 1
-
-            print(f'{i}: n_add_edges: {n_add_edges[i]} \n '
-                  f'add_term: {add_terms[i]} \n '
-                  f'mul_term: {mul_terms[i]}')
-
-            print('------')
-
-            self.dpdt_vect_s.append(self.d_vect_s[i]*mul_terms[i]*(1/n_add_edges[i])*add_terms[i] -
-                            self.p_vect_s[i]*self.d_vect_s[i])
+        # Construct the dpdt_vect_s:
+        self.dpdt_vect_s = [self._d_vect_s[i]*self._mul_terms[i]*self._add_terms[i] -
+                            self._p_vect_s[i]*self._d_vect_s[i] for i in range(self._N_nodes)]
 
         # This is an "energy" function to be minimized at the equilibrium points:
         self.opti_s = (sp.Matrix(self.dpdt_vect_s).T * sp.Matrix(self.dpdt_vect_s))[0, 0]
+
+
+
+    # def construct_dpdt_vect(self, nn: ndarray):
+    #     '''
+    #
+    #     '''
+    #     # substitute in real values for the Hill exponent, in order
+    #     # to solve the piecewise conditions:
+    #     subs_list = self.subs_matrix_vals(self._M_n_s, nn)
+    #     n_add_edges = self._n_add_edges.subs(subs_list)
+    #     add_terms = self._add_terms.subs(subs_list)
+    #     mul_terms = self._mul_terms.subs(subs_list)
+    #
+    #     self.dpdt_vect_s = []
+    #
+    #     for i in range(self._N_nodes):
+    #         # Fix a potential 0/0 issue:
+    #         if n_add_edges[i] == 0.0 and add_terms[i] == 0.0:
+    #             print('Divide by zero found')
+    #             n_add_edges[i] = 1
+    #
+    #         print(f'{i}: n_add_edges: {n_add_edges[i]} \n '
+    #               f'add_term: {add_terms[i]} \n '
+    #               f'mul_term: {mul_terms[i]}')
+    #
+    #         print('------')
+    #
+    #         self.dpdt_vect_s.append(self._d_vect_s[i] * mul_terms[i] * (1 / n_add_edges[i]) * add_terms[i] -
+    #                                 self._p_vect_s[i] * self._d_vect_s[i])
+    #
+    #     # This is an "energy" function to be minimized at the equilibrium points:
+    #     self.opti_s = (sp.Matrix(self.dpdt_vect_s).T * sp.Matrix(self.dpdt_vect_s))[0, 0]
 
 
     def subs_matrix_vals(self, M_s: MutableDenseMatrix, M_vals: MutableDenseMatrix|ndarray):
@@ -238,32 +297,32 @@ class ProbabilityNet(object):
         # First, lambdify the change vector in a way that supports any constraints:
         if constrained_inds is None or constrained_vals is None:
             # Compute the symbolic Jacobian:
-            dpdt_jac_s = sp.Matrix(self.dpdt_vect_s).jacobian(self.p_vect_s) # analytical Jacobian
+            dpdt_jac_s = sp.Matrix(self.dpdt_vect_s).jacobian(self._p_vect_s) # analytical Jacobian
 
             if self._inter_funk_type is InterFuncType.hill:
-                dpdt_vect_f = sp.lambdify((self.p_vect_s,
-                                           np.asarray(self.M_n_s),
-                                           np.asarray(self.M_beta_s),
-                                           self.d_vect_s),
+                dpdt_vect_f = sp.lambdify((self._p_vect_s,
+                                           np.asarray(self._M_n_s),
+                                           np.asarray(self._M_beta_s),
+                                           self._d_vect_s),
                                           self.dpdt_vect_s)
 
-                dpdt_jac_f = sp.lambdify((self.p_vect_s,
-                                          np.asarray(self.M_n_s),
-                                          np.asarray(self.M_beta_s),
-                                          self.d_vect_s),
+                dpdt_jac_f = sp.lambdify((self._p_vect_s,
+                                          np.asarray(self._M_n_s),
+                                          np.asarray(self._M_beta_s),
+                                          self._d_vect_s),
                                          dpdt_jac_s)
 
             elif self._inter_funk_type is InterFuncType.logistic:
-                dpdt_vect_f = sp.lambdify((self.p_vect_s,
+                dpdt_vect_f = sp.lambdify((self._p_vect_s,
                                            np.asarray(self.M_k_s),
                                            np.asarray(self.M_mu_s),
-                                           self.d_vect_s),
+                                           self._d_vect_s),
                                           self.dpdt_vect_s)
 
-                dpdt_jac_f = sp.lambdify((self.p_vect_s,
+                dpdt_jac_f = sp.lambdify((self._p_vect_s,
                                           np.asarray(self.M_k_s),
                                           np.asarray(self.M_mu_s),
-                                          self.d_vect_s),
+                                          self._d_vect_s),
                                          dpdt_jac_s)
 
             else:
@@ -271,9 +330,9 @@ class ProbabilityNet(object):
 
 
         else: # If there are constraints split the p-vals into an arguments and to-solve set:
-            p_vect_args = (np.asarray(self.p_vect_s)[constrained_inds]).tolist()
+            p_vect_args = (np.asarray(self._p_vect_s)[constrained_inds]).tolist()
             unconstrained_inds = np.setdiff1d(self._gmod.nodes_index, constrained_inds).tolist()
-            p_vect_solve = (np.asarray(self.p_vect_s)[unconstrained_inds]).tolist()
+            p_vect_solve = (np.asarray(self._p_vect_s)[unconstrained_inds]).tolist()
 
             # truncate the change vector to only be for unconstrained inds:
             dpdt_vect_s = np.asarray(self.dpdt_vect_s)[unconstrained_inds].tolist()
@@ -284,16 +343,16 @@ class ProbabilityNet(object):
             if self._inter_funk_type is InterFuncType.hill:
                 dpdt_vect_f = sp.lambdify((p_vect_solve,
                                            p_vect_args,
-                                           np.asarray(self.M_n_s),
-                                           np.asarray(self.M_beta_s),
-                                           self.d_vect_s),
+                                           np.asarray(self._M_n_s),
+                                           np.asarray(self._M_beta_s),
+                                           self._d_vect_s),
                                           dpdt_vect_s)
 
                 dpdt_jac_f = sp.lambdify((p_vect_solve,
                                           p_vect_args,
-                                          np.asarray(self.M_n_s),
-                                          np.asarray(self.M_beta_s),
-                                          self.d_vect_s),
+                                          np.asarray(self._M_n_s),
+                                          np.asarray(self._M_beta_s),
+                                          self._d_vect_s),
                                          dpdt_jac_s)
 
             elif self._inter_funk_type is InterFuncType.logistic:
@@ -301,14 +360,14 @@ class ProbabilityNet(object):
                                            p_vect_args,
                                            np.asarray(self.M_k_s),
                                            np.asarray(self.M_mu_s),
-                                           self.d_vect_s),
+                                           self._d_vect_s),
                                           dpdt_vect_s)
 
                 dpdt_jac_f = sp.lambdify((p_vect_solve,
                                           p_vect_args,
                                           np.asarray(self.M_k_s),
                                           np.asarray(self.M_mu_s),
-                                          self.d_vect_s),
+                                          self._d_vect_s),
                                          dpdt_jac_s)
 
             else:

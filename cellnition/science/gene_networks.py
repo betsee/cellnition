@@ -214,6 +214,7 @@ class GeneNetworkModel(object):
         self._solved_analytically = False # Indicate that the model does not have an analytical solution
         self.dcdt_vect_reduced_s = None # Initialize this to None
         self.process_params_s = []  # initialize this to be an empty list
+        self.edge_types = None
 
     def generate_network(self,
                          beta: float=0.15,

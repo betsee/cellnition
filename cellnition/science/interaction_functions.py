@@ -21,9 +21,22 @@ from networkx import DiGraph
 import sympy as sp
 from sympy.core.symbol import Symbol
 from sympy.tensor.indexed import Indexed
+from sympy import MatrixSymbol
 from cellnition.science.network_enums import EdgeType, GraphType, NodeType
 import pygraphviz as pgv
 
+def f_hill_s(i, j, pp: MatrixSymbol, nn: MatrixSymbol, beta: MatrixSymbol):
+    '''
+
+    '''
+    return 1/(1 + (beta[j,i] * pp[j,i]) ** -nn[j,i])
+
+
+def f_logi_s(i, j, pp: MatrixSymbol, kk: MatrixSymbol, mu: MatrixSymbol):
+    '''
+
+    '''
+    return 1 / (1 + sp.exp(-kk[j,i]*(pp[j,i] - mu[j,i])))
 
 def f_acti_hill_s(cc: Symbol|Indexed, beta: Symbol|Indexed, nn: Symbol|Indexed):
     '''
@@ -48,7 +61,6 @@ def f_acti_hill_s(cc: Symbol|Indexed, beta: Symbol|Indexed, nn: Symbol|Indexed):
     '''
     return ((cc * beta) ** nn) / (1 + (cc * beta) ** nn)
 
-
 def f_inhi_hill_s(cc: Symbol|Indexed, beta: Symbol|Indexed, nn: Symbol|Indexed):
     '''
     Inhibitor function based on a Hill function.
@@ -71,7 +83,6 @@ def f_inhi_hill_s(cc: Symbol|Indexed, beta: Symbol|Indexed, nn: Symbol|Indexed):
 
     '''
     return 1 / (1 + (cc * beta) ** nn)
-
 
 def f_neut_s(cc: Symbol|Indexed, kk: Symbol|Indexed, nn: Symbol|Indexed):
     '''
