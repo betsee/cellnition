@@ -185,7 +185,6 @@ class GeneNetworkModel(object):
 
         # Depending on whether edges are supplied by user, generate
         # a graph:
-
         if edges is None:
             self.generate_network(beta=beta,
                                   gamma=gamma,
@@ -696,29 +695,7 @@ class GeneNetworkModel(object):
 
         self.set_edge_types(self.edge_types, add_interactions)
 
-        # # Now that indices are set, give nodes a type attribute and classify node inds.
-        # # First, initialize a dictionary to collect all node indices by their node type:
-        # self.node_type_inds = {}
-        # for nt in NodeType:
-        #     self.node_type_inds[nt.name] = []
-        #
-        # # Next, set all nodes to the gene type by default:
-        # node_types = [NodeType.gene for i in self.nodes_index]
-        #
-        # # If there is a supplied node dictionary, go through it and
-        # # override the default gene type with the user-specified type:
-        # if node_type_dict is not None:
-        #     for ntag, ntype in node_type_dict.items():
-        #         for nde_i, nde_n in enumerate(self.nodes_list):
-        #             if type(nde_n) is str:
-        #                 if nde_n.startswith(ntag):
-        #                     node_types[nde_i] = ntype
-        #             else:
-        #                 if nde_n == ntag:
-        #                     node_types[nde_i] = ntype
-        #
-        # # Set node types to the graph:
-        # self.node_types = node_types
+        # Set node types to the graph:
         self.set_node_types(node_type_dict=node_type_dict, pure_gene_edges_only=pure_gene_edges_only)
 
         # Next we want to distinguish a subset of edges that connect only "regular nodes":

@@ -43,6 +43,7 @@ class ProbabilityNet(object):
         '''
         self._N_nodes = N_nodes
         self._inter_fun_type = interaction_function_type
+        self._nodes_index = [i for i in range(self._N_nodes)]
 
         # Matrix Equations:
         # Matrix symbols to construct matrix equation bases:
@@ -77,12 +78,12 @@ class ProbabilityNet(object):
                                                                                         self._M_beta_so[j, i]))))
 
         # Symbolic model parameters:
-        self._d_s = sp.IndexedBase('d', shape=self._N_nodes)  # Maximum rate of decay
-        self._p_s = sp.IndexedBase('p', shape=self._N_nodes)  # Probability of gene product
+        self._d_s = sp.IndexedBase('d', shape=self._N_nodes, positive=True)  # Maximum rate of decay
+        self._p_s = sp.IndexedBase('p', shape=self._N_nodes, positive=True)  # Probability of gene product
 
         # Vectorized node-parameters and variables:
-        self._d_vect_s = sp.Matrix([self._d_s[i] for i in range(self._N_nodes)], positive=True)  # maximum rate of decay for each node
-        self._p_vect_s = sp.Matrix([self._p_s[i] for i in range(self._N_nodes)], positive=True)  # gene product probability for each node
+        self._d_vect_s = [self._d_s[i] for i in range(self._N_nodes)]  # maximum rate of decay for each node
+        self._p_vect_s = sp.Matrix([self._p_s[i] for i in range(self._N_nodes)])  # gene product probability for each node
 
         self._beta_s = sp.IndexedBase('beta', shape=(self._N_nodes, self._N_nodes), positive=True)  # Hill centre
         self._n_s = sp.IndexedBase('n', shape=(self._N_nodes, self._N_nodes), positive=True)  # Hill coupling
@@ -100,6 +101,7 @@ class ProbabilityNet(object):
         # Create a matrix that allows us to access the concentration vectors
         # duplicated along columns:
         self._M_p_s = self._p_vect_s * self._ones_vect
+
 
     def build_adjacency_from_edge_type_list(self,
                         edge_types: list[EdgeType],
@@ -156,11 +158,16 @@ class ProbabilityNet(object):
 
         return A_add_s, A_mul_s, A_full_s
 
-    def get_adjacency_randomly(self, coupling_type: CouplingType=CouplingType.mixed):
+    def get_adjacency_randomly(self, coupling_type: CouplingType=CouplingType.mixed, set_autoactivation: bool=True):
         '''
         Return a randomly-generated full adjacency matrix.
         '''
         A_full_s = sp.Matrix(np.random.randint(-1, 2, size=(self._N_nodes, self._N_nodes)))
+
+        if set_autoactivation:
+            # Make it so that any diagonal elements are self-activating rather than self-inhibiting
+            A_full_s = sp.Matrix(self._N_nodes, self._N_nodes,
+                                 lambda i,j: A_full_s[i,j]*A_full_s[i,j] if i==j else A_full_s[i,j])
 
         A_add_s, A_mul_s = self.process_full_adjacency(A_full_s, coupling_type=coupling_type)
 
@@ -236,6 +243,10 @@ class ProbabilityNet(object):
 
         '''
 
+        # Initialize a list of node indices that should be constrained (removed from solution searches)
+        # due to their lack of regulation:
+        self._constrained_nodes = []
+
         if A_add_s.shape != (self._N_nodes, self._N_nodes):
             raise Exception("Shape of A_add_s is not in terms of network node number!")
 
@@ -263,8 +274,11 @@ class ProbabilityNet(object):
             (M_funk_mul_si[i, j], M_funk_mul_si[i, j] != sp.Rational(1, 2)),
             (1, True)))
 
+        # As A_add_s is a signed adjacency matrix, we need to get the absolute value to count edges:
+        abs_A_add_s = sp.hadamard_product(A_add_s, A_add_s)
 
-        n_add_edges_i = A_add_s * self._ones_vect.T
+        # Count the nodes interacting (on input) with each node:
+        n_add_edges_i = abs_A_add_s.T * self._ones_vect.T
         # Correct for any zeros in the n_add_edges and create a normalization object:
         self._n_add_edges = sp.Matrix(self._N_nodes, 1,
                                 lambda i, j: sp.Piecewise((sp.Rational(1, n_add_edges_i[i, j]), n_add_edges_i[i, j] != 0),
@@ -276,65 +290,58 @@ class ProbabilityNet(object):
 
         self._mul_terms = sp.Matrix(np.product(M_funk_mul_s, axis=1))
 
-        # Construct the dpdt_vect_s:
-        self.dpdt_vect_s = [self._d_vect_s[i]*self._mul_terms[i]*self._add_terms[i] -
-                            self._p_vect_s[i]*self._d_vect_s[i] for i in range(self._N_nodes)]
+        self._dpdt_vect_s = []
+        for i in range(self._N_nodes):
+            if self._add_terms[i] == 0 and self._mul_terms[i] == 1: # if there's no add term and no mul term
+                self._dpdt_vect_s.append(0) # set the rate of change of this unregulated node to zero
+                self._constrained_nodes.append(i) # append this node to the list of nodes that should be constrained
+            elif self._add_terms[i] == 0 and self._mul_terms[i] != 1: # remove the null add term to avoid nulling all growth
+                self._dpdt_vect_s.append(self._d_vect_s[i]*self._mul_terms[i] -
+                             self._p_vect_s[i] * self._d_vect_s[i])
+            else: # the node is a mix of additive and potential multiplicative regulation:
+                self._dpdt_vect_s.append(self._d_vect_s[i]*self._mul_terms[i]*self._add_terms[i] -
+                             self._p_vect_s[i] * self._d_vect_s[i])
 
         # This is an "energy" function to be minimized at the equilibrium points:
-        self.opti_s = (sp.Matrix(self.dpdt_vect_s).T * sp.Matrix(self.dpdt_vect_s))[0, 0]
+        self._opti_s = (sp.Matrix(self._dpdt_vect_s).T * sp.Matrix(self._dpdt_vect_s))[0, 0]
 
-    def subs_matrix_vals(self, M_s: MutableDenseMatrix, M_vals: MutableDenseMatrix|ndarray):
-        '''
-
-        '''
-        subs_list = []
-        for i in range(self._N_nodes):
-            for j in range(self._N_nodes):
-                subs_list.append((M_s[i, j], M_vals[i, j]))
-
-        return subs_list
+        # Create linearized lists of symbolic parameters that are needed to solve the model (exclude the
+        # zero entries of the M_n and M_beta matrices:
+        self._edges_index, self.edge_types = self.edges_from_adjacency(A_add_s, A_mul_s)
+        self._beta_vect_s = [self._beta_s[nde_i, nde_j] for nde_i, nde_j in self._edges_index]
+        self._n_vect_s = [self._n_s[nde_i, nde_j] for nde_i, nde_j in self._edges_index]
+        self._N_edges = len(self._edges_index) # count number of edges
 
     def make_numerical_params(self,
-                       d_base: float=1.0,
-                       n_base: float=3.0,
-                       beta_base: float=4.0,
-                       k_base: float = 10.0,
-                       mu_base: float=0.25) -> None:
+                       d_base: float|list[float]=1.0,
+                       n_base: float|list[float]=3.0,
+                       beta_base: float|list[float]=2.0,
+                       ) -> tuple[list[float], list[float], list[float]]:
         '''
         Scrape the network for base parameters to initialize numerical parameters.
 
         '''
-        # FIXME: we want to be able to input numerical lists instead of just floats
-        #  for the base parameters in this input. The node parameter (d_base) will be
-        #  input as a list arranged according to nodes and the edge parameters will be
-        #  input as a list arranged according to the edges (and built into a matrix).
+        # Node parameters:
+        if type(d_base) is list:
+            assert len(d_base) == self._N_nodes, "Length of d_base not equal to node number!"
+            d_vect = d_base
+        else:
+            d_vect = [d_base for i in range(self._N_nodes)]
 
-        # Scrape the network for base parameters
-        self.d_vect = [d_base for i in range(self._gmod.N_nodes)]
+        # Edge parameters:
+        if type(n_base) is list:
+            assert len(n_base) == self._N_edges, "Length of n_base not equal to edge number!"
+            n_vect = n_base
+        else:
+            n_vect = [n_base for i in range(self._N_edges)]
 
-        if self._inter_funk_type is InterFuncType.hill:
-            # Scrape a network for edge types and construct a coupling matrix (Hill type functions):
-            self.M_n = np.zeros((self._gmod.N_nodes, self._gmod.N_nodes))
-            self.M_beta = np.zeros((self._gmod.N_nodes, self._gmod.N_nodes))
+        if type(beta_base) is list:
+            assert len(beta_base) == self._N_edges, "Length of n_base not equal to edge number!"
+            beta_vect = beta_base
+        else:
+            beta_vect = [beta_base for i in range(self._N_edges)]
 
-            for ei, ((nde_i, nde_j), edg_type) in enumerate(zip(self._gmod.edges_index, self._gmod.edge_types)):
-                self.M_beta[nde_i, nde_j] = beta_base
-                if edg_type is EdgeType.A or edg_type is EdgeType.As:
-                    self.M_n[nde_i, nde_j] = n_base
-                else:
-                    self.M_n[nde_i, nde_j] = -n_base
-
-        elif self._inter_funk_type is InterFuncType.logistic:
-            # Scrape a network for edge types and construct a coupling matrix (logistic type functions):
-            self.M_k = np.zeros((self._gmod.N_nodes, self._gmod.N_nodes))
-            self.M_mu = np.zeros((self._gmod.N_nodes, self._gmod.N_nodes))
-
-            for ei, ((nde_i, nde_j), edg_type) in enumerate(zip(self._gmod.edges_index, self._gmod.edge_types)):
-                self.M_mu[nde_i, nde_j] = mu_base
-                if edg_type is EdgeType.A or edg_type is EdgeType.As:
-                    self.M_k[nde_i, nde_j] = k_base
-                else:
-                    self.M_k[nde_i, nde_j] = -k_base
+        return d_vect, n_vect, beta_vect
 
     def create_numerical_dpdt(self,
                               constrained_inds: list | None = None,
@@ -345,104 +352,63 @@ class ProbabilityNet(object):
         # First, lambdify the change vector in a way that supports any constraints:
         if constrained_inds is None or constrained_vals is None:
             # Compute the symbolic Jacobian:
-            dpdt_jac_s = sp.Matrix(self.dpdt_vect_s).jacobian(self._p_vect_s) # analytical Jacobian
+            dpdt_jac_s = sp.Matrix(self._dpdt_vect_s).jacobian(self._p_vect_s) # analytical Jacobian
 
-            if self._inter_funk_type is InterFuncType.hill:
-                dpdt_vect_f = sp.lambdify((self._p_vect_s,
-                                           np.asarray(self._M_n_s),
-                                           np.asarray(self._M_beta_s),
-                                           self._d_vect_s),
-                                          self.dpdt_vect_s)
+            dpdt_vect_f = sp.lambdify((list(self._p_vect_s),
+                                       self._n_vect_s,
+                                       self._beta_vect_s,
+                                       self._d_vect_s),
+                                      self._dpdt_vect_s)
 
-                dpdt_jac_f = sp.lambdify((self._p_vect_s,
-                                          np.asarray(self._M_n_s),
-                                          np.asarray(self._M_beta_s),
-                                          self._d_vect_s),
-                                         dpdt_jac_s)
-
-            elif self._inter_funk_type is InterFuncType.logistic:
-                dpdt_vect_f = sp.lambdify((self._p_vect_s,
-                                           np.asarray(self.M_k_s),
-                                           np.asarray(self.M_mu_s),
-                                           self._d_vect_s),
-                                          self.dpdt_vect_s)
-
-                dpdt_jac_f = sp.lambdify((self._p_vect_s,
-                                          np.asarray(self.M_k_s),
-                                          np.asarray(self.M_mu_s),
-                                          self._d_vect_s),
-                                         dpdt_jac_s)
-
-            else:
-                raise Exception("Only InterFuncType hill and logistic are supported.")
+            dpdt_jac_f = sp.lambdify((list(self._p_vect_s),
+                                      self._n_vect_s,
+                                      self._beta_vect_s,
+                                      self._d_vect_s),
+                                     dpdt_jac_s)
 
 
         else: # If there are constraints split the p-vals into an arguments and to-solve set:
-            p_vect_args = (np.asarray(self._p_vect_s)[constrained_inds]).tolist()
-            unconstrained_inds = np.setdiff1d(self._gmod.nodes_index, constrained_inds).tolist()
-            p_vect_solve = (np.asarray(self._p_vect_s)[unconstrained_inds]).tolist()
+            p_vect_args = (np.asarray(list(self._p_vect_s))[constrained_inds]).tolist()
+            unconstrained_inds = np.setdiff1d(self._nodes_index, constrained_inds).tolist()
+            p_vect_solve = (np.asarray(list(self._p_vect_s))[unconstrained_inds]).tolist()
 
             # truncate the change vector to only be for unconstrained inds:
-            dpdt_vect_s = np.asarray(self.dpdt_vect_s)[unconstrained_inds].tolist()
+            dpdt_vect_s = np.asarray(self._dpdt_vect_s)[unconstrained_inds].tolist()
 
             # Compute the symbolic Jacobian:
             dpdt_jac_s = sp.Matrix(dpdt_vect_s).jacobian(p_vect_solve) # analytical Jacobian
 
-            if self._inter_funk_type is InterFuncType.hill:
-                dpdt_vect_f = sp.lambdify((p_vect_solve,
-                                           p_vect_args,
-                                           np.asarray(self._M_n_s),
-                                           np.asarray(self._M_beta_s),
-                                           self._d_vect_s),
-                                          dpdt_vect_s)
+            dpdt_vect_f = sp.lambdify((p_vect_solve,
+                                       p_vect_args,
+                                       self._n_vect_s,
+                                       self._beta_vect_s,
+                                       self._d_vect_s),
+                                      dpdt_vect_s)
 
-                dpdt_jac_f = sp.lambdify((p_vect_solve,
-                                          p_vect_args,
-                                          np.asarray(self._M_n_s),
-                                          np.asarray(self._M_beta_s),
-                                          self._d_vect_s),
-                                         dpdt_jac_s)
-
-            elif self._inter_funk_type is InterFuncType.logistic:
-                dpdt_vect_f = sp.lambdify((p_vect_solve,
-                                           p_vect_args,
-                                           np.asarray(self.M_k_s),
-                                           np.asarray(self.M_mu_s),
-                                           self._d_vect_s),
-                                          dpdt_vect_s)
-
-                dpdt_jac_f = sp.lambdify((p_vect_solve,
-                                          p_vect_args,
-                                          np.asarray(self.M_k_s),
-                                          np.asarray(self.M_mu_s),
-                                          self._d_vect_s),
-                                         dpdt_jac_s)
-
-            else:
-                raise Exception("Only InterFuncType hill and logistic are supported.")
-
+            dpdt_jac_f = sp.lambdify((p_vect_solve,
+                                      p_vect_args,
+                                      self._n_vect_s,
+                                      self._beta_vect_s,
+                                      self._d_vect_s),
+                                     dpdt_jac_s)
 
         return dpdt_vect_f, dpdt_jac_f
 
-    def get_function_args(self, constraint_vals: list|None=None):
+    def get_function_args(self,
+                          constraint_vals: list|None=None,
+                          d_base: float|list[float]=1.0,
+                          n_base: float|list[float]=3.0,
+                          beta_base: float|list[float]=2.0):
         '''
 
         '''
+        d_vect, n_vect, beta_vect = self.make_numerical_params(d_base, n_base, beta_base)
+
         if constraint_vals is not None:
-            if self._inter_funk_type is InterFuncType.hill:
-                function_args = (constraint_vals, self.M_n, self.M_beta, self.d_vect)
-            elif self._inter_funk_type is InterFuncType.logistic:
-                function_args = (constraint_vals, self.M_k, self.M_mu, self.d_vect)
-            else:
-                raise Exception("Only hill and logistic InterFuncTypes are supported.")
+            function_args = (constraint_vals, n_vect, beta_vect, d_vect)
 
         else:
-            if self._inter_funk_type is InterFuncType.hill:
-                function_args = (self.M_n, self.M_beta, self.d_vect)
-            elif self._inter_funk_type is InterFuncType.logistic:
-                function_args = (self.M_k, self.M_mu, self.d_vect)
-            else:
-                raise Exception("Only hill and logistic InterFuncTypes are supported.")
+            function_args = (n_vect, beta_vect, d_vect)
 
         return function_args
 
@@ -450,7 +416,7 @@ class ProbabilityNet(object):
     def generate_state_space(self,
                              p_inds: list[int],
                              N_space: int,
-                             pmin: float=1.0e-25) -> ndarray:
+                             pmin: float=1.0e-25) -> tuple[ndarray, list, ndarray]:
         '''
         Generate a discrete state space over the range of probabilities of
         each individual gene in the network.
@@ -464,12 +430,12 @@ class ProbabilityNet(object):
 
         N_pts = len(pGrid[0].ravel())
 
-        pM = np.zeros((N_pts, self._gmod.N_nodes))
+        pM = np.zeros((N_pts, self._N_nodes))
 
         for i, pGrid in enumerate(pGrid):
             pM[:, i] = pGrid.ravel()
 
-        return pM
+        return pM, p_lins, pGrid
 
     def solve_probability_equms(self,
                                 constrained_inds: list|None = None,
@@ -477,13 +443,13 @@ class ProbabilityNet(object):
                                 d_base: float = 1.0,
                                 n_base: float = 3.0,
                                 beta_base: float = 4.0,
-                                k_base: float = 10.0,
-                                mu_base: float = 0.25,
                                 N_space: int = 2,
                                 pmin: float=1.0e-9,
-                                tol: float=1.0e-15,
+                                search_tol: float=1.0e-15,
+                                sol_tol: float=1.0e-1,
                                 N_round_sol: int = 2,
-                                jac_derivatives_cols: bool=False,
+                                verbose: bool=True,
+                                save_file: str|None = None
                                 ):
         '''
         Solve for the equilibrium points of gene product probabilities in
@@ -493,22 +459,19 @@ class ProbabilityNet(object):
         dpdt_vect_f, dpdt_jac_f = self.create_numerical_dpdt(constrained_inds=constrained_inds,
                                                  constrained_vals=constrained_vals)
 
-        self.make_numerical_params(d_base=d_base,
-                                   n_base=n_base,
-                                   beta_base=beta_base,
-                                   k_base=k_base,
-                                   mu_base=mu_base)
-
         if constrained_inds is None or constrained_vals is None:
-            unconstrained_inds = self._gmod.nodes_index
+            unconstrained_inds = self._nodes_index
         else:
-            unconstrained_inds = np.setdiff1d(self._gmod.nodes_index, constrained_inds).tolist()
+            unconstrained_inds = np.setdiff1d(self._nodes_index, constrained_inds).tolist()
 
-        M_pstates = self.generate_state_space(unconstrained_inds, N_space, pmin)
+        M_pstates, _, _ = self.generate_state_space(unconstrained_inds, N_space, pmin)
 
         sol_Mo = []
 
-        function_args = self.get_function_args(constraint_vals=constrained_vals)
+        function_args = self.get_function_args(constraint_vals=constrained_vals,
+                                               d_base=d_base,
+                                               n_base=n_base,
+                                               beta_base=beta_base)
 
         for pvecto in M_pstates: # for each test vector:
             p_vect_sol = pvecto[unconstrained_inds] # get values for the genes we're solving for...
@@ -516,12 +479,12 @@ class ProbabilityNet(object):
             sol_roots = fsolve(dpdt_vect_f,
                                p_vect_sol,
                                args=function_args,
-                               xtol=tol,
+                               xtol=search_tol,
                                fprime=dpdt_jac_f,
-                               col_deriv=jac_derivatives_cols
+                               col_deriv=False,
                                )
 
-            p_eqms = np.zeros(self._gmod.N_nodes)
+            p_eqms = np.zeros(self._N_nodes)
             p_eqms[unconstrained_inds] = sol_roots
 
             if constrained_inds is not None and constrained_vals is not None:
@@ -533,44 +496,43 @@ class ProbabilityNet(object):
 
         sol_M = np.asarray(sol_Mo)[unique_inds]
 
-        stable_sol_M, sol_M_char = self.find_attractor_sols(sol_M,
+        stable_sol_M, sol_M_char = self._find_attractor_sols(sol_M,
                                                              dpdt_vect_f,
                                                              dpdt_jac_f,
                                                              function_args,
                                                              constrained_inds=constrained_inds,
-                                                             tol= 1.0e-1,
-                                                             verbose = True,
+                                                             tol= sol_tol,
+                                                             verbose = verbose,
                                                              unique_sols = True,
-                                                             sol_round = 1,
-                                                             save_file = None)
+                                                             sol_round = N_round_sol,
+                                                             save_file = save_file)
 
         return stable_sol_M, sol_M_char, sol_M
-
-    def find_attractor_sols(self,
-                            sols_0: list|ndarray,
-                            dpdt_vect_f: Callable,
-                            jac_f: Callable,
-                            func_args: tuple|list,
-                            constrained_inds: list | None = None,
-                            tol: float=1.0e-1,
-                            verbose: bool=True,
-                            unique_sols: bool = True,
-                            sol_round: int = 1,
-                            save_file: str|None = None
-                            ):
+    def _find_attractor_sols(self,
+                             sols_0: list|ndarray,
+                             dpdt_vect_f: Callable,
+                             jac_f: Callable,
+                             func_args: tuple|list,
+                             constrained_inds: list | None = None,
+                             tol: float=1.0e-1,
+                             verbose: bool=True,
+                             unique_sols: bool = True,
+                             sol_round: int = 1,
+                             save_file: str|None = None
+                             ):
         '''
 
         '''
 
-        eps = 1.0e-25  # we need a small value to add to avoid dividing by zero
+        eps = 1.0e-25 # Small value to avoid divide-by-zero in the jacobian
 
         sol_dicts_list = []
 
         if constrained_inds is None:
-            unconstrained_inds = self._gmod.nodes_index
+            unconstrained_inds = self._nodes_index
 
         else:
-            unconstrained_inds = np.setdiff1d(self._gmod.nodes_index, constrained_inds)
+            unconstrained_inds = np.setdiff1d(self._nodes_index, constrained_inds)
 
         for pminso in sols_0:
 
@@ -578,7 +540,7 @@ class ProbabilityNet(object):
 
             solution_dict['Minima Values'] = pminso
 
-            pmins = np.asarray(pminso) # add the small amount here, before calculating the jacobian
+            pmins = np.asarray(pminso) + eps # add the small amount here, before calculating the jacobian
 
             solution_dict['Change at Minima'] = dpdt_vect_f(pmins[unconstrained_inds], *func_args)
 
@@ -654,16 +616,16 @@ class ProbabilityNet(object):
 
             solsM_return = np.asarray(solsM)[inds_solsy].T
 
-        # if save_file is not None:
-        #     solsMi = np.asarray(solsM)
-        #     header = [f'State {i}' for i in range(solsMi.shape[0])]
-        #     with open(save_file, 'w', newline="") as file:
-        #         csvwriter = csv.writer(file)  # create a csvwriter object
-        #         csvwriter.writerow(header)  # write the header
-        #         csvwriter.writerow(sol_char_error)  # write the root error at steady-state
-        #         csvwriter.writerow(sol_char_list)  # write the attractor characterization
-        #         for si in solsMi.T:
-        #             csvwriter.writerow(si)  # write the soln data rows for each gene
+        if save_file is not None:
+            solsMi = np.asarray(solsM)
+            header = [f'State {i}' for i in range(solsMi.shape[0])]
+            with open(save_file, 'w', newline="") as file:
+                csvwriter = csv.writer(file)  # create a csvwriter object
+                csvwriter.writerow(header)  # write the header
+                csvwriter.writerow(sol_char_error)  # write the root error at steady-state
+                csvwriter.writerow(sol_char_list)  # write the attractor characterization
+                for si in solsMi.T:
+                    csvwriter.writerow(si)  # write the soln data rows for each gene
 
         return solsM_return, sol_dicts_list
 
