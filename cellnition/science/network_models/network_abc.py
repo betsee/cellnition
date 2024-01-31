@@ -52,7 +52,7 @@ class NetworkABC(object, metaclass=ABCMeta):
     edges_list
     '''
 
-    def __init__(self
+    def __init__(self, N_Nodes: int
                  ):
         '''
         Initialize the class and build and characterize a network.
@@ -92,9 +92,11 @@ class NetworkABC(object, metaclass=ABCMeta):
             For randomly constructed binomial-type networks, this parameter determines the probability of forming
             an edge. As p_edge increases, the number of network edges increases drammatically.
         '''
-        # build using Hill equations:
-        self._f_acti_s = f_acti_hill_s
-        self._f_inhi_s = f_inhi_hill_s
+        # Set some basic features of the network that may be overridden later:
+        self._N_nodes = N_Nodes
+        self._nodes_index = [i for i in range(self._N_nodes)]
+        self.regular_node_inds = self._nodes_index
+        self.nodes_list = [f'G{i}' for i in range(self._N_nodes)]
 
         # Initialize some object state variables:
         self._reduced_dims = False # Indicate that model is full dimensions

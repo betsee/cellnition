@@ -8,8 +8,6 @@ This module builds and plots a state transition diagram from a solution
 set and corresponding GeneNetworkModel.
 '''
 
-#FIXME: allow for combination signals (i.e. s0*s1) to be studied (optionally) in
-# the state transition diagram.
 import itertools
 import numpy as np
 from numpy import ndarray
@@ -37,8 +35,8 @@ class StateMachine(object):
         State transition network, showing how each steady-state of the
         network is reached through a signal transition. This is MultiDiGraph,
         which means parallel edges (meaning it is possible for different signals to
-        transition the system between the same two states). For similicity, self-loops
-        are omitted.  
+        transition the system between the same two states). For simplicity, self-loops
+        are omitted from the diagrams.
 
     Private Attributes
     ------------------
@@ -66,6 +64,14 @@ class StateMachine(object):
         self._solsM = solsM
 
         self.G_states = None # The state transition network
+
+    def _order_states_by_distance(self):
+        '''
+        Re-arrange the supplied solution matrix so that the states are
+        progressively closer to one another, in order to see a more
+        logical transition through the network with perturbation.
+        '''
+        pass
 
     def find_state_match(self,
                          solsM: ndarray,

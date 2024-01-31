@@ -4,22 +4,20 @@ for desired attributes.
 '''
 import numpy as np
 from numpy import ndarray
-from cellnition.science.network_models.gene_networks import GeneNetworkModel
+from cellnition.science.network_models.probability_networks import ProbabilityNet
 
+# FIXME: These need to be totally re-done with new probability networks...
 #FIXME allow these to run with constraints on signals or nodes
 # FIXME: we'd like to remove signal node edges and signal nodes from this search.
 
-def multistability_search(gmod: GeneNetworkModel,
+def multistability_search(pnet: ProbabilityNet,
                           N_multi: int = 1,
-                          tol: float = 1.0e-3,
+                          sol_tol: float = 1.0e-1,
                           N_iter: int = 100,
                           verbose: bool = True,
-                          N_space: int = 3,
-                          N_round_sol: int = 6,
+                          N_space: int = 2,
                           N_round_unique_sol: int = 1,
                           search_tol: float = 1.0e-15,
-                          add_interactions: bool = True,
-                          unique_sols: bool = True,
                           constraint_vals: list[float]|None = None,
                           constraint_inds: list[int]|None = None,
                           node_type_dict: dict|None = None,
@@ -30,7 +28,7 @@ def multistability_search(gmod: GeneNetworkModel,
 
     Parameters
     ----------
-    gmod: GeneNetworkModel
+    pnet: GeneNetworkModel
         An instance of the GeneNetworkModel with an analytical model built.
 
     N_multi : int
@@ -48,7 +46,7 @@ def multistability_search(gmod: GeneNetworkModel,
     search_round_sol: int=6
         The number of digits to round solutions to in state space search.
 
-    tol: float=1.0e-3
+    sol_tol: float=1.0e-3
         The tolerance below which solutions are considered robust enough to
         include in the solution set.
 
@@ -97,31 +95,31 @@ def multistability_search(gmod: GeneNetworkModel,
             raise Exception("Node constraint values must be same length as constrained node indices!")
 
     for i in range(N_iter):
-        edge_types = gmod.get_edge_types(p_acti=0.5)
-        gmod.build_analytical_model(edge_types=edge_types,
+        edge_types = pnet.get_edge_types(p_acti=0.5)
+        pnet.build_analytical_model(edge_types=edge_types,
                                     add_interactions=add_interactions,
                                     node_type_dict=node_type_dict)
 
         if constraint_vals is None or constraint_inds is None:
-            sols_0 = gmod.optimized_phase_space_search(Ns=N_space,
-                                                       cmax=1.5 * np.max(gmod.in_degree_sequence),
+            sols_0 = pnet.optimized_phase_space_search(Ns=N_space,
+                                                       cmax=1.5 * np.max(pnet.in_degree_sequence),
                                                        round_sol=N_round_sol,
                                                        tol=search_tol,
                                                        method="Root"
                                                        )
 
         else:
-            sols_0 = gmod.constrained_phase_space_search(constraint_vals,
-                                                               constraint_inds,
-                                                               Ns=N_space,
-                                                               cmax=1.5 * np.max(gmod.in_degree_sequence),
-                                                               tol=search_tol,
-                                                               round_sol=N_round_sol,
-                                                               method='Root'
-                                                               )
+            sols_0 = pnet.constrained_phase_space_search(constraint_vals,
+                                                         constraint_inds,
+                                                         Ns=N_space,
+                                                         cmax=1.5 * np.max(pnet.in_degree_sequence),
+                                                         tol=search_tol,
+                                                         round_sol=N_round_sol,
+                                                         method='Root'
+                                                         )
 
-        solsM = gmod.find_attractor_sols(sols_0,
-                                         tol=tol,
+        solsM = pnet.find_attractor_sols(sols_0,
+                                         tol=sol_tol,
                                          unique_sols=unique_sols,
                                          verbose=False,
                                          N_round=N_round_unique_sol)
@@ -143,19 +141,16 @@ def multistability_search(gmod: GeneNetworkModel,
     return numsol_list, multisols
 
 
-def param_space_search(gmod: GeneNetworkModel,
+def param_space_search(pnet: ProbabilityNet,
                        N_pts: int=3,
-                       ni: float|list = 3.0,
-                       B_min: float = 2.0,
-                       B_max: float = 10.0,
-                       sol_round: int = 1,
-                       N_search: int = 3,
-                       search_round_sol: int=6,
-                       tol: float=1.0e-3,
-                       cmax_multi: float=2.0,
+                       n_base: float | list = 3.0,
+                       beta_min: float = 2.0,
+                       beta_max: float = 10.0,
+                       N_unique_sol_round: int = 1,
+                       N_search: int = 2,
+                       sol_tol: float=1.0e-3,
+                       search_tol: float=1.0e-3,
                        verbose: bool=True,
-                       coi: float|list = 0.0,
-                       ki: float|list = 10.0,
                        constraint_vals: list[float] | None = None,
                        constraint_inds: list[int] | None = None
                        ) -> tuple[ndarray, list]:
@@ -166,22 +161,22 @@ def param_space_search(gmod: GeneNetworkModel,
 
     Parameters
     ----------
-    gmod: GeneNetworkModel
+    pnet: GeneNetworkModel
         An instance of the GeneNetworkModel with an analytical model built.
 
     N_pts: int=3
         The number of points to consider along each axis of the parameter space.
 
-    ni: float|list = 3.0
+    n_base: float|list = 3.0
         The Hill exponent (held constant).
 
-    B_min: float = 0.1
+    beta_min: float = 0.1
         The minimum value for the beta coefficient of each interaction edge.
 
-    B_max: float = 2.0
+    beta_max: float = 2.0
         The maximum value for the beta coefficient of each interaction edge.
 
-    sol_round: int = 1
+    N_unique_sol_round: int = 1
         Digit to round solutions to prior to determining uniqueness.
 
     N_search: int = 3
@@ -190,7 +185,7 @@ def param_space_search(gmod: GeneNetworkModel,
     search_round_sol: int=6
         The number of digits to round solutions to in state space search.
 
-    tol: float=1.0e-3
+    sol_tol: float=1.0e-3
         The tolerance below which solutions are considered robust enough to
         include in the solution set.
 
@@ -233,11 +228,11 @@ def param_space_search(gmod: GeneNetworkModel,
             raise Exception("Node constraint values must be same length as constrained node indices!")
 
     # What we wish to create is a parameter space search, as this net is small enough to enable that.
-    Blin = np.linspace(B_min, B_max, N_pts)
+    Blin = np.linspace(beta_min, beta_max, N_pts)
 
     param_lin_set = []
 
-    for edj_i in range(gmod.regular_edges_index):
+    for edj_i in range(pnet.regular_edges_index):
         param_lin_set.append(Blin*1) # append the linear K-vector choices for each edge
 
     # Create a set of matrices specifying the concentration grid for each
@@ -254,48 +249,48 @@ def param_space_search(gmod: GeneNetworkModel,
         print(param_M_SET[0].ravel().shape)
 
     if verbose:
-        print(f'Search cmax will be {cmax_multi * np.max(gmod.in_degree_sequence)}')
+        print(f'Search cmax will be {cmax_multi * np.max(pnet.in_degree_sequence)}')
 
     for param_set_i in param_test_set:
-        bvecti = param_set_i[0:gmod.N_edges].tolist()
+        bvecti = param_set_i[0:pnet.N_edges].tolist()
 
         # Here we set di = 1.0, realizing the di value has no effect on the
         # steady-state since it can be divided through the rate equation when
         # solving for the root.
-        gmod.create_parameter_vects(beta_base=bvecti, n_base=ni, d_base=1.0, co=coi, ki=ki)
+        pnet.create_parameter_vects(beta_base=bvecti, n_base=n_base, d_base=1.0, co=coi, ki=ki)
 
         if constraint_vals is None or constraint_inds is None:
 
-            sols_0 = gmod.optimized_phase_space_search(Ns=N_search,
-                                                       cmax=cmax_multi * np.max(gmod.in_degree_sequence),
+            sols_0 = pnet.optimized_phase_space_search(Ns=N_search,
+                                                       cmax=cmax_multi * np.max(pnet.in_degree_sequence),
                                                        round_sol=search_round_sol,
                                                        tol=1.0e-15,
                                                        method="Root"
                                                        )
 
         else:
-            sols_0 = gmod.constrained_phase_space_search(constraint_vals,
-                                                               constraint_inds,
-                                                               Ns=N_search,
-                                                               cmin=0.0,
-                                                               cmax=cmax_multi * np.max(gmod.in_degree_sequence),
-                                                               tol=1.0e-15,
-                                                               round_sol=search_round_sol,
-                                                               method='Root'
-                                                               )
+            sols_0 = pnet.constrained_phase_space_search(constraint_vals,
+                                                         constraint_inds,
+                                                         Ns=N_search,
+                                                         cmin=0.0,
+                                                         cmax=cmax_multi * np.max(pnet.in_degree_sequence),
+                                                         tol=1.0e-15,
+                                                         round_sol=search_round_sol,
+                                                         method='Root'
+                                                         )
 
-        solsM = gmod.find_attractor_sols(sols_0,
-                                         tol=tol,
+        solsM = pnet.find_attractor_sols(sols_0,
+                                         tol=sol_tol,
                                          verbose=False,
                                          unique_sols=True,
-                                         sol_round=sol_round)
+                                         sol_round=N_unique_sol_round)
 
         if len(solsM):
             num_sols = solsM.shape[1]
         else:
             num_sols = 0
 
-        bif_space_M.append([*gmod.beta_vect, num_sols])
+        bif_space_M.append([*pnet.beta_vect, num_sols])
         sols_space_M.append(solsM)
 
     return np.asarray(bif_space_M), sols_space_M

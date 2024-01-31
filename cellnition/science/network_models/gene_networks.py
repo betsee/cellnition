@@ -164,7 +164,7 @@ class GeneNetworkModel(NetworkABC):
 
         '''
 
-        super().__init__() # Initialize the base class
+        super().__init__(N_nodes) # Initialize the base class
 
         self._inter_fun_type = interaction_function_type
 

@@ -20,23 +20,26 @@ from sympy import MutableDenseMatrix
 from cellnition.science.network_models.network_abc import NetworkABC
 from cellnition.science.network_enums import EdgeType, InterFuncType, CouplingType
 
-# FIXME: I bet we can implement a node type via the same process
+# FIXME: I bet we can implement a node type via this same process
+# FIXME: This class should have a network-building start method so we get the external parameters needed
+# for use in different downstream tools (e.g. state_machine, network_workflow, etc)
+# FIXME: This needs to be able to solve steady-states only on a reduced node set (e.g. cycle nodes)
 
 class ProbabilityNet(NetworkABC):
     '''
     '''
     def __init__(self,
                  N_nodes: int,
-                 interaction_function_type: InterFuncType = InterFuncType.hill):
+                 interaction_function_type: InterFuncType = InterFuncType.logistic):
         '''
 
         '''
 
-        super().__init__()  # Initialize the base class
+        super().__init__(N_nodes)  # Initialize the base class
 
         self._N_nodes = N_nodes
         self._inter_fun_type = interaction_function_type
-        self._nodes_index = [i for i in range(self._N_nodes)]
+
 
         # Matrix Equations:
         # Matrix symbols to construct matrix equation bases:

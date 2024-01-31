@@ -11,7 +11,7 @@ points of a grid in a phase space.
 '''
 import numpy as np
 from numpy import ndarray
-from cellnition.science.network_models.gene_networks import GeneNetworkModel
+from cellnition.science.network_models.probability_networks import ProbabilityNet
 import pyvista as pv
 
 # FIXME: Add in linear plot
@@ -21,32 +21,28 @@ class PhaseSpace(object):
     '''
 
     '''
-    def __init__(self, gmod: GeneNetworkModel):
+    def __init__(self, pnet: ProbabilityNet):
         '''
         Initialize the PhaseSpace object.
 
         Parameters
         ----------
-        gmod : GeneNetworkModel
+        pnet : GeneNetworkModel
             An instance of GeneNetworkModel, which has an analytical model already built.
 
         '''
 
-        if gmod.dcdt_vect_f is None:
-            raise Exception("Must use the method build_analytical_model to generate attributes"
-                            "to use this function.")
-
-        self._gmod = gmod
+        self._pnet = pnet
 
     def brute_force_phase_space(self,
                                 N_pts: int=15,
-                                cmin: float=0.0,
-                                cmax: float|list=1.0,
-                                Bi: float|list=2.0,
-                                ni:float|list=3.0,
-                                di:float|list=1.0,
+                                constrained_inds: list|None = None,
+                                constrained_vals: list|None = None,
+                                beta_base: float | list=2.0,
+                                n_base: float | list=3.0,
+                                d_base: float | list=1.0,
                                 zer_thresh: float=0.01,
-                                include_signals: bool = False
+                                pmin: float=1.0e-8,
                                 ):
         '''
         Generate a sampling of the phase space of the system on multiple dimensions, and calculate
@@ -66,7 +62,7 @@ class PhaseSpace(object):
             Value or list of Hill constants for each concentration in the system.
             If a float is specified, all concentrations will use the same value.
 
-        ni : float|list=3.0
+        n_base : float|list=3.0
             Value or list of Hill exponents for each concentration in the system.
             If a float is specified, all concentrations will use the same value.
 
@@ -74,7 +70,7 @@ class PhaseSpace(object):
             Value or list of maximum production rates for each concentration in the system.
             If a float is specified, all concentrations will use the same value.
 
-        di : float|list=1.0
+        d_base : float|list=1.0
             Value or list of maximum decay rates for each concentration in the system.
             If a float is specified, all concentrations will use the same value.
 
@@ -87,40 +83,28 @@ class PhaseSpace(object):
 
         '''
 
-        # Create parameter vectors for the model:
-        self._gmod.create_parameter_vects(Bi, ni, di)
-
-        if self._gmod._reduced_dims and self._gmod._solved_analytically is False:
-            N_nodes = len(self._gmod._c_vect_reduced_s)
-            dcdt_vect_f = self._gmod.dcdt_vect_reduced_f
-            c_vect_s = self._gmod._c_vect_reduced_s
+        dcdt_vect_f, dcdt_jac_f = self._pnet.create_numerical_dcdt(constrained_inds=constrained_inds,
+                                                             constrained_vals=constrained_vals)
+        if constrained_inds is None or constrained_vals is None:
+            unconstrained_inds = self._pnet._nodes_index
         else:
-            N_nodes = self._gmod._N_nodes
-            dcdt_vect_f = self._gmod.dcdt_vect_f
-            c_vect_s = self._gmod._c_vect_s
+            unconstrained_inds = np.setdiff1d(self._pnet._nodes_index, constrained_inds).tolist()
 
-        c_vect_set, C_M_SET, c_lin_set = self._gmod.generate_state_space(c_vect_s,
-                                                                   Ns=N_pts,
-                                                                   cmin=cmin,
-                                                                   cmax=cmax,
-                                                                   include_signals=include_signals)
+        c_vect_set, c_lin_set, C_M_SET = self._pnet.generate_state_space(unconstrained_inds,
+                                                                         N_pts,
+                                                                         pmin)
 
         M_shape = C_M_SET[0].shape
 
         dcdt_M = np.zeros(c_vect_set.shape)
 
+        function_args = self._pnet.get_function_args(constraint_vals=constrained_vals,
+                                               d_base=d_base,
+                                               n_base=n_base,
+                                               beta_base=beta_base)
+
         for i, c_vecti in enumerate(c_vect_set):
-            if self._gmod._include_process is False:
-                dcdt_i = dcdt_vect_f(c_vecti,
-                                     self._gmod.d_vect,
-                                     self._gmod.beta_vect,
-                                     self._gmod.n_vect)
-            else:
-                dcdt_i = dcdt_vect_f(c_vecti,
-                                     self._gmod.d_vect,
-                                     self._gmod.beta_vect,
-                                     self._gmod.n_vect,
-                                     self._gmod.process_params_f)
+            dcdt_i = dcdt_vect_f(c_vecti, *function_args)
             dcdt_M[i] = dcdt_i * 1
 
         dcdt_M_set = []

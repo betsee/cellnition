@@ -12,7 +12,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import networkx as nx
 from cellnition.science.network_enums import EdgeType, GraphType, NodeType
-from cellnition.science.network_models.gene_networks import GeneNetworkModel
+from cellnition.science.network_models.probability_networks import ProbabilityNet
 from cellnition.science.netplot import plot_network
 from cellnition.science.gene_knockout import GeneKnockout
 from cellnition.science.phase_space_searches import multistability_search
@@ -148,26 +148,23 @@ class NetworkWorkflow(object):
         return gmod, update_string, fname_base
 
     def work_frame(self,
-                   gmod: GeneNetworkModel,
+                   pnet: ProbabilityNet,
                    save_path: str,
                    fname_base: str,
                    i_frame: int=0,
                    verbose: bool=True,
                    reduce_dims: bool = False,
-                   Bi: float | list = 2.0,
-                   ni: float|list = 3.0,
-                   di: float|list = 1.0,
-                   coi: float|list = 0.0,
-                   ki: float|list = 10.0,
+                   beta_base: float | list = 2.0,
+                   n_base: float | list = 3.0,
+                   d_base: float | list = 1.0,
                    add_interactions: bool = True,
                    edge_types: list[EdgeType]|None = None,
                    edge_type_search: bool = True,
-                   N_edge_search: int = 5,
+                   edge_type_search_iterations: int = 5,
                    find_solutions: bool = True,
                    knockout_experiments: bool = True,
                    sol_search_tol: float = 1.0e-15,
                    N_search_space: int = 3,
-                   N_round_sol: int = 6,
                    N_round_unique_sol: int = 1,
                    sol_unique_tol: float = 1.0e-1,
                    sol_ko_tol: float = 1.0e-1,
@@ -199,25 +196,25 @@ class NetworkWorkflow(object):
             # print(update_string)
 
         # set node types to the network:
-        gmod.set_node_types(node_type_dict=node_type_dict, pure_gene_edges_only=pure_gene_edges_only)
+        pnet.set_node_types(node_type_dict=node_type_dict, pure_gene_edges_only=pure_gene_edges_only)
 
         if edge_types is None:
             if edge_type_search is False:
                 # Create random edge types:
-                edge_types = gmod.get_edge_types(p_acti=0.5)
+                edge_types = pnet.get_edge_types(p_acti=0.5)
 
             else:
-                gmod.create_parameter_vects(beta_base=Bi, n_base=ni, d_base=di, co=coi, ki=ki)
-                numsols, multisols = multistability_search(gmod, 1,
-                                                                tol=sol_unique_tol,
-                                                                N_iter=N_edge_search,
-                                                                verbose=extra_verbose,
-                                                                add_interactions=add_interactions,
-                                                                N_round_unique_sol=N_round_unique_sol,
-                                                                unique_sols=True,
-                                                                constraint_vals=constraint_vals,
-                                                                constraint_inds=constraint_inds,
-                                                                node_type_dict=node_type_dict
+                pnet.create_parameter_vects(beta_base=beta_base, n_base=n_base, d_base=d_base, co=coi, ki=ki)
+                numsols, multisols = multistability_search(pnet, 1,
+                                                           sol_tol=sol_unique_tol,
+                                                           N_iter=edge_type_search_iterations,
+                                                           verbose=extra_verbose,
+                                                           add_interactions=add_interactions,
+                                                           N_round_unique_sol=N_round_unique_sol,
+                                                           unique_sols=True,
+                                                           constraint_vals=constraint_vals,
+                                                           constraint_inds=constraint_inds,
+                                                           node_type_dict=node_type_dict
                                                            )
 
                 i_max = (np.asarray(numsols) == np.max(numsols)).nonzero()[0]
@@ -225,13 +222,13 @@ class NetworkWorkflow(object):
                 _, edge_types = multisols[i_max[0]]
 
         # set edge types to the network:
-        gmod.edge_types = edge_types
-        gmod.set_edge_types(gmod.edge_types, add_interactions)
+        pnet.edge_types = edge_types
+        pnet.set_edge_types(pnet.edge_types, add_interactions)
 
         # save the randomly generated network as a text file:
         gfile = f'network_{fname_base}.gml'
         save_gfile = os.path.join(save_path, gfile)
-        gmod.save_network(save_gfile)
+        pnet.save_network(save_gfile)
 
         # Save the network images:
         graph_net = f'hier_graph_{fname_base}.png'
@@ -241,58 +238,59 @@ class NetworkWorkflow(object):
         save_graph_net_circo = os.path.join(save_path, graph_net_c)
 
         # Highlight the hierarchical nature of the graph and info flow:
-        gp=plot_network(gmod.nodes_list,
-                    gmod.edges_list,
-                    gmod.node_types,
-                    gmod.edge_types,
-                    node_vals = gmod.hier_node_level,
-                    val_cmap = 'Greys_r',
-                    save_path=save_graph_net,
-                    layout='dot',
-                    rev_font_color=True
-                   )
+        gp=plot_network(pnet.nodes_list,
+                        pnet.edges_list,
+                        pnet.node_types,
+                        pnet.edge_types,
+                        node_vals = pnet.hier_node_level,
+                        val_cmap = 'Greys_r',
+                        save_path=save_graph_net,
+                        layout='dot',
+                        rev_font_color=True
+                        )
 
         # Highlight the existance of a "core" graph:
-        cycle_tags = np.zeros(gmod._N_nodes)
-        cycle_tags[gmod.nodes_in_cycles] = 1.0
+        cycle_tags = np.zeros(pnet._N_nodes)
+        cycle_tags[pnet.nodes_in_cycles] = 1.0
 
-        gp=plot_network(gmod.nodes_list,
-            gmod.edges_list,
-            gmod.node_types,
-            gmod.edge_types,
-            node_vals = cycle_tags,
-            val_cmap = 'Blues',
-            save_path=save_graph_net_circo,
-            layout='circo',
-            rev_font_color=False
-           )
+        gp=plot_network(pnet.nodes_list,
+                        pnet.edges_list,
+                        pnet.node_types,
+                        pnet.edge_types,
+                        node_vals = cycle_tags,
+                        val_cmap = 'Blues',
+                        save_path=save_graph_net_circo,
+                        layout='circo',
+                        rev_font_color=False,
+                        vminmax = (0.0, 1.0)
+                        )
 
         # Plot and save the degree distribution for this graph:
         graph_deg = f'degseq_{fname_base}.png'
         save_graph_deg = os.path.join(save_path, graph_deg)
-        fig, ax = gmod.plot_degree_distributions()
+        fig, ax = pnet.plot_degree_distributions()
         fig.savefig(save_graph_deg, dpi=300, transparent=True, format='png')
         plt.close(fig)
 
         if find_solutions:
 
-            gmod.build_analytical_model(edge_types=edge_types,
+            pnet.build_analytical_model(edge_types=edge_types,
                                         add_interactions=add_interactions,
                                         node_type_dict=node_type_dict,
                                         pure_gene_edges_only=pure_gene_edges_only,
                                         )
 
-            gmod.create_parameter_vects(beta_base=Bi, n_base=ni, d_base=di, co=coi, ki=ki)
+            pnet.create_parameter_vects(beta_base=beta_base, n_base=n_base, d_base=d_base, co=coi, ki=ki)
 
             if reduce_dims:  # If reduce dimensions then perform this calculation
-                gmod.reduce_model_dimensions()
+                pnet.reduce_model_dimensions()
 
-            if gmod._reduced_dims and gmod._solved_analytically is False:  # if dim reduction was attempted and was successful...
+            if pnet._reduced_dims and pnet._solved_analytically is False:  # if dim reduction was attempted and was successful...
                 # determine the size of the reduced dimensions vector:
-                N_reduced_dims = len(gmod._dcdt_vect_reduced_s)
+                N_reduced_dims = len(pnet._dcdt_vect_reduced_s)
 
-            elif gmod._solved_analytically:
-                N_reduced_dims = gmod._N_nodes
+            elif pnet._solved_analytically:
+                N_reduced_dims = pnet._N_nodes
 
             else:  # otherwise assign it to zero
                 N_reduced_dims = 0
@@ -306,36 +304,36 @@ class NetworkWorkflow(object):
             eqn_net_file = f'Eqns_{fname_base}.csv'
             save_eqn_net = os.path.join(save_path, eqn_net_file)
 
-            gmod.save_model_equations(save_eqn_render, save_eqn_renderr, save_eqn_net)
+            pnet.save_model_equations(save_eqn_render, save_eqn_renderr, save_eqn_net)
 
             if add_interactions is True:
-                cmax = 1.5*np.max(gmod.in_degree_sequence)
+                cmax = 1.5*np.max(pnet.in_degree_sequence)
             else:
                 cmax = 1.5
 
             if constraint_inds is None or constraint_vals is None:
                 print("Solving experiments *without* constraints")
-                sols_0 = gmod.optimized_phase_space_search(Ns=N_search_space,
-                                                   cmax=cmax,
-                                                   round_sol=N_round_sol,
-                                                   tol=sol_search_tol,
-                                                   method=solver_method
-                                                  )
+                sols_0 = pnet.optimized_phase_space_search(Ns=N_search_space,
+                                                           cmax=cmax,
+                                                           round_sol=N_round_sol,
+                                                           tol=sol_search_tol,
+                                                           method=solver_method
+                                                           )
 
             else: # otherwise, if node constraints are defined:
                 print("Solving experiments *with* constraints")
-                sols_0 = gmod.constrained_phase_space_search(constraint_vals,
-                                                                   constraint_inds,
-                                                                   Ns=N_search_space,
-                                                                   cmax=cmax,
-                                                                   tol=sol_search_tol,
-                                                                   round_sol=N_round_sol,
-                                                                   method=solver_method
-                                                                   )
+                sols_0 = pnet.constrained_phase_space_search(constraint_vals,
+                                                             constraint_inds,
+                                                             Ns=N_search_space,
+                                                             cmax=cmax,
+                                                             tol=sol_search_tol,
+                                                             round_sol=N_round_sol,
+                                                             method=solver_method
+                                                             )
 
             soln_fn = f'soldat_{fname_base}.csv'
             save_solns = os.path.join(save_path, soln_fn)
-            solsM = gmod.find_attractor_sols(sols_0,
+            solsM = pnet.find_attractor_sols(sols_0,
                                              tol=sol_unique_tol,
                                              N_round=N_round_unique_sol,
                                              verbose=extra_verbose,
@@ -350,17 +348,17 @@ class NetworkWorkflow(object):
             fign = f'solArray_{fname_base}.png'
             figsave = os.path.join(save_path, fign)
 
-            fig, ax = gmod.plot_sols_array(solsM, figsave)
+            fig, ax = pnet.plot_sols_array(solsM, figsave)
             plt.close(fig)
 
             # Perform knockout experiments:
             if add_interactions is True:
-                cmax = 1.5 * np.max(gmod.in_degree_sequence)
+                cmax = 1.5 * np.max(pnet.in_degree_sequence)
             else:
-                cmax = 1.5*(1 / np.max(np.asarray(gmod.d_vect)))
+                cmax = 1.5*(1 / np.max(np.asarray(pnet.d_vect)))
 
             if knockout_experiments:
-                gko = GeneKnockout(gmod)
+                gko = GeneKnockout(pnet)
                 knockout_sol_set, knockout_matrix = gko.gene_knockout_ss_solve(
                                                                            Ns=N_search_space,
                                                                        cmin=0.0,
@@ -392,20 +390,20 @@ class NetworkWorkflow(object):
 
         graph_data = {'Index': i_frame,
                       'Base File': fname_base,
-                      'Graph Type': gmod._graph_type.name,
-                      'Alpha': np.round(1.0 - gmod._beta - gmod._gamma,2),
-                      'Beta': gmod._beta, # this only applies for scale-free graphs
-                      'Gamma': gmod._gamma,
-                      'Delta in': gmod._delta_in,
-                      'Delta out': gmod._delta_out,
-                      'Edge p': gmod._p_edge, # this only applies for binomial graphs
-                      'N Cycles': gmod.N_cycles,
-                      'N Nodes': gmod._N_nodes,
-                      'N Edges': gmod.N_edges,
-                      'Out-Degree Max': gmod.out_dmax,
-                      'In-Degree Max': gmod.in_dmax,
-                      'Democracy Coefficient': gmod.dem_coeff,
-                      'Hierarchical Incoherence': gmod.hier_incoherence,
+                      'Graph Type': pnet._graph_type.name,
+                      'Alpha': np.round(1.0 - pnet._beta - pnet._gamma, 2),
+                      'Beta': pnet._beta,  # this only applies for scale-free graphs
+                      'Gamma': pnet._gamma,
+                      'Delta in': pnet._delta_in,
+                      'Delta out': pnet._delta_out,
+                      'Edge p': pnet._p_edge,  # this only applies for binomial graphs
+                      'N Cycles': pnet.N_cycles,
+                      'N Nodes': pnet._N_nodes,
+                      'N Edges': pnet.N_edges,
+                      'Out-Degree Max': pnet.out_dmax,
+                      'In-Degree Max': pnet.in_dmax,
+                      'Democracy Coefficient': pnet.dem_coeff,
+                      'Hierarchical Incoherence': pnet.hier_incoherence,
                       'N Unique Solutions': num_sols,
                       'N Reduced Dims': N_reduced_dims}
 
@@ -447,29 +445,6 @@ class NetworkWorkflow(object):
 
         return graph_files_list
 
-
-
-    # gmod_list = []
-    # for i, graph_file in enumerate(graph_files_list):
-    #     print(i)
-    #     read_gfile = os.path.join(read_path, graph_file)
-    #     gmod = sim.read_network(read_gfile, add_interactions = True, build_analytical=True)
-
-    #     # What we want to see is: can the model be reduced?
-    #     gmod.reduce_model_dimensions()
-
-    #     eqn_render = f'f{graph_file[0:-4]}_Eqn.png'
-    #     save_eqn_render = os.path.join(save_path, eqn_render)
-
-    #     eqn_renderr = f'f{graph_file[0:-4]}_Eqnr.png'
-    #     save_eqn_renderr = os.path.join(save_path, eqn_renderr)
-
-    #     eqn_net_file = f'{graph_file[0:-4]}_Eqns.csv'
-    #     save_eqn_net = os.path.join(save_path, eqn_net_file)
-
-    #     gmod.save_model_equations(save_eqn_render, save_eqn_renderr, save_eqn_net)
-
-    #     gmod_list.append(gmod)
 
 
 
