@@ -4,7 +4,7 @@ for desired attributes.
 '''
 import numpy as np
 from numpy import ndarray
-from cellnition.science.gene_networks import GeneNetworkModel
+from cellnition.science.network_models.gene_networks import GeneNetworkModel
 
 #FIXME allow these to run with constraints on signals or nodes
 # FIXME: we'd like to remove signal node edges and signal nodes from this search.
@@ -262,7 +262,7 @@ def param_space_search(gmod: GeneNetworkModel,
         # Here we set di = 1.0, realizing the di value has no effect on the
         # steady-state since it can be divided through the rate equation when
         # solving for the root.
-        gmod.create_parameter_vects(Bi=bvecti, ni=ni, di=1.0, co=coi, ki=ki)
+        gmod.create_parameter_vects(beta_base=bvecti, n_base=ni, d_base=1.0, co=coi, ki=ki)
 
         if constraint_vals is None or constraint_inds is None:
 
@@ -295,7 +295,7 @@ def param_space_search(gmod: GeneNetworkModel,
         else:
             num_sols = 0
 
-        bif_space_M.append([*gmod.B_vect, num_sols])
+        bif_space_M.append([*gmod.beta_vect, num_sols])
         sols_space_M.append(solsM)
 
     return np.asarray(bif_space_M), sols_space_M

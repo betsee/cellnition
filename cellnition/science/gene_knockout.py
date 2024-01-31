@@ -8,14 +8,10 @@ This module implements a gene knockout experiment on a network model, where each
 gene in the network is silenced and the new steady-states or dynamic activity is
 determined.
 '''
-import csv
 import numpy as np
 from numpy import ndarray
 import matplotlib.pyplot as plt
-from scipy.optimize import minimize, fsolve
-import sympy as sp
-from cellnition.science.network_enums import EdgeType, GraphType, NodeType
-from cellnition.science.gene_networks import GeneNetworkModel
+from cellnition.science.network_models.probability_networks import ProbabilityNet
 
 # FIXME: DOCUMENT THROUGHOUT
 
@@ -26,33 +22,32 @@ class GeneKnockout(object):
     the behaviour of the network re-assessed.
 
     '''
-    def __init__(self, gmod: GeneNetworkModel):
+    def __init__(self, pnet: ProbabilityNet):
         '''
         Initialize the class.
 
         Parameters
         ----------
-        gmod : GeneNetworkModel
+        pnet : GeneNetworkModel
             An instance of GeneNetworkModel with an analytical model built;
             forms the basis of the knockout experiment.
 
         '''
-        self._gmod = gmod # initialize the system
+        self._pnet = pnet # initialize the system
 
     def gene_knockout_ss_solve(self,
                                Ns: int = 3,
-                               cmin: float = 0.0,
-                               cmax: float = 1.0,
                                tol: float = 1.0e-15,
-                               round_sol: int = 6,
                                round_unique_sol: int = 2,
-                               unique_sols: bool = True,
                                sol_tol: float = 1.0e-1,
+                               d_base: float = 1.0,
+                               n_base: float = 3.0,
+                               beta_base: float = 4.0,
                                verbose: bool = True,
                                save_file_basename: str | None = None,
                                constraint_vals: list[float]|None = None,
                                constraint_inds: list[int]|None = None,
-                               solver_method: str = 'Root'
+                               p_min: float=1.0e-8
                                ):
         '''
         Performs a sequential knockout of all genes in the network, computing all possible steady-state
@@ -60,11 +55,6 @@ class GeneKnockout(object):
         as the knockouts aren't a temporary perturbation, but a long-term silencing.
 
         '''
-        print("Knockout Experiments-----")
-
-        if self._gmod.dcdt_vect_s is None:
-            raise Exception("Must use the method build_analytical_model in GeneNetworkModel "
-                            "to generate attributes required to run gene knockout sims.")
 
         if constraint_vals is not None and constraint_inds is not None:
             if len(constraint_vals) != len(constraint_inds):
@@ -74,47 +64,31 @@ class GeneKnockout(object):
 
         if save_file_basename is not None:
             save_file_list = [f'{save_file_basename}_allc.csv']
-            save_file_list.extend([f'{save_file_basename}_ko_c{i}.csv' for i in range(self._gmod.N_nodes)])
+            save_file_list.extend([f'{save_file_basename}_ko_c{i}.csv' for i in range(self._pnet._N_nodes)])
 
         else:
             save_file_list = [None]
-            save_file_list.extend([None for i in range(self._gmod.N_nodes)])
+            save_file_list.extend([None for i in range(self._pnet._N_nodes)])
 
-        if constraint_vals is None or constraint_inds is None:
-            # Solve the system with all concentrations:
-            sols_0 = self._gmod.optimized_phase_space_search(Ns=Ns,
-                                                             cmin=cmin,
-                                                             cmax=cmax,
-                                                             round_sol=round_sol,
-                                                             tol=tol,
-                                                             method=solver_method
-                                                             )
 
-        else:
-            sols_0 = self._gmod.constrained_phase_space_search(constraint_vals,
-                                                               constraint_inds,
-                                                               Ns=Ns,
-                                                               cmin=cmin,
-                                                               cmax=cmax,
-                                                               tol=tol,
-                                                               round_sol=round_sol,
-                                                               method=solver_method
-                                                               )
-
-        # Screen only for attractor solutions:
-        solsM = self._gmod.find_attractor_sols(sols_0,
-                                         tol=sol_tol,
-                                         verbose=verbose,
-                                         unique_sols=unique_sols,
-                                         sol_round=round_unique_sol,
-                                         save_file=save_file_list[0])
+        solsM, sol_M0_char, sols_0 = self._pnet.solve_probability_equms(constrained_inds=constraint_inds,
+                                                                        constrained_vals=constraint_vals,
+                                                                        d_base=d_base,
+                                                                        n_base=n_base,
+                                                                        beta_base=beta_base,
+                                                                        N_space=Ns,
+                                                                        pmin=p_min,
+                                                                        search_tol=tol,
+                                                                        sol_tol=sol_tol,
+                                                                        N_round_sol=round_unique_sol
+                                                                        )
 
         if verbose:
             print(f'-------------------')
 
         knockout_sol_set.append(solsM.copy()) # append the "wild-type" solution set
 
-        for i in self._gmod.regular_node_inds:  # Include only 'gene' nodes as silenced
+        for i in self._pnet.regular_node_inds:  # Include only 'gene' nodes as silenced
 
             if constraint_vals is None or constraint_inds is None:
                 # Gene knockout is the only constraint:
@@ -125,23 +99,17 @@ class GeneKnockout(object):
                 cvals = constraint_vals + [0.0]
                 cinds = constraint_inds + [i]
 
-            sols_1 = self._gmod.constrained_phase_space_search(cvals,
-                                                               cinds,
-                                                               Ns=Ns,
-                                                               cmin=cmin,
-                                                               cmax=cmax,
-                                                               tol=tol,
-                                                               round_sol=round_sol,
-                                                               method=solver_method
-                                                               )
-
-            # Screen only for attractor solutions:
-            solsM = self._gmod.find_attractor_sols(sols_1,
-                                             tol=sol_tol,
-                                             verbose=verbose,
-                                             unique_sols=unique_sols,
-                                             sol_round=round_unique_sol,
-                                             save_file=save_file_list[i + 1])
+            solsM, sol_M0_char, sols_1 = self._pnet.solve_probability_equms(constrained_inds=constraint_inds,
+                                                                        constrained_vals=constraint_vals,
+                                                                        d_base=d_base,
+                                                                        n_base=n_base,
+                                                                        beta_base=beta_base,
+                                                                        N_space=Ns,
+                                                                        pmin=p_min,
+                                                                        search_tol=tol,
+                                                                        sol_tol=sol_tol,
+                                                                        N_round_sol=round_unique_sol
+                                                                            )
 
             if verbose:
                 print(f'-------------------')
@@ -152,7 +120,7 @@ class GeneKnockout(object):
         ko_M = None
         for i, ko_aro in enumerate(knockout_sol_set):
             if len(ko_aro) == 0:
-                ko_ar = np.asarray([np.zeros(self._gmod.N_nodes)]).T
+                ko_ar = np.asarray([np.zeros(self._pnet._N_nodes)]).T
             else:
                 ko_ar = ko_aro
 
@@ -167,7 +135,13 @@ class GeneKnockout(object):
                                  tend: float,
                                  dt: float,
                                  cvecti_o: ndarray|list,
-                                 dt_samp: float|None = None):
+                                 dt_samp: float|None = None,
+                                 d_base: float = 1.0,
+                                 n_base: float = 3.0,
+                                 beta_base: float = 4.0,
+                                 constraint_vals: list[float] | None = None,
+                                 constraint_inds: list[int] | None = None,
+                                 ):
         '''
 
         '''
@@ -177,63 +151,66 @@ class GeneKnockout(object):
 
         tvect = np.linspace(0.0, tend, Nt)
 
-        # sampling compression
-        if dt_samp is not None:
-            sampr = int(dt_samp / dt)
-            tvect_samp = tvect[0::sampr]
-            tvectr = tvect_samp
-        else:
-            tvect_samp = None
-            tvectr = tvect
-
-        conc_vect_ko = []
-        ko_M = [] # matrix storing solutions at steady state
+        conc_timevect_ko = []
+        knockout_sol_set = [] # matrix storing solutions at steady state
 
         # make a time-step update vector so we can update any sensors as
         # an absolute reading (dt = 1.0) while treating the kinetics of the
         # other node types:
-        dtv = 1.0e-3 * np.ones(self._gmod.N_nodes)
-        dtv[self._gmod.sensor_node_inds] = 1.0
+        dtv = 1.0e-3 * np.ones(self._pnet._N_nodes)
+        dtv[self._pnet.sensor_node_inds] = 1.0
 
-        function_args = self._gmod._fetch_function_args_f()
         wild_type_sim = False
-        for i in self._gmod.regular_node_inds:  # Step through each regular gene index
-            c_vect_time = []
+        for i in self._pnet.regular_node_inds:  # Step through each regular gene index
             cvecti = cvecti_o.copy()  # start all nodes off at the supplied initial conditions
 
             if wild_type_sim is False: # perform a wild-type simulation
-                for ti, tt in enumerate(tvect):
-                    # for the first run, do a wild-type simulation
-                    dcdt = self._gmod.dcdt_vect_f(cvecti, *function_args)
-                    cvecti += dtv * dcdt
+                c_vect_time, tvectr = self._pnet.run_time_sim(tend,
+                                                         dt,
+                                                         cvecti,
+                                                         sig_inds=None,
+                                                         sig_times=None,
+                                                         sig_mag=None,
+                                                         dt_samp=dt_samp,
+                                                         constrained_inds=constraint_inds,
+                                                         constrained_vals=constraint_vals,
+                                                         d_base=d_base,
+                                                         n_base=n_base,
+                                                         beta_base=beta_base
+                                                         )
 
-                    if tt in tvect_samp:
-                        c_vect_time.append(cvecti.copy())
-
-                ko_M.append(cvecti.copy())  # append the wt steady-state to knockout ss solutions array
-                conc_vect_ko.append(c_vect_time)
+                knockout_sol_set.append(1*c_vect_time[-1])  # append the wt steady-state to knockout ss solutions array
+                conc_timevect_ko.append(c_vect_time)
                 wild_type_sim = True # set to true so it's not done again
 
             cvecti = cvecti_o.copy()  # reset nodes back to the supplied initial conditions
-            c_vect_time = []
 
-            for ti, tt in enumerate(tvect):
-                dcdt = self._gmod.dcdt_vect_f(cvecti, *function_args)
-                cvecti += dtv * dcdt
+            # Now alter node values as signals
+            tsig = [(tvect[int(Nt/2)], 2*tend)]  # start and end time for the silencing
+            isig = [i] # index for silencing
+            magsig = [(1.0, 0.0)] # magnitude of signal switch before and after
 
-                if ti > int(Nt / 2):
-                    cvecti[i] = 0.0  # force the silencing of the k.o. gene concentration
+            c_vect_time, tvectr = self._pnet.run_time_sim(tend,
+                                                     dt,
+                                                     cvecti,
+                                                     sig_inds=tsig,
+                                                     sig_times=isig,
+                                                     sig_mag=magsig,
+                                                     dt_samp=dt_samp,
+                                                     constrained_inds=constraint_inds,
+                                                     constrained_vals=constraint_vals,
+                                                     d_base=d_base,
+                                                     n_base=n_base,
+                                                     beta_base=beta_base
+                                                     )
 
-                if tt in tvect_samp:
-                    c_vect_time.append(cvecti.copy())
+            knockout_sol_set.append(1 * c_vect_time[-1])  # append the wt steady-state to knockout ss solutions array
+            conc_timevect_ko.append(c_vect_time)
 
-                ko_M.append(cvecti.copy()) # append the last solution set to the steady-state matrix
-                conc_vect_ko.append(c_vect_time.copy())
+        knockout_sol_set = np.asarray(knockout_sol_set).T
+        conc_timevect_ko = np.asarray(conc_timevect_ko)
 
-        ko_M = np.asarray(ko_M).T
-        conc_vect_ko = np.asarray(conc_vect_ko)
-
-        return tvectr, conc_vect_ko, ko_M
+        return tvectr, conc_timevect_ko, knockout_sol_set
 
     def plot_knockout_arrays(self, knockout_sol_set: list | ndarray, figsave: str=None):
             '''
@@ -260,7 +237,7 @@ class GeneKnockout(object):
                 if len(solsMio):
                     solsMi = solsMio
                 else:
-                    solsMi = np.asarray([np.zeros(self._gmod.N_nodes)]).T
+                    solsMi = np.asarray([np.zeros(self._pnet._N_nodes)]).T
                 axi.imshow(solsMi, aspect="equal", vmax=vmax, vmin=vmin, cmap=cmap)
                 axi.axis('off')
                 if i != 0:

@@ -9,16 +9,9 @@ allowing for plots and visualizations of phase portraits and optimization functi
 points of a grid in a phase space.
 
 '''
-import csv
 import numpy as np
 from numpy import ndarray
-import matplotlib.pyplot as plt
-from matplotlib import colors
-from matplotlib import colormaps
-from scipy.optimize import minimize, fsolve
-import sympy as sp
-from cellnition.science.network_enums import EdgeType, GraphType, NodeType
-from cellnition.science.gene_networks import GeneNetworkModel
+from cellnition.science.network_models.gene_networks import GeneNetworkModel
 import pyvista as pv
 
 # FIXME: Add in linear plot
@@ -98,13 +91,13 @@ class PhaseSpace(object):
         self._gmod.create_parameter_vects(Bi, ni, di)
 
         if self._gmod._reduced_dims and self._gmod._solved_analytically is False:
-            N_nodes = len(self._gmod.c_vect_reduced_s)
+            N_nodes = len(self._gmod._c_vect_reduced_s)
             dcdt_vect_f = self._gmod.dcdt_vect_reduced_f
-            c_vect_s = self._gmod.c_vect_reduced_s
+            c_vect_s = self._gmod._c_vect_reduced_s
         else:
-            N_nodes = self._gmod.N_nodes
+            N_nodes = self._gmod._N_nodes
             dcdt_vect_f = self._gmod.dcdt_vect_f
-            c_vect_s = self._gmod.c_vect_s
+            c_vect_s = self._gmod._c_vect_s
 
         c_vect_set, C_M_SET, c_lin_set = self._gmod.generate_state_space(c_vect_s,
                                                                    Ns=N_pts,
@@ -120,12 +113,12 @@ class PhaseSpace(object):
             if self._gmod._include_process is False:
                 dcdt_i = dcdt_vect_f(c_vecti,
                                      self._gmod.d_vect,
-                                     self._gmod.B_vect,
+                                     self._gmod.beta_vect,
                                      self._gmod.n_vect)
             else:
                 dcdt_i = dcdt_vect_f(c_vecti,
                                      self._gmod.d_vect,
-                                     self._gmod.B_vect,
+                                     self._gmod.beta_vect,
                                      self._gmod.n_vect,
                                      self._gmod.process_params_f)
             dcdt_M[i] = dcdt_i * 1

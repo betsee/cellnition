@@ -12,7 +12,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import networkx as nx
 from cellnition.science.network_enums import EdgeType, GraphType, NodeType
-from cellnition.science.gene_networks import GeneNetworkModel
+from cellnition.science.network_models.gene_networks import GeneNetworkModel
 from cellnition.science.netplot import plot_network
 from cellnition.science.gene_knockout import GeneKnockout
 from cellnition.science.phase_space_searches import multistability_search
@@ -44,8 +44,8 @@ class NetworkWorkflow(object):
         gmod = GeneNetworkModel(N_nodes,
                                 graph_type=GraphType.scale_free,
                                 edges=None,
-                                beta=bi,
-                                gamma=gi,
+                                b_param=bi,
+                                g_param=gi,
                                 delta_in=delta_in,
                                 delta_out=delta_out)
 
@@ -207,7 +207,7 @@ class NetworkWorkflow(object):
                 edge_types = gmod.get_edge_types(p_acti=0.5)
 
             else:
-                gmod.create_parameter_vects(Bi=Bi, ni=ni, di=di, co=coi, ki=ki)
+                gmod.create_parameter_vects(beta_base=Bi, n_base=ni, d_base=di, co=coi, ki=ki)
                 numsols, multisols = multistability_search(gmod, 1,
                                                                 tol=sol_unique_tol,
                                                                 N_iter=N_edge_search,
@@ -253,7 +253,7 @@ class NetworkWorkflow(object):
                    )
 
         # Highlight the existance of a "core" graph:
-        cycle_tags = np.zeros(gmod.N_nodes)
+        cycle_tags = np.zeros(gmod._N_nodes)
         cycle_tags[gmod.nodes_in_cycles] = 1.0
 
         gp=plot_network(gmod.nodes_list,
@@ -282,17 +282,17 @@ class NetworkWorkflow(object):
                                         pure_gene_edges_only=pure_gene_edges_only,
                                         )
 
-            gmod.create_parameter_vects(Bi=Bi, ni=ni, di=di, co=coi, ki=ki)
+            gmod.create_parameter_vects(beta_base=Bi, n_base=ni, d_base=di, co=coi, ki=ki)
 
             if reduce_dims:  # If reduce dimensions then perform this calculation
                 gmod.reduce_model_dimensions()
 
             if gmod._reduced_dims and gmod._solved_analytically is False:  # if dim reduction was attempted and was successful...
                 # determine the size of the reduced dimensions vector:
-                N_reduced_dims = len(gmod.dcdt_vect_reduced_s)
+                N_reduced_dims = len(gmod._dcdt_vect_reduced_s)
 
             elif gmod._solved_analytically:
-                N_reduced_dims = gmod.N_nodes
+                N_reduced_dims = gmod._N_nodes
 
             else:  # otherwise assign it to zero
                 N_reduced_dims = 0
@@ -400,7 +400,7 @@ class NetworkWorkflow(object):
                       'Delta out': gmod._delta_out,
                       'Edge p': gmod._p_edge, # this only applies for binomial graphs
                       'N Cycles': gmod.N_cycles,
-                      'N Nodes': gmod.N_nodes,
+                      'N Nodes': gmod._N_nodes,
                       'N Edges': gmod.N_edges,
                       'Out-Degree Max': gmod.out_dmax,
                       'In-Degree Max': gmod.in_dmax,

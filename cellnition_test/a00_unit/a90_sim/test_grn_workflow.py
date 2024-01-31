@@ -64,11 +64,10 @@ def test_grn_workflow_libgraph(tmp_path) -> None:
         Abstract path encapsulating a temporary directory unique to this unit
         test, created in the base temporary directory.
     '''
-    from cellnition.science.gene_networks import GeneNetworkModel
-    from cellnition.science.network_enums import EdgeType, GraphType, NodeType
+    from cellnition.science.network_models.gene_networks import GeneNetworkModel
+    from cellnition.science.network_enums import GraphType
     from cellnition.science.network_library import BasicTrinodeNet
     from cellnition.science.network_workflow import NetworkWorkflow
-    from cellnition.science.phase_space_searches import param_space_search
 
     # Absolute or relative dirname of a test-specific temporary directory to
     # which "NetworkWorkflow" will emit GraphML and other files.
@@ -197,7 +196,7 @@ def test_grn_workflow_readfromfile(tmp_path) -> None:
     from cellnition.science.network_workflow import NetworkWorkflow
     from cellnition.science.network_enums import GraphType
     from cellnition.science.network_library import QuadStateNet
-    from cellnition.science.gene_networks import GeneNetworkModel
+    from cellnition.science.network_models.gene_networks import GeneNetworkModel
 
     # Absolute or relative dirname of a test-specific temporary directory to
     # which "NetworkWorkflow" will emit GraphML and other files.
@@ -272,7 +271,7 @@ def test_network_library() -> None:
     # Defer test-specific imports.
     from cellnition.science import network_library
     from cellnition.science.network_library import LibNet
-    from cellnition.science.gene_networks import GeneNetworkModel
+    from cellnition.science.network_models.gene_networks import GeneNetworkModel
     from cellnition.science.network_enums import GraphType
 
     # Tuple of all "LibNet" subclasses, defined as the tuple comprehension of...

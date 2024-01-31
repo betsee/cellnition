@@ -7,19 +7,17 @@
 This module builds and plots a state transition diagram from a solution
 set and corresponding GeneNetworkModel.
 '''
-import itertools
 
 #FIXME: allow for combination signals (i.e. s0*s1) to be studied (optionally) in
 # the state transition diagram.
-
+import itertools
 import numpy as np
 from numpy import ndarray
 from matplotlib import colors
 from matplotlib import colormaps
 import networkx as nx
 from networkx import MultiDiGraph
-from cellnition.science.gene_networks import GeneNetworkModel
-
+from cellnition.science.network_models.network_abc import NetworkABC
 import pygraphviz as pgv
 
 class StateMachine(object):
@@ -51,14 +49,14 @@ class StateMachine(object):
         A set of steady-state solutions from _gmod.
     '''
 
-    def __init__(self, gmod: GeneNetworkModel, solsM: ndarray):
+    def __init__(self, gmod: NetworkABC, solsM: ndarray):
         '''
         Initialize the StateMachine.
 
         Parameters
         ----------
-        gmod : GeneNetworkModel
-            An instance of GeneNetworkModel with an analytical model built.
+        gmod : NetworkABC
+            An instance of NetworkABC with an analytical model built.
 
         solsM : ndarray
             A set of unique steady-state solutions from the GeneNetworkModel.
@@ -108,15 +106,23 @@ class StateMachine(object):
 
 
     def create_transition_network(self,
+                                  signal_node_inds: list[int],
                                   dt: float = 1.0e-3,
                                   tend: float = 100.0,
-                                  sigtstart: float = 33.0,
-                                  sigtend: float = 66.0,
-                                  sigmax: float = 2.0,
+                                  sig_tstart: float = 33.0,
+                                  sig_tend: float = 66.0,
+                                  sig_base: float = 0.0,
+                                  sig_active: float = 1.0,
                                   delta_window: float = 1.0,
+                                  dt_samp: float=0.15,
                                   verbose: bool = True,
                                   tol: float = 1.0e-6,
-                                  do_combos: bool=False
+                                  do_combos: bool=False,
+                                  constrained_inds: list | None = None,
+                                  constrained_vals: list | None = None,
+                                  d_base: float = 1.0,
+                                  n_base: float = 3.0,
+                                  beta_base: float = 4.0
                                   ):
         '''
         Build a state transition matrix/diagram by starting the system
@@ -127,6 +133,10 @@ class StateMachine(object):
 
         Parameters
         ----------
+        signal_node_inds : list[int]
+            List specifing the nodes to be peturbed in the creation of this state
+            transition network.
+
         dt: float = 1.0e-3
             Timestep for the time simulation.
 
@@ -134,16 +144,19 @@ class StateMachine(object):
             End time for the time simulation. This must be long
             enough to allow the system to reach the second steady-state.
 
-        sigtstart: float = 33.0
+        sig_tstart: float = 33.0
             The time to start the signal perturbation. Care must be taken
-            to ensure enough time is alloted prior to starting the perturbation
+            to ensure enough time is allotted prior to starting the perturbation
             for the system to have reached an initial steady state.
 
-        sigtend: float = 66.0
+        sig_tend: float = 66.0
             The time to end the signal perturbation.
 
-        sigmax: float = 2.0
-            Magnitude to add to the signal nodes.
+        sig_base: float = 1.0
+            Baseline magnitude of the signal node.
+
+        sig_active: float = 1.0
+            Magnitude of the signal pulse during the perturbation.
 
         delta_window: float = 1.0
             Time to sample prior to the application of the signal perturbation,
@@ -157,11 +170,11 @@ class StateMachine(object):
             match error is above tol, it is added to the matrix as a new state.
 
         do_combos : bool = False
-            Consider combinations of all signal nodes in the network (e.g. s0*s1)
+            Consider combinations of all signal nodes in the network (e.g. s2, s0 + s1, s0 + s1 +s2)
             as possible transitions for states.
 
         '''
-        c_zeros = np.zeros(self._gmod.N_nodes)  # start everything out low
+        c_zeros = np.zeros(self._gmod._N_nodes)  # start everything out low
 
         # Create a steady-state solutions matrix that is stacked with the
         # 'zero' or 'base' state:
@@ -169,16 +182,13 @@ class StateMachine(object):
 
         G_states = MultiDiGraph()
 
-        signal_inds = [[sigi] for sigi in self._gmod.signal_node_inds]
-
-        if do_combos:
-            extended_sigs = []
-            for sigi in self._gmod.signal_node_inds:
-                for sigj in self._gmod.signal_node_inds:
-                    if sigi != sigj:
-                        extended_sigs.append([sigi, sigj])
-            extended_sigs.append(self._gmod.signal_node_inds) # append all of them as a list to do all at once
-            signal_inds.extend(extended_sigs)
+        if do_combos is False: # Just do perturbations in terms of each signal node
+            signal_inds = [[sigi] for sigi in signal_node_inds]
+        else: # Do perturbations as all possible combinations (without replacement) or each signal node
+            lensig = len(signal_node_inds)
+            signal_inds = []
+            for i in range(0, lensig):
+                signal_inds.extend([list(sigis) for sigis in itertools.combinations(signal_node_inds, i + 1)])
 
         # Make string labels for each of the signals:
         signal_labels = []
@@ -201,8 +211,8 @@ class StateMachine(object):
             # For each signal in the network:
             for si, sigi in enumerate(signal_inds):
                 cvecti = cvecto.copy()  # reset the state to the desired starting state
-                sig_times = [(sigtstart, sigtend) for ss in sigi]
-                sig_mags = [(0.0, sigmax) for ss in sigi]
+                sig_times = [(sig_tstart, sig_tend) for ss in sigi]
+                sig_mags = [(sig_base, sig_active) for ss in sigi]
 
                 # Run the time simulation:
                 concs_time, tvect = self._gmod.run_time_sim(tend,
@@ -211,10 +221,16 @@ class StateMachine(object):
                                                       sigi,
                                                       sig_times,
                                                       sig_mags,
-                                                      dt_samp=0.15)
+                                                      dt_samp=dt_samp,
+                                                      constrained_inds=constrained_inds,
+                                                      constrained_vals=constrained_vals,
+                                                      d_base=d_base,
+                                                      n_base=n_base,
+                                                      beta_base=beta_base
+                                                      )
 
-                it_30low = (tvect <= sigtstart - delta_window).nonzero()[0]
-                it_30high = (tvect >= sigtstart - 2 * delta_window).nonzero()[0]
+                it_30low = (tvect <= sig_tstart - delta_window).nonzero()[0]
+                it_30high = (tvect >= sig_tstart - 2 * delta_window).nonzero()[0]
                 it_30 = np.intersect1d(it_30low, it_30high)[0]
 
                 concs_before = concs_time[it_30, :]

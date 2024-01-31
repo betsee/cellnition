@@ -14,25 +14,15 @@ import csv
 from collections.abc import Callable
 import numpy as np
 from numpy import ndarray
-import matplotlib.pyplot as plt
-from matplotlib import colors
-from matplotlib import colormaps
-from scipy.optimize import minimize, fsolve
-from scipy.signal import square
-import networkx as nx
-from networkx import DiGraph
+from scipy.optimize import fsolve
 import sympy as sp
-from sympy.core.symbol import Symbol
-from sympy.tensor.indexed import Indexed
 from sympy import MutableDenseMatrix
-from cellnition.science.network_enums import EdgeType, GraphType, NodeType, InterFuncType, CouplingType
-from cellnition.science.gene_networks import GeneNetworkModel
-import pygraphviz as pgv
+from cellnition.science.network_models.network_abc import NetworkABC
+from cellnition.science.network_enums import EdgeType, InterFuncType, CouplingType
 
-# FIXME: scrub parameters so we don't need to use empty-valued params
 # FIXME: I bet we can implement a node type via the same process
 
-class ProbabilityNet(object):
+class ProbabilityNet(NetworkABC):
     '''
     '''
     def __init__(self,
@@ -41,6 +31,9 @@ class ProbabilityNet(object):
         '''
 
         '''
+
+        super().__init__()  # Initialize the base class
+
         self._N_nodes = N_nodes
         self._inter_fun_type = interaction_function_type
         self._nodes_index = [i for i in range(self._N_nodes)]
@@ -83,7 +76,7 @@ class ProbabilityNet(object):
 
         # Vectorized node-parameters and variables:
         self._d_vect_s = [self._d_s[i] for i in range(self._N_nodes)]  # maximum rate of decay for each node
-        self._p_vect_s = sp.Matrix([self._p_s[i] for i in range(self._N_nodes)])  # gene product probability for each node
+        self._c_vect_s = sp.Matrix([self._p_s[i] for i in range(self._N_nodes)])  # gene product probability for each node
 
         self._beta_s = sp.IndexedBase('beta', shape=(self._N_nodes, self._N_nodes), positive=True)  # Hill centre
         self._n_s = sp.IndexedBase('n', shape=(self._N_nodes, self._N_nodes), positive=True)  # Hill coupling
@@ -100,8 +93,7 @@ class ProbabilityNet(object):
 
         # Create a matrix that allows us to access the concentration vectors
         # duplicated along columns:
-        self._M_p_s = self._p_vect_s * self._ones_vect
-
+        self._M_p_s = self._c_vect_s * self._ones_vect
 
     def build_adjacency_from_edge_type_list(self,
                         edge_types: list[EdgeType],
@@ -110,7 +102,6 @@ class ProbabilityNet(object):
         '''
 
         '''
-
         A_full_s = np.zeros((self._N_nodes, self._N_nodes), dtype=int)
         A_add_s = np.zeros((self._N_nodes, self._N_nodes), dtype=int)
         A_mul_s = np.zeros((self._N_nodes, self._N_nodes), dtype=int)
@@ -290,23 +281,24 @@ class ProbabilityNet(object):
 
         self._mul_terms = sp.Matrix(np.product(M_funk_mul_s, axis=1))
 
-        self._dpdt_vect_s = []
+        self._dcdt_vect_s = []
         for i in range(self._N_nodes):
             if self._add_terms[i] == 0 and self._mul_terms[i] == 1: # if there's no add term and no mul term
-                self._dpdt_vect_s.append(0) # set the rate of change of this unregulated node to zero
+                self._dcdt_vect_s.append(0) # set the rate of change of this unregulated node to zero
                 self._constrained_nodes.append(i) # append this node to the list of nodes that should be constrained
             elif self._add_terms[i] == 0 and self._mul_terms[i] != 1: # remove the null add term to avoid nulling all growth
-                self._dpdt_vect_s.append(self._d_vect_s[i]*self._mul_terms[i] -
-                             self._p_vect_s[i] * self._d_vect_s[i])
+                self._dcdt_vect_s.append(self._d_vect_s[i] * self._mul_terms[i] -
+                                         self._c_vect_s[i] * self._d_vect_s[i])
             else: # the node is a mix of additive and potential multiplicative regulation:
-                self._dpdt_vect_s.append(self._d_vect_s[i]*self._mul_terms[i]*self._add_terms[i] -
-                             self._p_vect_s[i] * self._d_vect_s[i])
+                self._dcdt_vect_s.append(self._d_vect_s[i] * self._mul_terms[i] * self._add_terms[i] -
+                                         self._c_vect_s[i] * self._d_vect_s[i])
 
         # This is an "energy" function to be minimized at the equilibrium points:
-        self._opti_s = (sp.Matrix(self._dpdt_vect_s).T * sp.Matrix(self._dpdt_vect_s))[0, 0]
+        self._opti_s = (sp.Matrix(self._dcdt_vect_s).T * sp.Matrix(self._dcdt_vect_s))[0, 0]
 
         # Create linearized lists of symbolic parameters that are needed to solve the model (exclude the
         # zero entries of the M_n and M_beta matrices:
+        # FIXME: need to rebuild the graph model if edges index changes...
         self._edges_index, self.edge_types = self.edges_from_adjacency(A_add_s, A_mul_s)
         self._beta_vect_s = [self._beta_s[nde_i, nde_j] for nde_i, nde_j in self._edges_index]
         self._n_vect_s = [self._n_s[nde_i, nde_j] for nde_i, nde_j in self._edges_index]
@@ -343,7 +335,7 @@ class ProbabilityNet(object):
 
         return d_vect, n_vect, beta_vect
 
-    def create_numerical_dpdt(self,
+    def create_numerical_dcdt(self,
                               constrained_inds: list | None = None,
                               constrained_vals: list | None = None):
         '''
@@ -352,47 +344,47 @@ class ProbabilityNet(object):
         # First, lambdify the change vector in a way that supports any constraints:
         if constrained_inds is None or constrained_vals is None:
             # Compute the symbolic Jacobian:
-            dpdt_jac_s = sp.Matrix(self._dpdt_vect_s).jacobian(self._p_vect_s) # analytical Jacobian
+            dcdt_jac_s = sp.Matrix(self._dcdt_vect_s).jacobian(self._c_vect_s) # analytical Jacobian
 
-            dpdt_vect_f = sp.lambdify((list(self._p_vect_s),
+            dcdt_vect_f = sp.lambdify((list(self._c_vect_s),
                                        self._n_vect_s,
                                        self._beta_vect_s,
                                        self._d_vect_s),
-                                      self._dpdt_vect_s)
+                                      self._dcdt_vect_s)
 
-            dpdt_jac_f = sp.lambdify((list(self._p_vect_s),
+            dcdt_jac_f = sp.lambdify((list(self._c_vect_s),
                                       self._n_vect_s,
                                       self._beta_vect_s,
                                       self._d_vect_s),
-                                     dpdt_jac_s)
+                                     dcdt_jac_s)
 
 
         else: # If there are constraints split the p-vals into an arguments and to-solve set:
-            p_vect_args = (np.asarray(list(self._p_vect_s))[constrained_inds]).tolist()
+            c_vect_args = (np.asarray(list(self._c_vect_s))[constrained_inds]).tolist()
             unconstrained_inds = np.setdiff1d(self._nodes_index, constrained_inds).tolist()
-            p_vect_solve = (np.asarray(list(self._p_vect_s))[unconstrained_inds]).tolist()
+            c_vect_solve = (np.asarray(list(self._c_vect_s))[unconstrained_inds]).tolist()
 
             # truncate the change vector to only be for unconstrained inds:
-            dpdt_vect_s = np.asarray(self._dpdt_vect_s)[unconstrained_inds].tolist()
+            dcdt_vect_s = np.asarray(self._dcdt_vect_s)[unconstrained_inds].tolist()
 
             # Compute the symbolic Jacobian:
-            dpdt_jac_s = sp.Matrix(dpdt_vect_s).jacobian(p_vect_solve) # analytical Jacobian
+            dcdt_jac_s = sp.Matrix(dcdt_vect_s).jacobian(c_vect_solve) # analytical Jacobian
 
-            dpdt_vect_f = sp.lambdify((p_vect_solve,
-                                       p_vect_args,
+            dcdt_vect_f = sp.lambdify((c_vect_solve,
+                                       c_vect_args,
                                        self._n_vect_s,
                                        self._beta_vect_s,
                                        self._d_vect_s),
-                                      dpdt_vect_s)
+                                      dcdt_vect_s)
 
-            dpdt_jac_f = sp.lambdify((p_vect_solve,
-                                      p_vect_args,
+            dcdt_jac_f = sp.lambdify((c_vect_solve,
+                                      c_vect_args,
                                       self._n_vect_s,
                                       self._beta_vect_s,
                                       self._d_vect_s),
-                                     dpdt_jac_s)
+                                     dcdt_jac_s)
 
-        return dpdt_vect_f, dpdt_jac_f
+        return dcdt_vect_f, dcdt_jac_f
 
     def get_function_args(self,
                           constraint_vals: list|None=None,
@@ -414,28 +406,28 @@ class ProbabilityNet(object):
 
 
     def generate_state_space(self,
-                             p_inds: list[int],
+                             c_inds: list[int],
                              N_space: int,
                              pmin: float=1.0e-25) -> tuple[ndarray, list, ndarray]:
         '''
         Generate a discrete state space over the range of probabilities of
         each individual gene in the network.
         '''
-        p_lins = []
+        c_lins = []
 
-        for i in p_inds:
-            p_lins.append(np.linspace(pmin, 1.0, N_space))
+        for i in c_inds:
+            c_lins.append(np.linspace(pmin, 1.0, N_space))
 
-        pGrid = np.meshgrid(*p_lins)
+        cGrid = np.meshgrid(*c_lins)
 
-        N_pts = len(pGrid[0].ravel())
+        N_pts = len(cGrid[0].ravel())
 
-        pM = np.zeros((N_pts, self._N_nodes))
+        cM = np.zeros((N_pts, self._N_nodes))
 
-        for i, pGrid in enumerate(pGrid):
-            pM[:, i] = pGrid.ravel()
+        for i, cGrid in enumerate(cGrid):
+            cM[:, i] = cGrid.ravel()
 
-        return pM, p_lins, pGrid
+        return cM, c_lins, cGrid
 
     def solve_probability_equms(self,
                                 constrained_inds: list|None = None,
@@ -456,8 +448,8 @@ class ProbabilityNet(object):
         terms of a given set of numerical parameters.
         '''
 
-        dpdt_vect_f, dpdt_jac_f = self.create_numerical_dpdt(constrained_inds=constrained_inds,
-                                                 constrained_vals=constrained_vals)
+        dcdt_vect_f, dcdt_jac_f = self.create_numerical_dcdt(constrained_inds=constrained_inds,
+                                                             constrained_vals=constrained_vals)
 
         if constrained_inds is None or constrained_vals is None:
             unconstrained_inds = self._nodes_index
@@ -473,32 +465,32 @@ class ProbabilityNet(object):
                                                n_base=n_base,
                                                beta_base=beta_base)
 
-        for pvecto in M_pstates: # for each test vector:
-            p_vect_sol = pvecto[unconstrained_inds] # get values for the genes we're solving for...
+        for cvecto in M_pstates: # for each test vector:
+            c_vect_sol = cvecto[unconstrained_inds] # get values for the genes we're solving for...
 
-            sol_roots = fsolve(dpdt_vect_f,
-                               p_vect_sol,
+            sol_roots = fsolve(dcdt_vect_f,
+                               c_vect_sol,
                                args=function_args,
                                xtol=search_tol,
-                               fprime=dpdt_jac_f,
+                               fprime=dcdt_jac_f,
                                col_deriv=False,
                                )
 
-            p_eqms = np.zeros(self._N_nodes)
-            p_eqms[unconstrained_inds] = sol_roots
+            c_eqms = np.zeros(self._N_nodes)
+            c_eqms[unconstrained_inds] = sol_roots
 
             if constrained_inds is not None and constrained_vals is not None:
-                p_eqms[constrained_inds] = constrained_vals
+                c_eqms[constrained_inds] = constrained_vals
 
-            sol_Mo.append(p_eqms)
+            sol_Mo.append(c_eqms)
 
         _, unique_inds = np.unique(np.round(sol_Mo, N_round_sol), axis=0, return_index=True)
 
         sol_M = np.asarray(sol_Mo)[unique_inds]
 
         stable_sol_M, sol_M_char = self._find_attractor_sols(sol_M,
-                                                             dpdt_vect_f,
-                                                             dpdt_jac_f,
+                                                             dcdt_vect_f,
+                                                             dcdt_jac_f,
                                                              function_args,
                                                              constrained_inds=constrained_inds,
                                                              tol= sol_tol,
@@ -510,7 +502,7 @@ class ProbabilityNet(object):
         return stable_sol_M, sol_M_char, sol_M
     def _find_attractor_sols(self,
                              sols_0: list|ndarray,
-                             dpdt_vect_f: Callable,
+                             dcdt_vect_f: Callable,
                              jac_f: Callable,
                              func_args: tuple|list,
                              constrained_inds: list | None = None,
@@ -542,7 +534,7 @@ class ProbabilityNet(object):
 
             pmins = np.asarray(pminso) + eps # add the small amount here, before calculating the jacobian
 
-            solution_dict['Change at Minima'] = dpdt_vect_f(pmins[unconstrained_inds], *func_args)
+            solution_dict['Change at Minima'] = dcdt_vect_f(pmins[unconstrained_inds], *func_args)
 
             jac = jac_f(pmins[unconstrained_inds], *func_args)
 
@@ -628,5 +620,73 @@ class ProbabilityNet(object):
                     csvwriter.writerow(si)  # write the soln data rows for each gene
 
         return solsM_return, sol_dicts_list
+
+    def run_time_sim(self,
+                     tend: float,
+                     dt: float,
+                     cvecti: ndarray|list,
+                     sig_inds: ndarray|list|None = None,
+                     sig_times: ndarray | list | None = None,
+                     sig_mag: ndarray | list | None = None,
+                     dt_samp: float|None = None,
+                     constrained_inds: list | None = None,
+                     constrained_vals: list | None = None,
+                     d_base: float = 1.0,
+                     n_base: float = 3.0,
+                     beta_base: float = 4.0
+                     ):
+        '''
+
+        '''
+        Nt = int(tend/dt)
+        tvect = np.linspace(0.0, tend, Nt)
+
+        if sig_inds is not None:
+            c_signals = self.make_signals_matrix(tvect, sig_inds, sig_times, sig_mag)
+        else:
+            c_signals = None
+
+        concs_time = []
+
+        # sampling compression
+        if dt_samp is not None:
+            sampr = int(dt_samp / dt)
+            tvect_samp = tvect[0::sampr]
+            tvectr = tvect_samp
+        else:
+            tvect_samp = None
+            tvectr = tvect
+
+        # make a time-step update vector so we can update any sensors as
+        # an absolute reading (dt = 1.0) while treating the kinetics of the
+        # other node types:
+        dtv = 1.0e-3 * np.ones(self._N_nodes)
+        dtv[self.sensor_node_inds] = 1.0
+
+        dcdt_vect_f, dcdt_jac_f = self.create_numerical_dcdt(constrained_inds=constrained_inds,
+                                                             constrained_vals=constrained_vals)
+
+        function_args = self.get_function_args(constraint_vals=constrained_vals,
+                                               d_base=d_base,
+                                               n_base=n_base,
+                                               beta_base=beta_base)
+
+        for ti, tt in enumerate(tvect):
+            dcdt = dcdt_vect_f(cvecti, *function_args)
+            cvecti += dtv * dcdt
+
+            if c_signals is not None:
+                # manually set the signal node values:
+                cvecti[self.signal_node_inds] = c_signals[ti, self.signal_node_inds]
+
+            if dt_samp is None:
+                concs_time.append(cvecti * 1)
+            else:
+                if tt in tvect_samp:
+                    concs_time.append(cvecti * 1)
+
+        concs_time = np.asarray(concs_time)
+
+        return concs_time, tvectr
 
 
