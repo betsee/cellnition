@@ -697,8 +697,8 @@ class ProbabilityNet(NetworkABC):
         # make a time-step update vector so we can update any sensors as
         # an absolute reading (dt = 1.0) while treating the kinetics of the
         # other node types:
-        dtv = 1.0e-3 * np.ones(self._N_nodes)
-        dtv[self.sensor_node_inds] = 1.0
+        # dtv = dt * np.ones(self._N_nodes)
+        # dtv[self.sensor_node_inds] = 1.0
 
         dcdt_vect_f, dcdt_jac_f = self.create_numerical_dcdt(constrained_inds=constrained_inds,
                                                              constrained_vals=constrained_vals)
@@ -709,12 +709,12 @@ class ProbabilityNet(NetworkABC):
                                                beta_base=beta_base)
 
         for ti, tt in enumerate(tvect):
-            dcdt = dcdt_vect_f(cvecti, *function_args)
-            cvecti += dtv * dcdt
+            dcdt = np.asarray(dcdt_vect_f(cvecti, *function_args))
+            cvecti += dt * dcdt
 
             if c_signals is not None:
                 # manually set the signal node values:
-                cvecti[self.signal_node_inds] = c_signals[ti, self.signal_node_inds]
+                cvecti[sig_inds] = c_signals[ti, sig_inds]
 
             if dt_samp is None:
                 concs_time.append(cvecti * 1)

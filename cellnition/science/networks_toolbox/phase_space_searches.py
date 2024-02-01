@@ -12,8 +12,6 @@ from cellnition.science.network_models.network_enums import (EdgeType,
                                                              CouplingType)
 
 
-# FIXME: These need to be totally re-done with new probability networks...
-#FIXME allow these to run with constraints on signals or nodes
 # FIXME: we'd like to remove signal node edges and signal nodes from this search.
 
 def multistability_search(pnet: ProbabilityNet,

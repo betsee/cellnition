@@ -75,7 +75,7 @@ class StateMachine(object):
 
     def find_state_match(self,
                          solsM: ndarray,
-                         cvecti: list | ndarray) -> tuple[ndarray, float]:
+                         cvecti: list | ndarray) -> tuple:
         '''
         Given a matrix of possible states and a concentration vector,
         return the state that best-matches the concentration vector,
@@ -127,8 +127,8 @@ class StateMachine(object):
                                   constrained_inds: list | None = None,
                                   constrained_vals: list | None = None,
                                   d_base: float = 1.0,
-                                  n_base: float = 3.0,
-                                  beta_base: float = 4.0
+                                  n_base: float = 15.0,
+                                  beta_base: float = 0.25
                                   ):
         '''
         Build a state transition matrix/diagram by starting the system
@@ -187,6 +187,7 @@ class StateMachine(object):
         solsM_with0 = np.column_stack((c_zeros, self._solsM))
 
         G_states = MultiDiGraph()
+        # G_states = DiGraph()
 
         if do_combos is False: # Just do perturbations in terms of each signal node
             signal_inds = [[sigi] for sigi in signal_node_inds]
@@ -258,6 +259,8 @@ class StateMachine(object):
                 statei, erri = self.find_state_match(solsM_with0, concs_before)
                 statej, errj = self.find_state_match(solsM_with0, concs_after)
 
+                # FIXME: this doesn't work to add in states as we go -- results in
+                # a mess!
                 if erri > tol:
                     solsM_with0 = np.column_stack((solsM_with0, concs_before))
                     statei, erri = self.find_state_match(solsM_with0, concs_before)
@@ -318,7 +321,7 @@ class StateMachine(object):
                        fontcolor=nde_font_color,
                        )
 
-        for (eio, ejo), etranso in edgedata_Gstates.items():
+        for (eio, ejo, em), etranso in edgedata_Gstates.items():
             ei = f'State {eio}'
             ej = f'State {ejo}'
             if etranso == -1:
