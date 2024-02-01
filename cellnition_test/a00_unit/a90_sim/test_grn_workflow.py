@@ -65,8 +65,8 @@ def test_grn_workflow_libgraph(tmp_path) -> None:
         test, created in the base temporary directory.
     '''
     from cellnition.science.network_models.gene_networks import GeneNetworkModel
-    from cellnition.science.network_enums import GraphType
-    from cellnition.science.network_library import BasicTrinodeNet
+    from cellnition.science.network_models.network_enums import GraphType
+    from cellnition.science.network_models.network_library import BasicTrinodeNet
     from cellnition.science.network_workflow import NetworkWorkflow
 
     # Absolute or relative dirname of a test-specific temporary directory to
@@ -194,8 +194,8 @@ def test_grn_workflow_readfromfile(tmp_path) -> None:
     '''
     import os
     from cellnition.science.network_workflow import NetworkWorkflow
-    from cellnition.science.network_enums import GraphType
-    from cellnition.science.network_library import QuadStateNet
+    from cellnition.science.network_models.network_enums import GraphType
+    from cellnition.science.network_models.network_library import QuadStateNet
     from cellnition.science.network_models.gene_networks import GeneNetworkModel
 
     # Absolute or relative dirname of a test-specific temporary directory to
@@ -269,10 +269,10 @@ def test_network_library() -> None:
     '''
 
     # Defer test-specific imports.
-    from cellnition.science import network_library
-    from cellnition.science.network_library import LibNet
+    from cellnition.science.network_models import network_library
+    from cellnition.science.network_models.network_library import LibNet
     from cellnition.science.network_models.gene_networks import GeneNetworkModel
-    from cellnition.science.network_enums import GraphType
+    from cellnition.science.network_models.network_enums import GraphType
 
     # Tuple of all "LibNet" subclasses, defined as the tuple comprehension of...
     LIB_NETS: tuple[type[LibNet]] = tuple(

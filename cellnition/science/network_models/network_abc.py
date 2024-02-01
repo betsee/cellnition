@@ -11,21 +11,12 @@ import csv
 import numpy as np
 from numpy import ndarray
 import matplotlib.pyplot as plt
-from matplotlib import colors
-from matplotlib import colormaps
-from scipy.optimize import minimize, fsolve
-from scipy.signal import square
 import networkx as nx
-from networkx import DiGraph
 import sympy as sp
 from sympy.core.symbol import Symbol
 from sympy.tensor.indexed import Indexed
-from cellnition.science.network_enums import EdgeType, GraphType, NodeType, InterFuncType
-from cellnition.science.interaction_functions import (f_acti_hill_s,
-                                                      f_inhi_hill_s,
-                                                      f_neut_s,
-                                                      f_acti_logi_s,
-                                                      f_inhi_logi_s)
+from cellnition.science.network_models.network_enums import EdgeType, GraphType, NodeType, InterFuncType
+from cellnition.science.network_models.interaction_functions import (f_neut_s)
 import pygraphviz as pgv
 
 # TODO: Add in stochasticity
@@ -104,6 +95,7 @@ class NetworkABC(object, metaclass=ABCMeta):
         self._dcdt_vect_reduced_s = None # Initialize this to None
         self.process_params_s = []  # initialize this to be an empty list
         self.edge_types = None
+        self.edges_index = None
 
     def build_network_from_edges(self, edges: list[tuple]):
         '''
@@ -112,7 +104,7 @@ class NetworkABC(object, metaclass=ABCMeta):
         self._graph_type = GraphType.user
         self.edges_list = edges
         self.GG = nx.DiGraph(self.edges_list)
-        self.N_edges = len(self.edges_list)
+        self._N_edges = len(self.edges_list)
         self.nodes_list = sorted(self.GG.nodes())
         self._N_nodes = len(self.nodes_list)  # re-assign the node number in case specification was wrong
 
@@ -165,7 +157,6 @@ class NetworkABC(object, metaclass=ABCMeta):
         self._p_edge = p_edge
         self._graph_type = graph_type
 
-
         if graph_type is GraphType.scale_free:
             # generate a scale-free network with the supplied parameters...
             # The input scale-free probability is given as 1.0 minus beta and gamma, as all
@@ -194,7 +185,7 @@ class NetworkABC(object, metaclass=ABCMeta):
 
         # obtain the unique edges only:
         self.edges_list = list(set(GGo.edges()))
-        self.N_edges = len(self.edges_list)
+        self._N_edges = len(self.edges_list)
 
         # As the scale_free_graph function can return duplicate edges, get rid of these
         # by re-defining the graph with the unique edges only:
@@ -315,7 +306,7 @@ class NetworkABC(object, metaclass=ABCMeta):
 
             # Next, define a difference matrix for the network -- this calculates the difference between node i and j
             # as an edge parameter when it is dotted with a parameter defined on nodes:
-            self.D_diff = np.zeros((self.N_edges, self._N_nodes))
+            self.D_diff = np.zeros((self._N_edges, self._N_nodes))
             for ei, (nde_i, nde_j) in enumerate(self.edges_index):
                 self.D_diff[ei, nde_i] = 1
                 self.D_diff[ei, nde_j] = -1
@@ -406,14 +397,14 @@ class NetworkABC(object, metaclass=ABCMeta):
 
         edge_types_o = [EdgeType.A, EdgeType.I]
         edge_prob = [p_acti, p_inhi]
-        edge_types = np.random.choice(edge_types_o, self.N_edges, p=edge_prob)
+        edge_types = np.random.choice(edge_types_o, self._N_edges, p=edge_prob)
 
         if set_selfloops_acti: # if self-loops of the network are forced to be activators:
             edge_types[self.selfloop_edge_inds] = EdgeType.A
 
         return edge_types
 
-    def set_edge_types(self, edge_types: list|ndarray, add_interactions: bool):
+    def set_edge_types(self, edge_types: list|ndarray):
         '''
         Assign edge_types to the graph and create an edge function list used in analytical model building.
 
@@ -435,35 +426,6 @@ class NetworkABC(object, metaclass=ABCMeta):
             edge_attr_dict[ei] = {"edge_type": et.name}
 
         nx.set_edge_attributes(self.GG, edge_attr_dict)
-
-        self.edge_funcs = []
-        self.add_edge_interaction_bools = []
-        self.growth_interaction_bools = []
-
-        for et in self.edge_types:
-            if et is EdgeType.A:
-                self.edge_funcs.append(self._f_acti_s)
-                self.add_edge_interaction_bools.append(add_interactions)
-                self.growth_interaction_bools.append(True) # interact with growth component of reaction
-            elif et is EdgeType.I:
-                self.edge_funcs.append(self._f_inhi_s)
-                self.add_edge_interaction_bools.append(add_interactions)
-                self.growth_interaction_bools.append(True)  # interact with growth component of reaction
-            elif et is EdgeType.N:
-                self.edge_funcs.append(f_neut_s)
-                self.add_edge_interaction_bools.append(False)
-                self.growth_interaction_bools.append(True)  # interact with growth component of reaction
-            elif et is EdgeType.As: # else if it's As for a sensor activation interaction, then:
-                # self.edge_funcs.append(self.f_acti_s) # activate
-                # self.add_edge_interaction_bools.append(True) # add
-                # self.growth_interaction_bools.append(True)  # interact with growth component of reaction
-                self.edge_funcs.append(self._f_inhi_s) # inhibit
-                self.add_edge_interaction_bools.append(False) # multiply
-                self.growth_interaction_bools.append(False)  # interact with decay component of reaction
-            else:
-                self.edge_funcs.append(self._f_inhi_s) # inhibit
-                self.add_edge_interaction_bools.append(False) # multiply
-                self.growth_interaction_bools.append(True)  # interact with growth component of reaction
 
     def set_node_types(self, node_type_dict: dict|None = None, pure_gene_edges_only: bool = False):
         '''
@@ -579,7 +541,7 @@ class NetworkABC(object, metaclass=ABCMeta):
             else:
                 raise Exception("Edge type not found.")
 
-        self.N_edges = len(self.edges_list)
+        self._N_edges = len(self.edges_list)
 
     def read_node_info_from_graph(self):
         '''
@@ -939,7 +901,7 @@ class NetworkABC(object, metaclass=ABCMeta):
         '''
         t_s = sp.symbols('t')
         c_change = sp.Matrix([sp.Derivative(ci, t_s) for ci in self._c_vect_s])
-        eqn_net = sp.Eq(c_change, self._dcdt_vect_s)
+        eqn_net = sp.Eq(c_change, sp.Matrix(self._dcdt_vect_s))
 
         sp.preview(eqn_net,
                    viewer='file',

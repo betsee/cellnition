@@ -70,9 +70,12 @@ class GeneKnockout(object):
             save_file_list = [None]
             save_file_list.extend([None for i in range(self._pnet._N_nodes)])
 
+        constrained_inds, constrained_vals = self._pnet.handle_constrained_nodes(constraint_inds,
+                                                                           constraint_vals)
 
-        solsM, sol_M0_char, sols_0 = self._pnet.solve_probability_equms(constrained_inds=constraint_inds,
-                                                                        constrained_vals=constraint_vals,
+
+        solsM, sol_M0_char, sols_0 = self._pnet.solve_probability_equms(constraint_inds=constrained_inds,
+                                                                        constraint_vals=constrained_vals,
                                                                         d_base=d_base,
                                                                         n_base=n_base,
                                                                         beta_base=beta_base,
@@ -99,8 +102,10 @@ class GeneKnockout(object):
                 cvals = constraint_vals + [0.0]
                 cinds = constraint_inds + [i]
 
-            solsM, sol_M0_char, sols_1 = self._pnet.solve_probability_equms(constrained_inds=constraint_inds,
-                                                                        constrained_vals=constraint_vals,
+            # We also need to add in naturally-occurring constraints from unregulated nodes:
+
+            solsM, sol_M0_char, sols_1 = self._pnet.solve_probability_equms(constraint_inds=cinds,
+                                                                        constraint_vals=cvals,
                                                                         d_base=d_base,
                                                                         n_base=n_base,
                                                                         beta_base=beta_base,
@@ -108,7 +113,8 @@ class GeneKnockout(object):
                                                                         pmin=p_min,
                                                                         search_tol=tol,
                                                                         sol_tol=sol_tol,
-                                                                        N_round_sol=round_unique_sol
+                                                                        N_round_sol=round_unique_sol,
+                                                                        verbose=verbose
                                                                             )
 
             if verbose:

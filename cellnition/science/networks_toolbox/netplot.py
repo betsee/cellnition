@@ -3,7 +3,7 @@ import numpy as np
 from numpy import ndarray
 from matplotlib import colormaps
 from matplotlib import colors
-from cellnition.science.network_enums import EdgeType, GraphType, NodeType
+from cellnition.science.network_models.network_enums import EdgeType, NodeType
 
 def plot_network(nodes_list: list|ndarray,
                  edge_list: list|ndarray,

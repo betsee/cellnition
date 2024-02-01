@@ -5,6 +5,12 @@ for desired attributes.
 import numpy as np
 from numpy import ndarray
 from cellnition.science.network_models.probability_networks import ProbabilityNet
+from cellnition.science.network_models.network_enums import (EdgeType,
+                                                             GraphType,
+                                                             NodeType,
+                                                             InterFuncType,
+                                                             CouplingType)
+
 
 # FIXME: These need to be totally re-done with new probability networks...
 #FIXME allow these to run with constraints on signals or nodes
@@ -13,14 +19,18 @@ from cellnition.science.network_models.probability_networks import ProbabilityNe
 def multistability_search(pnet: ProbabilityNet,
                           N_multi: int = 1,
                           sol_tol: float = 1.0e-1,
-                          N_iter: int = 100,
+                          N_iter: int = 5,
                           verbose: bool = True,
+                          beta_base: float | list = 2.0,
+                          n_base: float | list = 3.0,
+                          d_base: float | list = 1.0,
                           N_space: int = 2,
                           N_round_unique_sol: int = 1,
                           search_tol: float = 1.0e-15,
                           constraint_vals: list[float]|None = None,
                           constraint_inds: list[int]|None = None,
-                          node_type_dict: dict|None = None,
+                          coupling_type: CouplingType = CouplingType.mixed,
+                          p_min: float=1.0e-8
                           ) -> tuple[list, list]:
     '''
     By randomly generating sets of different edge interaction types (i.e. activator or inhibitor), find
@@ -96,33 +106,30 @@ def multistability_search(pnet: ProbabilityNet,
 
     for i in range(N_iter):
         edge_types = pnet.get_edge_types(p_acti=0.5)
-        pnet.build_analytical_model(edge_types=edge_types,
-                                    add_interactions=add_interactions,
-                                    node_type_dict=node_type_dict)
 
-        if constraint_vals is None or constraint_inds is None:
-            sols_0 = pnet.optimized_phase_space_search(Ns=N_space,
-                                                       cmax=1.5 * np.max(pnet.in_degree_sequence),
-                                                       round_sol=N_round_sol,
-                                                       tol=search_tol,
-                                                       method="Root"
-                                                       )
+        # set the edge and node types to the network:
+        pnet.set_edge_types(edge_types)
 
-        else:
-            sols_0 = pnet.constrained_phase_space_search(constraint_vals,
-                                                         constraint_inds,
-                                                         Ns=N_space,
-                                                         cmax=1.5 * np.max(pnet.in_degree_sequence),
-                                                         tol=search_tol,
-                                                         round_sol=N_round_sol,
-                                                         method='Root'
-                                                         )
+        # Get the adjacency matrices for this model:
+        A_add_s, A_mul_s, A_full_s = pnet.build_adjacency_from_edge_type_list(edge_types,
+                                                                              pnet.edges_index,
+                                                                              coupling_type=coupling_type)
+        # build the analytical model for this network:
+        pnet.build_analytical_model(A_add_s, A_mul_s)
 
-        solsM = pnet.find_attractor_sols(sols_0,
-                                         tol=sol_tol,
-                                         unique_sols=unique_sols,
-                                         verbose=False,
-                                         N_round=N_round_unique_sol)
+        solsM, sol_M0_char, sol_0 = pnet.solve_probability_equms(constraint_inds=constraint_inds,
+                                                                 constraint_vals=constraint_vals,
+                                                                 d_base=d_base,
+                                                                 n_base=n_base,
+                                                                 beta_base=beta_base,
+                                                                 N_space=N_space,
+                                                                 pmin=p_min,
+                                                                 search_tol=search_tol,
+                                                                 sol_tol=sol_tol,
+                                                                 N_round_sol=N_round_unique_sol,
+                                                                 save_file=None,
+                                                                 verbose=verbose
+                                                                 )
 
         if len(solsM):
             num_sols = solsM.shape[1]
@@ -134,7 +141,7 @@ def multistability_search(pnet: ProbabilityNet,
             if edge_types_l not in multisol_edges:  # If we don't already have this combo:
                 if verbose:
                     print(f'Found solution with {num_sols} states on iteration {i}')
-                multisols.append([sols_0, edge_types])
+                multisols.append([sol_0, edge_types])
                 numsol_list.append(num_sols)
                 multisol_edges.append(edge_types_l)
 
@@ -152,7 +159,8 @@ def param_space_search(pnet: ProbabilityNet,
                        search_tol: float=1.0e-3,
                        verbose: bool=True,
                        constraint_vals: list[float] | None = None,
-                       constraint_inds: list[int] | None = None
+                       constraint_inds: list[int] | None = None,
+                       p_min: float=1.0e-8
                        ) -> tuple[ndarray, list]:
     '''
     Search parameter space of a model to find parameter combinations that give different multistable
@@ -228,69 +236,53 @@ def param_space_search(pnet: ProbabilityNet,
             raise Exception("Node constraint values must be same length as constrained node indices!")
 
     # What we wish to create is a parameter space search, as this net is small enough to enable that.
-    Blin = np.linspace(beta_min, beta_max, N_pts)
+    beta_lin = np.linspace(beta_min, beta_max, N_pts)
 
-    param_lin_set = []
+    beta_lin_set = []
 
-    for edj_i in range(pnet.regular_edges_index):
-        param_lin_set.append(Blin*1) # append the linear K-vector choices for each edge
+    for edj_i in range(pnet._N_edges):
+        beta_lin_set.append(beta_lin*1) # append the beta-vector choices for each edge
 
     # Create a set of matrices specifying the concentration grid for each
     # node of the network:
-    param_M_SET = np.meshgrid(*param_lin_set, indexing='ij')
+    beta_M_SET = np.meshgrid(*beta_lin_set, indexing='ij')
 
     # Create linearized arrays for each concentration, stacked into one column per node:
-    param_test_set = np.asarray([pM.ravel() for pM in param_M_SET]).T
+    beta_test_set = np.asarray([bM.ravel() for bM in beta_M_SET]).T
 
     bif_space_M = [] # Matrix holding the parameter values and number of unique stable solutions
     sols_space_M = []
 
     if verbose:
-        print(param_M_SET[0].ravel().shape)
+        print(f'Solving for {beta_M_SET[0].ravel().shape} iterations...')
 
-    if verbose:
-        print(f'Search cmax will be {cmax_multi * np.max(pnet.in_degree_sequence)}')
-
-    for param_set_i in param_test_set:
-        bvecti = param_set_i[0:pnet.N_edges].tolist()
+    for beta_set_i in beta_test_set:
 
         # Here we set di = 1.0, realizing the di value has no effect on the
         # steady-state since it can be divided through the rate equation when
-        # solving for the root.
-        pnet.create_parameter_vects(beta_base=bvecti, n_base=n_base, d_base=1.0, co=coi, ki=ki)
+        # solving for the root
 
-        if constraint_vals is None or constraint_inds is None:
+        solsM, sol_M0_char, sol_0 = pnet.solve_probability_equms(constraint_inds=constraint_inds,
+                                                                 constraint_vals=constraint_vals,
+                                                                 d_base=1.0,
+                                                                 n_base=n_base,
+                                                                 beta_base=beta_set_i,
+                                                                 N_space=N_search,
+                                                                 pmin=p_min,
+                                                                 search_tol=search_tol,
+                                                                 sol_tol=sol_tol,
+                                                                 N_round_sol=N_unique_sol_round,
+                                                                 save_file=None,
+                                                                 verbose=verbose
+                                                                 )
 
-            sols_0 = pnet.optimized_phase_space_search(Ns=N_search,
-                                                       cmax=cmax_multi * np.max(pnet.in_degree_sequence),
-                                                       round_sol=search_round_sol,
-                                                       tol=1.0e-15,
-                                                       method="Root"
-                                                       )
-
-        else:
-            sols_0 = pnet.constrained_phase_space_search(constraint_vals,
-                                                         constraint_inds,
-                                                         Ns=N_search,
-                                                         cmin=0.0,
-                                                         cmax=cmax_multi * np.max(pnet.in_degree_sequence),
-                                                         tol=1.0e-15,
-                                                         round_sol=search_round_sol,
-                                                         method='Root'
-                                                         )
-
-        solsM = pnet.find_attractor_sols(sols_0,
-                                         tol=sol_tol,
-                                         verbose=False,
-                                         unique_sols=True,
-                                         sol_round=N_unique_sol_round)
 
         if len(solsM):
             num_sols = solsM.shape[1]
         else:
             num_sols = 0
 
-        bif_space_M.append([*pnet.beta_vect, num_sols])
+        bif_space_M.append([*beta_set_i, num_sols])
         sols_space_M.append(solsM)
 
     return np.asarray(bif_space_M), sols_space_M

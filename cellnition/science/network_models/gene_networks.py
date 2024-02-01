@@ -34,12 +34,11 @@ import sympy as sp
 from sympy.core.symbol import Symbol
 from sympy.tensor.indexed import Indexed
 from cellnition.science.network_models.network_abc import NetworkABC
-from cellnition.science.network_enums import EdgeType, GraphType, NodeType, InterFuncType
-from cellnition.science.interaction_functions import (f_acti_hill_s,
-                                                      f_inhi_hill_s,
-                                                      f_neut_s,
-                                                      f_acti_logi_s,
-                                                      f_inhi_logi_s)
+from cellnition.science.network_models.network_enums import GraphType, NodeType, InterFuncType
+from cellnition.science.network_models.interaction_functions import (f_acti_hill_s,
+                                                                     f_inhi_hill_s,
+                                                                     f_acti_logi_s,
+                                                                     f_inhi_logi_s)
 
 # TODO: Add in stochasticity
 # TODO: Time signals should be able to do flipped case (from 1 to zero)
@@ -285,8 +284,8 @@ class GeneNetworkModel(NetworkABC):
         d_max_s = sp.IndexedBase('d_max') # Symbolic base decay rate for each node
 
         # These are needed for lambdification of analytical models:
-        self.B_vect_s = [B_s[i] for i in range(self.N_edges)]
-        self.n_vect_s = [n_s[i] for i in range(self.N_edges)]
+        self.B_vect_s = [B_s[i] for i in range(self._N_edges)]
+        self.n_vect_s = [n_s[i] for i in range(self._N_edges)]
         self.d_vect_s = [d_max_s[i] for i in self.nodes_index]
 
         if type(self.nodes_list[0]) is str:
@@ -547,7 +546,7 @@ class GeneNetworkModel(NetworkABC):
         # :
         if type(beta_base) is not list:
             B_vect = []
-            for ei in range(self.N_edges):
+            for ei in range(self._N_edges):
                 B_vect.append(beta_base)
 
         else:
@@ -555,7 +554,7 @@ class GeneNetworkModel(NetworkABC):
 
         if type(n_base) is not list:
             n_vect = []
-            for ei in range(self.N_edges):
+            for ei in range(self._N_edges):
                 n_vect.append(n_base)
         else:
             n_vect = n_base

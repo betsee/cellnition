@@ -11,11 +11,15 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 import networkx as nx
-from cellnition.science.network_enums import EdgeType, GraphType, NodeType
+from cellnition.science.network_models.network_enums import (EdgeType,
+                                                             GraphType,
+                                                             NodeType,
+                                                             InterFuncType,
+                                                             CouplingType)
 from cellnition.science.network_models.probability_networks import ProbabilityNet
-from cellnition.science.netplot import plot_network
-from cellnition.science.gene_knockout import GeneKnockout
-from cellnition.science.phase_space_searches import multistability_search
+from cellnition.science.networks_toolbox.netplot import plot_network
+from cellnition.science.networks_toolbox.gene_knockout import GeneKnockout
+from cellnition.science.networks_toolbox.phase_space_searches import multistability_search
 
 # FIXME: document throughout
 
@@ -31,60 +35,143 @@ class NetworkWorkflow(object):
 
     def scalefree_graph_gen(self,
                             N_nodes: int,
-                            bi: float,
-                            gi: float,
+                            b_param: float,
+                            g_param: float,
                             delta_in: float,
                             delta_out: float,
-                            i: int):
+                            i: int,
+                            interaction_function_type: InterFuncType = InterFuncType.logistic,
+                            coupling_type: CouplingType = CouplingType.mixed):
         '''
 
         '''
-        ai = 1.0 - bi - gi
+        a_param = 1.0 - b_param - g_param # calculate the a-parameter for sf net gen
+        # Initialize an instance of probability nets:
+        pnet = ProbabilityNet(N_nodes, interaction_function_type=interaction_function_type)
+        # randomly generate a scale-free network model:
+        pnet.randomly_generate_special_network(b_param=b_param,
+                                               g_param=g_param,
+                                               delta_in=delta_in,
+                                               delta_out=delta_out,
+                                               graph_type= GraphType.scale_free)
+        # characterize the network:
+        pnet.characterize_graph()
 
-        gmod = GeneNetworkModel(N_nodes,
-                                graph_type=GraphType.scale_free,
-                                edges=None,
-                                b_param=bi,
-                                g_param=gi,
-                                delta_in=delta_in,
-                                delta_out=delta_out)
+        # randomly generate edge types:
+        edge_types = pnet.get_edge_types()
 
+        # set the edge and node types to the network:
+        pnet.set_edge_types(edge_types)
+        pnet.set_node_types()
 
-        dem_coeff = np.round(gmod.dem_coeff, 1)
-        incoh = np.round(gmod.hier_incoherence, 1)
-        fname_base = f'{i}_sf{N_nodes}_b{bi}_g{gi}_Ncycles{gmod.N_cycles}_dem{dem_coeff}_incoh{incoh}'
+        # Get the signed adjacency matrices for this model:
+        A_add_s, A_mul_s, A_full_s = pnet.build_adjacency_from_edge_type_list(edge_types,
+                                                                              pnet.edges_index,
+                                                                              coupling_type=coupling_type)
+        # Build the analytical model
+        pnet.build_analytical_model(A_add_s, A_mul_s)
 
-        update_string = (f'{i}: params {np.round(ai,2), bi, gi, delta_in, delta_out}, '
-                         f'cycles: {gmod.N_cycles}, '
+        dem_coeff = np.round(pnet.dem_coeff, 1)
+        incoh = np.round(pnet.hier_incoherence, 1)
+        fname_base = f'{i}_sf{N_nodes}_b{b_param}_g{g_param}_Ncycles{pnet.N_cycles}_dem{dem_coeff}_incoh{incoh}'
+
+        update_string = (f'{i}: params {np.round(a_param,2), b_param, g_param, delta_in, delta_out}, '
+                         f'cycles: {pnet.N_cycles}, '
                          f'dem_coeff: {dem_coeff}, '
                          f'incoh.: {incoh}')
 
-        return gmod, update_string, fname_base
+        return pnet, update_string, fname_base
 
     def binomial_graph_gen(self,
                            N_nodes: int,
                            p_edge: float,
-                           i: int):
+                           i: int,
+                           interaction_function_type: InterFuncType = InterFuncType.logistic,
+                           coupling_type: CouplingType = CouplingType.mixed
+                           ):
         '''
 
         '''
-        gmod = GeneNetworkModel(N_nodes, graph_type=GraphType.random, edges=None, p_edge=p_edge)
+        # Initialize an instance of probability nets:
+        pnet = ProbabilityNet(N_nodes, interaction_function_type=interaction_function_type)
+        # randomly generate a scale-free network model:
+        pnet.randomly_generate_special_network(p_edge=p_edge,
+                                               graph_type=GraphType.random)
+        # characterize the network:
+        pnet.characterize_graph()
 
-        dem_coeff = np.round(gmod.dem_coeff, 1)
-        incoh = np.round(gmod.hier_incoherence, 1)
-        fname_base = f'{i}_bino{N_nodes}_Ncycles{gmod.N_cycles}_dem{dem_coeff}_incoh{incoh}'
+        # randomly generate edge types:
+        edge_types = pnet.get_edge_types()
+
+        # set the edge and node types to the network:
+        pnet.set_edge_types(edge_types)
+        pnet.set_node_types()
+
+        # Get the signed adjacency matrices for this model:
+        A_add_s, A_mul_s, A_full_s = pnet.build_adjacency_from_edge_type_list(edge_types,
+                                                                              pnet.edges_index,
+                                                                              coupling_type=coupling_type)
+        # Build the analytical model
+        pnet.build_analytical_model(A_add_s, A_mul_s)
+
+        dem_coeff = np.round(pnet.dem_coeff, 1)
+        incoh = np.round(pnet.hier_incoherence, 1)
+        fname_base = f'{i}_bino{N_nodes}_Ncycles{pnet.N_cycles}_dem{dem_coeff}_incoh{incoh}'
 
         update_string = (f'{i}: params {p_edge}, '
-                         f'cycles: {gmod.N_cycles}, '
+                         f'cycles: {pnet.N_cycles}, '
                          f'dem_coeff: {dem_coeff}, '
                          f'incoherence: {incoh}')
 
-        return gmod, update_string, fname_base
+        return pnet, update_string, fname_base
+
+    def make_network_from_edges(self,
+                                  edges: list[tuple],
+                                  edge_types: list[EdgeType]|None = None,
+                                  interaction_function_type: InterFuncType=InterFuncType.logistic,
+                                  coupling_type: CouplingType=CouplingType.mixed,
+                                  network_name: str='network',
+                                  i: int=0):
+        '''
+
+        '''
+        N_nodes = np.unique(np.ravel(edges)).shape[0]
+        pnet = ProbabilityNet(N_nodes, interaction_function_type=interaction_function_type)
+        pnet.build_network_from_edges(edges)
+
+        # characterize the network:
+        pnet.characterize_graph()
+
+        if edge_types is None:
+            # randomly generate edge types:
+            edge_types = pnet.get_edge_types()
+
+        # set the edge and node types to the network:
+        pnet.set_edge_types(edge_types)
+        pnet.set_node_types()
+
+        # Get the adjacency matrices for this model:
+        A_add_s, A_mul_s, A_full_s = pnet.build_adjacency_from_edge_type_list(edge_types,
+                                                                              pnet.edges_index,
+                                                          coupling_type=coupling_type)
+        # build the analytical model for this network:
+        pnet.build_analytical_model(A_add_s, A_mul_s)
+
+        fname_base = f'{i}_{network_name}'
+
+        dem_coeff = np.round(pnet.dem_coeff, 1)
+        incoh = np.round(pnet.hier_incoherence, 1)
+
+        update_string = (f'{i}: cycles: {pnet.N_cycles}, '
+                         f'dem_coeff: {dem_coeff}, '
+                         f'incoherence: {incoh}')
+
+        return pnet, update_string, fname_base
 
     def read_graph_from_file(self,
                              filename: str,
-                             add_interactions: bool = True,
-                             build_analytical: bool=False,
+                             interaction_function_type: InterFuncType = InterFuncType.logistic,
+                             coupling_type: CouplingType = CouplingType.mixed,
                              i: int=0):
         '''
         Read a network, including edge types, from a saved file.
@@ -121,31 +208,34 @@ class NetworkWorkflow(object):
             node_types.append(NodeType[nde_t])
 
         # Build a gene network with the properties read from the file:
-        gmod = GeneNetworkModel(N_nodes, edges=edges_list)
+        pnet = ProbabilityNet(N_nodes, interaction_function_type=interaction_function_type)
+        pnet.build_network_from_edges(edges_list)
 
+        # characterize the network:
+        pnet.characterize_graph()
+
+        pnet.set_edge_types(edge_types)
         # Assign node types to the network model:
-        gmod.set_node_types(node_type_dict=node_type_dict)
+        pnet.set_node_types(node_type_dict=node_type_dict)
 
-        if build_analytical:
-            # Build an analytical model using the edge_type and node_type assignments:
-            gmod.build_analytical_model(edge_types=edge_types,
-                                add_interactions=add_interactions,
-                                node_type_dict=None
-                               )
+        # Get the adjacency matrices for this model:
+        A_add_s, A_mul_s, A_full_s = pnet.build_adjacency_from_edge_type_list(edge_types,
+                                                                              pnet.edges_index,
+                                                          coupling_type=coupling_type)
+        # build the analytical model for this network:
+        pnet.build_analytical_model(A_add_s, A_mul_s)
 
-        else: # just set the edge types for the model:
-            gmod.set_edge_types(edge_types, add_interactions=add_interactions)
+        dem_coeff = np.round(pnet.dem_coeff, 1)
+        incoh = np.round(pnet.hier_incoherence, 1)
 
-        dem_coeff = np.round(gmod.dem_coeff, 1)
-        incoh = np.round(gmod.hier_incoherence, 1)
+        fname_base = f'{i}_bino{N_nodes}_Ncycles{pnet.N_cycles}_dem{dem_coeff}_incoh{incoh}'
 
-        fname_base = f'{i}_bino{N_nodes}_Ncycles{gmod.N_cycles}_dem{dem_coeff}_incoh{incoh}'
-
-        update_string = (f'{i}: cycles: {gmod.N_cycles}, '
+        update_string = (f'{i}: cycles: {pnet.N_cycles}, '
                          f'dem_coeff: {dem_coeff}, '
                          f'incoherence: {incoh}')
 
-        return gmod, update_string, fname_base
+        return pnet, update_string, fname_base
+
 
     def work_frame(self,
                    pnet: ProbabilityNet,
@@ -154,38 +244,30 @@ class NetworkWorkflow(object):
                    i_frame: int=0,
                    verbose: bool=True,
                    reduce_dims: bool = False,
-                   beta_base: float | list = 2.0,
-                   n_base: float | list = 3.0,
+                   beta_base: float | list = 0.25,
+                   n_base: float | list = 15.0,
                    d_base: float | list = 1.0,
-                   add_interactions: bool = True,
                    edge_types: list[EdgeType]|None = None,
                    edge_type_search: bool = True,
                    edge_type_search_iterations: int = 5,
                    find_solutions: bool = True,
                    knockout_experiments: bool = True,
                    sol_search_tol: float = 1.0e-15,
-                   N_search_space: int = 3,
+                   N_search_space: int = 2,
                    N_round_unique_sol: int = 1,
                    sol_unique_tol: float = 1.0e-1,
                    sol_ko_tol: float = 1.0e-1,
                    constraint_vals: list[float]|None = None,
                    constraint_inds: list[int]|None = None,
                    update_string: str|None = None,
-                   pure_gene_edges_only: bool = False,
                    node_type_dict: dict|None = None,
-                   solver_method: str = 'Root',
-                   extra_verbose: bool=False
+                   extra_verbose: bool=False,
+                   p_min: float=1.0e-8,
+                   coupling_type: CouplingType=CouplingType.mixed
                    ):
         '''
         A single frame of the workflow
         '''
-
-        # if graph_type is GraphType.scale_free:
-        #     # generate a graph for this frame
-        #     gmod, update_string, fname_base = self.scalefree_graph_gen(N_nodes, bi, gi, delta_in, delta_out, i_frame)
-        #
-        # else: # generate a random (a.k.a binomial) graph
-        #     gmod, update_string, fname_base = self.binomial_graph_gen(N_nodes, p_edge, i_frame)
 
         if constraint_vals is not None and constraint_inds is not None:
             if len(constraint_vals) != len(constraint_inds):
@@ -196,7 +278,7 @@ class NetworkWorkflow(object):
             # print(update_string)
 
         # set node types to the network:
-        pnet.set_node_types(node_type_dict=node_type_dict, pure_gene_edges_only=pure_gene_edges_only)
+        pnet.set_node_types(node_type_dict=node_type_dict)
 
         if edge_types is None:
             if edge_type_search is False:
@@ -204,18 +286,22 @@ class NetworkWorkflow(object):
                 edge_types = pnet.get_edge_types(p_acti=0.5)
 
             else:
-                pnet.create_parameter_vects(beta_base=beta_base, n_base=n_base, d_base=d_base, co=coi, ki=ki)
-                numsols, multisols = multistability_search(pnet, 1,
-                                                           sol_tol=sol_unique_tol,
-                                                           N_iter=edge_type_search_iterations,
-                                                           verbose=extra_verbose,
-                                                           add_interactions=add_interactions,
-                                                           N_round_unique_sol=N_round_unique_sol,
-                                                           unique_sols=True,
-                                                           constraint_vals=constraint_vals,
-                                                           constraint_inds=constraint_inds,
-                                                           node_type_dict=node_type_dict
-                                                           )
+                numsols, multisols = multistability_search(pnet,
+                                                          N_multi=1,
+                                                          sol_tol=sol_unique_tol,
+                                                          N_iter=edge_type_search_iterations,
+                                                          verbose=extra_verbose,
+                                                          beta_base=beta_base,
+                                                          n_base=n_base,
+                                                          d_base=d_base,
+                                                          N_space=N_search_space,
+                                                          N_round_unique_sol=N_round_unique_sol,
+                                                          search_tol=sol_search_tol,
+                                                          constraint_vals=constraint_vals,
+                                                          constraint_inds=constraint_inds,
+                                                          coupling_type=coupling_type,
+                                                          p_min=p_min
+                                                          )
 
                 i_max = (np.asarray(numsols) == np.max(numsols)).nonzero()[0]
 
@@ -223,7 +309,15 @@ class NetworkWorkflow(object):
 
         # set edge types to the network:
         pnet.edge_types = edge_types
-        pnet.set_edge_types(pnet.edge_types, add_interactions)
+        pnet.set_edge_types(pnet.edge_types)
+
+        # rebuild the model with the new edge_types:
+        # Get the adjacency matrices for this model:
+        A_add_s, A_mul_s, A_full_s = pnet.build_adjacency_from_edge_type_list(edge_types,
+                                                                              pnet.edges_index,
+                                                          coupling_type=coupling_type)
+        # build the analytical model for this network:
+        pnet.build_analytical_model(A_add_s, A_mul_s)
 
         # save the randomly generated network as a text file:
         gfile = f'network_{fname_base}.gml'
@@ -274,14 +368,6 @@ class NetworkWorkflow(object):
 
         if find_solutions:
 
-            pnet.build_analytical_model(edge_types=edge_types,
-                                        add_interactions=add_interactions,
-                                        node_type_dict=node_type_dict,
-                                        pure_gene_edges_only=pure_gene_edges_only,
-                                        )
-
-            pnet.create_parameter_vects(beta_base=beta_base, n_base=n_base, d_base=d_base, co=coi, ki=ki)
-
             if reduce_dims:  # If reduce dimensions then perform this calculation
                 pnet.reduce_model_dimensions()
 
@@ -292,8 +378,8 @@ class NetworkWorkflow(object):
             elif pnet._solved_analytically:
                 N_reduced_dims = pnet._N_nodes
 
-            else:  # otherwise assign it to zero
-                N_reduced_dims = 0
+            else:  # otherwise assign it to NaN
+                N_reduced_dims = np.nan
 
             eqn_render = f'Eqn_{fname_base}.png'
             save_eqn_render = os.path.join(save_path, eqn_render)
@@ -306,39 +392,23 @@ class NetworkWorkflow(object):
 
             pnet.save_model_equations(save_eqn_render, save_eqn_renderr, save_eqn_net)
 
-            if add_interactions is True:
-                cmax = 1.5*np.max(pnet.in_degree_sequence)
-            else:
-                cmax = 1.5
-
-            if constraint_inds is None or constraint_vals is None:
-                print("Solving experiments *without* constraints")
-                sols_0 = pnet.optimized_phase_space_search(Ns=N_search_space,
-                                                           cmax=cmax,
-                                                           round_sol=N_round_sol,
-                                                           tol=sol_search_tol,
-                                                           method=solver_method
-                                                           )
-
-            else: # otherwise, if node constraints are defined:
-                print("Solving experiments *with* constraints")
-                sols_0 = pnet.constrained_phase_space_search(constraint_vals,
-                                                             constraint_inds,
-                                                             Ns=N_search_space,
-                                                             cmax=cmax,
-                                                             tol=sol_search_tol,
-                                                             round_sol=N_round_sol,
-                                                             method=solver_method
-                                                             )
-
             soln_fn = f'soldat_{fname_base}.csv'
             save_solns = os.path.join(save_path, soln_fn)
-            solsM = pnet.find_attractor_sols(sols_0,
-                                             tol=sol_unique_tol,
-                                             N_round=N_round_unique_sol,
-                                             verbose=extra_verbose,
-                                             unique_sols=True,
-                                             save_file=save_solns)
+
+            solsM, sol_M0_char, sol_0 = pnet.solve_probability_equms(constraint_inds=constraint_inds,
+                                                                  constraint_vals=constraint_vals,
+                                                                  d_base=d_base,
+                                                                  n_base=n_base,
+                                                                  beta_base=beta_base,
+                                                                  N_space=N_search_space,
+                                                                  pmin=p_min,
+                                                                  search_tol=sol_search_tol,
+                                                                  sol_tol=sol_unique_tol,
+                                                                  N_round_sol=N_round_unique_sol,
+                                                                  save_file=save_solns,
+                                                                  verbose=extra_verbose
+                                                                  )
+
 
             if len(solsM):
                 num_sols = solsM.shape[1]
@@ -351,28 +421,22 @@ class NetworkWorkflow(object):
             fig, ax = pnet.plot_sols_array(solsM, figsave)
             plt.close(fig)
 
-            # Perform knockout experiments:
-            if add_interactions is True:
-                cmax = 1.5 * np.max(pnet.in_degree_sequence)
-            else:
-                cmax = 1.5*(1 / np.max(np.asarray(pnet.d_vect)))
-
+            # Perform knockout experiments, if desired:
             if knockout_experiments:
                 gko = GeneKnockout(pnet)
                 knockout_sol_set, knockout_matrix = gko.gene_knockout_ss_solve(
-                                                                           Ns=N_search_space,
-                                                                       cmin=0.0,
-                                                                       cmax=cmax,
+                                                                       Ns=N_search_space,
                                                                        tol=sol_search_tol,
-                                                                       round_sol=N_round_sol,
+                                                                       d_base=d_base,
+                                                                       n_base=n_base,
+                                                                       beta_base=beta_base,
                                                                        round_unique_sol=N_round_unique_sol,
                                                                        verbose=extra_verbose,
-                                                                       unique_sols=True,
                                                                        sol_tol=sol_ko_tol,
                                                                        save_file_basename=None,
                                                                        constraint_vals=constraint_vals,
                                                                        constraint_inds=constraint_inds,
-                                                                       solver_method=solver_method
+                                                                       p_min=p_min
                                                                        )
 
                 ko_file = f'knockoutArrays{fname_base}.png'
@@ -391,15 +455,9 @@ class NetworkWorkflow(object):
         graph_data = {'Index': i_frame,
                       'Base File': fname_base,
                       'Graph Type': pnet._graph_type.name,
-                      'Alpha': np.round(1.0 - pnet._beta - pnet._gamma, 2),
-                      'Beta': pnet._beta,  # this only applies for scale-free graphs
-                      'Gamma': pnet._gamma,
-                      'Delta in': pnet._delta_in,
-                      'Delta out': pnet._delta_out,
-                      'Edge p': pnet._p_edge,  # this only applies for binomial graphs
                       'N Cycles': pnet.N_cycles,
                       'N Nodes': pnet._N_nodes,
-                      'N Edges': pnet.N_edges,
+                      'N Edges': pnet._N_edges,
                       'Out-Degree Max': pnet.out_dmax,
                       'In-Degree Max': pnet.in_dmax,
                       'Democracy Coefficient': pnet.dem_coeff,

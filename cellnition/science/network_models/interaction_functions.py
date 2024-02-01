@@ -8,22 +8,12 @@ This module contains different functions that can be applied as the influence of
 over another node (node-node interaction) when constructing an analytical
 model. These functions are intended to be used with symbolic computing (sympy).
 '''
-import csv
-import numpy as np
 from numpy import ndarray
-import matplotlib.pyplot as plt
-from matplotlib import colors
-from matplotlib import colormaps
-from scipy.optimize import minimize, fsolve
-from scipy.signal import square
-import networkx as nx
-from networkx import DiGraph
 import sympy as sp
 from sympy.core.symbol import Symbol
 from sympy.tensor.indexed import Indexed
 from sympy import MatrixSymbol
-from cellnition.science.network_enums import EdgeType, GraphType, NodeType
-import pygraphviz as pgv
+
 
 def f_hill_s(i, j, pp: MatrixSymbol, nn: MatrixSymbol, beta: MatrixSymbol):
     '''

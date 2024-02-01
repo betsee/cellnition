@@ -6,9 +6,9 @@
 '''
 This module defines several types of study networks.
 '''
-from abc import ABCMeta, abstractmethod
+from abc import ABCMeta
 import numpy as np
-from cellnition.science.network_enums import EdgeType, GraphType, NodeType
+from cellnition.science.network_models.network_enums import EdgeType, NodeType
 
 
 class LibNet(object, metaclass=ABCMeta):

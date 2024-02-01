@@ -18,7 +18,7 @@ from scipy.optimize import fsolve
 import sympy as sp
 from sympy import MutableDenseMatrix
 from cellnition.science.network_models.network_abc import NetworkABC
-from cellnition.science.network_enums import EdgeType, InterFuncType, CouplingType
+from cellnition.science.network_models.network_enums import EdgeType, InterFuncType, CouplingType
 
 # FIXME: I bet we can implement a node type via this same process
 # FIXME: This class should have a network-building start method so we get the external parameters needed
@@ -302,15 +302,16 @@ class ProbabilityNet(NetworkABC):
         # Create linearized lists of symbolic parameters that are needed to solve the model (exclude the
         # zero entries of the M_n and M_beta matrices:
         # FIXME: need to rebuild the graph model if edges index changes...
-        self._edges_index, self.edge_types = self.edges_from_adjacency(A_add_s, A_mul_s)
-        self._beta_vect_s = [self._beta_s[nde_i, nde_j] for nde_i, nde_j in self._edges_index]
-        self._n_vect_s = [self._n_s[nde_i, nde_j] for nde_i, nde_j in self._edges_index]
-        self._N_edges = len(self._edges_index) # count number of edges
+        self._beta_vect_s = [self._beta_s[nde_i, nde_j] for nde_i, nde_j in self.edges_index]
+        self._n_vect_s = [self._n_s[nde_i, nde_j] for nde_i, nde_j in self.edges_index]
+
+        self._A_add_s = A_add_s
+        self._A_mul_s = A_mul_s
 
     def make_numerical_params(self,
                        d_base: float|list[float]=1.0,
-                       n_base: float|list[float]=3.0,
-                       beta_base: float|list[float]=2.0,
+                       n_base: float|list[float]=15.0,
+                       beta_base: float|list[float]=0.25,
                        ) -> tuple[list[float], list[float], list[float]]:
         '''
         Scrape the network for base parameters to initialize numerical parameters.
@@ -433,11 +434,11 @@ class ProbabilityNet(NetworkABC):
         return cM, c_lins, cGrid
 
     def solve_probability_equms(self,
-                                constrained_inds: list|None = None,
-                                constrained_vals: list|None = None,
+                                constraint_inds: list|None = None,
+                                constraint_vals: list|None = None,
                                 d_base: float = 1.0,
-                                n_base: float = 3.0,
-                                beta_base: float = 4.0,
+                                n_base: float = 15.0,
+                                beta_base: float = 0.25,
                                 N_space: int = 2,
                                 pmin: float=1.0e-9,
                                 search_tol: float=1.0e-15,
@@ -450,6 +451,13 @@ class ProbabilityNet(NetworkABC):
         Solve for the equilibrium points of gene product probabilities in
         terms of a given set of numerical parameters.
         '''
+
+
+        # For any network, there may be nodes without regulation that require constraints
+        # (these are in self._constrained_nodes). Therefore, add these to any user-supplied
+        # constraints:
+        constrained_inds, constrained_vals = self.handle_constrained_nodes(constraint_inds,
+                                                                           constraint_vals)
 
         dcdt_vect_f, dcdt_jac_f = self.create_numerical_dcdt(constrained_inds=constrained_inds,
                                                              constrained_vals=constrained_vals)
@@ -624,6 +632,32 @@ class ProbabilityNet(NetworkABC):
 
         return solsM_return, sol_dicts_list
 
+    def handle_constrained_nodes(self,
+                                 constr_inds: list[int] | None,
+                                 constr_vals: list[float] | None,
+    ) -> tuple[list[int], list[float]]:
+        '''
+        Networks will often have nodes without regulation that need to
+        be constrained during optimization. This helper-method augments
+        these naturally-occuring nodes with any additional constraints
+        supplied by the user.
+        '''
+        len_constr = len(self._constrained_nodes)
+        zero_constr = np.zeros(len_constr).tolist()
+
+        if len_constr != 0:
+            if constr_inds is None or constr_vals is None:
+                constrained_inds = self._constrained_nodes.copy()
+                constrained_vals = zero_constr
+            else:
+                constrained_inds = constr_inds + self._constrained_nodes.copy()
+                constrained_vals = constr_vals + zero_constr
+        else:
+            constrained_inds = constr_inds*1
+            constrained_vals = constr_vals*1
+
+        return constrained_inds, constrained_vals
+
     def run_time_sim(self,
                      tend: float,
                      dt: float,
@@ -635,8 +669,8 @@ class ProbabilityNet(NetworkABC):
                      constrained_inds: list | None = None,
                      constrained_vals: list | None = None,
                      d_base: float = 1.0,
-                     n_base: float = 3.0,
-                     beta_base: float = 4.0
+                     n_base: float = 15.0,
+                     beta_base: float = 0.25
                      ):
         '''
 
