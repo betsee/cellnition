@@ -18,7 +18,10 @@ from scipy.optimize import fsolve
 import sympy as sp
 from sympy import MutableDenseMatrix
 from cellnition.science.network_models.network_abc import NetworkABC
-from cellnition.science.network_models.network_enums import EdgeType, InterFuncType, CouplingType
+from cellnition.science.network_models.network_enums import (EdgeType,
+                                                             InterFuncType,
+                                                             CouplingType,
+                                                             EquilibriumType)
 
 # FIXME: I bet we can implement a node type via this same process
 # FIXME: This class should have a network-building start method so we get the external parameters needed
@@ -37,15 +40,15 @@ class ProbabilityNet(NetworkABC):
 
         super().__init__(N_nodes)  # Initialize the base class
 
-        self._N_nodes = N_nodes
+        self.N_nodes = N_nodes
         self._inter_fun_type = interaction_function_type
 
 
         # Matrix Equations:
         # Matrix symbols to construct matrix equation bases:
-        self._M_n_so = sp.MatrixSymbol('M_n', self._N_nodes, self._N_nodes)
-        self._M_beta_so = sp.MatrixSymbol('M_beta', self._N_nodes, self._N_nodes)
-        self._M_p_so = sp.MatrixSymbol('M_p', self._N_nodes, self._N_nodes)
+        self._M_n_so = sp.MatrixSymbol('M_n', self.N_nodes, self.N_nodes)
+        self._M_beta_so = sp.MatrixSymbol('M_beta', self.N_nodes, self.N_nodes)
+        self._M_p_so = sp.MatrixSymbol('M_p', self.N_nodes, self.N_nodes)
 
         # Define symbolic adjacency matrices to use as masks in defining multi and add matrices:
         self._A_add_so = sp.MatrixSymbol('A_add', N_nodes, N_nodes)
@@ -74,25 +77,25 @@ class ProbabilityNet(NetworkABC):
                                                                                         self._M_beta_so[j, i]))))
 
         # Symbolic model parameters:
-        self._d_s = sp.IndexedBase('d', shape=self._N_nodes, positive=True)  # Maximum rate of decay
-        self._p_s = sp.IndexedBase('p', shape=self._N_nodes, positive=True)  # Probability of gene product
+        self._d_s = sp.IndexedBase('d', shape=self.N_nodes, positive=True)  # Maximum rate of decay
+        self._p_s = sp.IndexedBase('p', shape=self.N_nodes, positive=True)  # Probability of gene product
 
         # Vectorized node-parameters and variables:
-        self._d_vect_s = [self._d_s[i] for i in range(self._N_nodes)]  # maximum rate of decay for each node
-        self._c_vect_s = sp.Matrix([self._p_s[i] for i in range(self._N_nodes)])  # gene product probability for each node
+        self._d_vect_s = [self._d_s[i] for i in range(self.N_nodes)]  # maximum rate of decay for each node
+        self._c_vect_s = sp.Matrix([self._p_s[i] for i in range(self.N_nodes)])  # gene product probability for each node
 
-        self._beta_s = sp.IndexedBase('beta', shape=(self._N_nodes, self._N_nodes), positive=True)  # Hill centre
-        self._n_s = sp.IndexedBase('n', shape=(self._N_nodes, self._N_nodes), positive=True)  # Hill coupling
+        self._beta_s = sp.IndexedBase('beta', shape=(self.N_nodes, self.N_nodes), positive=True)  # Hill centre
+        self._n_s = sp.IndexedBase('n', shape=(self.N_nodes, self.N_nodes), positive=True)  # Hill coupling
 
         # Create a matrix out of the n_s symbols:
-        self._M_n_s = sp.Matrix(self._N_nodes, self._N_nodes,
+        self._M_n_s = sp.Matrix(self.N_nodes, self.N_nodes,
                                 lambda i, j: self._n_s[i, j])
 
-        self._M_beta_s = sp.Matrix(self._N_nodes, self._N_nodes,
+        self._M_beta_s = sp.Matrix(self.N_nodes, self.N_nodes,
                                    lambda i, j: self._beta_s[i, j])
 
         # Define vector of ones to use in matrix operations:
-        self._ones_vect = sp.ones(1, self._N_nodes)
+        self._ones_vect = sp.ones(1, self.N_nodes)
 
         # Create a matrix that allows us to access the concentration vectors
         # duplicated along columns:
@@ -105,9 +108,9 @@ class ProbabilityNet(NetworkABC):
         '''
 
         '''
-        A_full_s = np.zeros((self._N_nodes, self._N_nodes), dtype=int)
-        A_add_s = np.zeros((self._N_nodes, self._N_nodes), dtype=int)
-        A_mul_s = np.zeros((self._N_nodes, self._N_nodes), dtype=int)
+        A_full_s = np.zeros((self.N_nodes, self.N_nodes), dtype=int)
+        A_add_s = np.zeros((self.N_nodes, self.N_nodes), dtype=int)
+        A_mul_s = np.zeros((self.N_nodes, self.N_nodes), dtype=int)
 
         # Build A_full_s, an adjacency matrix that doesn't distinguish between additive
         # and multiplicative interactions:
@@ -156,11 +159,11 @@ class ProbabilityNet(NetworkABC):
         '''
         Return a randomly-generated full adjacency matrix.
         '''
-        A_full_s = sp.Matrix(np.random.randint(-1, 2, size=(self._N_nodes, self._N_nodes)))
+        A_full_s = sp.Matrix(np.random.randint(-1, 2, size=(self.N_nodes, self.N_nodes)))
 
         if set_autoactivation:
             # Make it so that any diagonal elements are self-activating rather than self-inhibiting
-            A_full_s = sp.Matrix(self._N_nodes, self._N_nodes,
+            A_full_s = sp.Matrix(self.N_nodes, self.N_nodes,
                                  lambda i,j: A_full_s[i,j]*A_full_s[i,j] if i==j else A_full_s[i,j])
 
         A_add_s, A_mul_s = self.process_full_adjacency(A_full_s, coupling_type=coupling_type)
@@ -176,8 +179,8 @@ class ProbabilityNet(NetworkABC):
         edges_index = []
 
         A_full_s = A_add_s + A_mul_s
-        for i in range(self._N_nodes):
-            for j in range(self._N_nodes):
+        for i in range(self.N_nodes):
+            for j in range(self.N_nodes):
                 afull_ij = A_full_s[i,j]
                 if afull_ij != 0:
                     edges_index.append((i, j))
@@ -201,11 +204,11 @@ class ProbabilityNet(NetworkABC):
         based on a specified coupling type.
 
         '''
-        A_add_s = np.zeros((self._N_nodes, self._N_nodes), dtype=int)
-        A_mul_s = np.zeros((self._N_nodes, self._N_nodes), dtype=int)
+        A_add_s = np.zeros((self.N_nodes, self.N_nodes), dtype=int)
+        A_mul_s = np.zeros((self.N_nodes, self.N_nodes), dtype=int)
 
-        for i in range(self._N_nodes):
-            for j in range(self._N_nodes):
+        for i in range(self.N_nodes):
+            for j in range(self.N_nodes):
                 afull_ij = A_full_s[i,j]
                 if afull_ij == 1:
                     if coupling_type is CouplingType.additive or coupling_type is CouplingType.mixed:
@@ -239,12 +242,12 @@ class ProbabilityNet(NetworkABC):
 
         # Initialize a list of node indices that should be constrained (removed from solution searches)
         # due to their lack of regulation:
-        self._constrained_nodes = []
+        self.signal_node_inds = []
 
-        if A_add_s.shape != (self._N_nodes, self._N_nodes):
+        if A_add_s.shape != (self.N_nodes, self.N_nodes):
             raise Exception("Shape of A_add_s is not in terms of network node number!")
 
-        if A_mul_s.shape != (self._N_nodes, self._N_nodes):
+        if A_mul_s.shape != (self.N_nodes, self.N_nodes):
             raise Exception("Shape of A_add_s is not in terms of network node number!")
 
         M_funk_add_si = self._M_funk_add_so.subs(
@@ -260,11 +263,11 @@ class ProbabilityNet(NetworkABC):
              (self._A_mul_so, A_mul_s)])
 
         # Filter out the 1/2 terms and set to 0 (addiditive) or 1 (multiplicative):
-        M_funk_add_s = sp.Matrix(self._N_nodes, self._N_nodes, lambda i, j: sp.Piecewise(
+        M_funk_add_s = sp.Matrix(self.N_nodes, self.N_nodes, lambda i, j: sp.Piecewise(
             (M_funk_add_si[i, j], M_funk_add_si[i, j] != sp.Rational(1, 2)),
             (0, True)))
 
-        M_funk_mul_s = sp.Matrix(self._N_nodes, self._N_nodes, lambda i, j: sp.Piecewise(
+        M_funk_mul_s = sp.Matrix(self.N_nodes, self.N_nodes, lambda i, j: sp.Piecewise(
             (M_funk_mul_si[i, j], M_funk_mul_si[i, j] != sp.Rational(1, 2)),
             (1, True)))
 
@@ -274,8 +277,8 @@ class ProbabilityNet(NetworkABC):
         # Count the nodes interacting (on input) with each node:
         n_add_edges_i = abs_A_add_s.T * self._ones_vect.T
         # Correct for any zeros in the n_add_edges and create a normalization object:
-        self._n_add_edges = sp.Matrix(self._N_nodes, 1,
-                                lambda i, j: sp.Piecewise((sp.Rational(1, n_add_edges_i[i, j]), n_add_edges_i[i, j] != 0),
+        self._n_add_edges = sp.Matrix(self.N_nodes, 1,
+                                      lambda i, j: sp.Piecewise((sp.Rational(1, n_add_edges_i[i, j]), n_add_edges_i[i, j] != 0),
                                                           (1, True)))
         add_terms_i = M_funk_add_s * self._ones_vect.T
 
@@ -285,10 +288,10 @@ class ProbabilityNet(NetworkABC):
         self._mul_terms = sp.Matrix(np.product(M_funk_mul_s, axis=1))
 
         self._dcdt_vect_s = []
-        for i in range(self._N_nodes):
+        for i in range(self.N_nodes):
             if self._add_terms[i] == 0 and self._mul_terms[i] == 1: # if there's no add term and no mul term
                 self._dcdt_vect_s.append(0) # set the rate of change of this unregulated node to zero
-                self._constrained_nodes.append(i) # append this node to the list of nodes that should be constrained
+                self.signal_node_inds.append(i) # append this node to the list of nodes that should be constrained
             elif self._add_terms[i] == 0 and self._mul_terms[i] != 1: # remove the null add term to avoid nulling all growth
                 self._dcdt_vect_s.append(self._d_vect_s[i] * self._mul_terms[i] -
                                          self._c_vect_s[i] * self._d_vect_s[i])
@@ -308,6 +311,9 @@ class ProbabilityNet(NetworkABC):
         self._A_add_s = A_add_s
         self._A_mul_s = A_mul_s
 
+        # get the "regular" nodes:
+        self.nonsignal_node_inds = np.setdiff1d(self.nodes_index, self.signal_node_inds)
+
     def make_numerical_params(self,
                        d_base: float|list[float]=1.0,
                        n_base: float|list[float]=15.0,
@@ -319,23 +325,23 @@ class ProbabilityNet(NetworkABC):
         '''
         # Node parameters:
         if type(d_base) is list:
-            assert len(d_base) == self._N_nodes, "Length of d_base not equal to node number!"
+            assert len(d_base) == self.N_nodes, "Length of d_base not equal to node number!"
             d_vect = d_base
         else:
-            d_vect = [d_base for i in range(self._N_nodes)]
+            d_vect = [d_base for i in range(self.N_nodes)]
 
         # Edge parameters:
         if type(n_base) is list:
-            assert len(n_base) == self._N_edges, "Length of n_base not equal to edge number!"
+            assert len(n_base) == self.N_edges, "Length of n_base not equal to edge number!"
             n_vect = n_base
         else:
-            n_vect = [n_base for i in range(self._N_edges)]
+            n_vect = [n_base for i in range(self.N_edges)]
 
         if type(beta_base) is list:
-            assert len(beta_base) == self._N_edges, "Length of n_base not equal to edge number!"
+            assert len(beta_base) == self.N_edges, "Length of n_base not equal to edge number!"
             beta_vect = beta_base
         else:
-            beta_vect = [beta_base for i in range(self._N_edges)]
+            beta_vect = [beta_base for i in range(self.N_edges)]
 
         return d_vect, n_vect, beta_vect
 
@@ -426,7 +432,7 @@ class ProbabilityNet(NetworkABC):
 
         N_pts = len(cGrid[0].ravel())
 
-        cM = np.zeros((N_pts, self._N_nodes))
+        cM = np.zeros((N_pts, self.N_nodes))
 
         for i, cGrid in enumerate(cGrid):
             cM[:, i] = cGrid.ravel()
@@ -436,6 +442,7 @@ class ProbabilityNet(NetworkABC):
     def solve_probability_equms(self,
                                 constraint_inds: list|None = None,
                                 constraint_vals: list|None = None,
+                                signal_constr_vals: list|None = None,
                                 d_base: float = 1.0,
                                 n_base: float = 15.0,
                                 beta_base: float = 0.25,
@@ -456,8 +463,9 @@ class ProbabilityNet(NetworkABC):
         # For any network, there may be nodes without regulation that require constraints
         # (these are in self._constrained_nodes). Therefore, add these to any user-supplied
         # constraints:
-        constrained_inds, constrained_vals = self.handle_constrained_nodes(constraint_inds,
-                                                                           constraint_vals)
+        constrained_inds, constrained_vals = self._handle_constrained_nodes(constraint_inds,
+                                                                            constraint_vals,
+                                                                            signal_constr_vals=signal_constr_vals)
 
         dcdt_vect_f, dcdt_jac_f = self.create_numerical_dcdt(constrained_inds=constrained_inds,
                                                              constrained_vals=constrained_vals)
@@ -487,7 +495,7 @@ class ProbabilityNet(NetworkABC):
                                col_deriv=False,
                                )
 
-            c_eqms = np.zeros(self._N_nodes)
+            c_eqms = np.zeros(self.N_nodes)
             c_eqms[unconstrained_inds] = sol_roots
 
             if constrained_inds is not None and constrained_vals is not None:
@@ -563,29 +571,29 @@ class ProbabilityNet(NetworkABC):
             # FIXME: this should be enumeration
             # If all eigenvalues are real and they're all negative:
             if len(real_eig_inds) == len(eig_vals) and np.all(np.real(eig_vals) <= 0.0):
-                char_tag = 'Stable Attractor'
+                char_tag = EquilibriumType.attractor.name
 
             # If all eigenvalues are real and they're all positive:
             elif len(real_eig_inds) == len(eig_vals) and np.all(np.real(eig_vals) > 0.0):
-                char_tag = 'Stable Repellor'
+                char_tag = EquilibriumType.repellor.name
 
             # If there are no real eigenvalues we only know its a limit cycle but can't say
             # anything certain about stability:
             elif len(real_eig_inds) == 0 and np.all(np.real(eig_vals) <= 0.0):
-                char_tag = 'Stable Limit Cycle'
+                char_tag = EquilibriumType.limit_cycle.name
 
             # If there are no real eigenvalues and a mix of real component sign, we only know its a limit cycle but can't say
             # anything certain about stability:
             elif len(real_eig_inds) == 0 and np.any(np.real(eig_vals) > 0.0):
-                char_tag = 'Limit Cycle'
+                char_tag = EquilibriumType.limit_cycle.name
 
             elif np.all(np.real(eig_vals[real_eig_inds]) <= 0.0):
-                char_tag = 'Stable Limit Cycle'
+                char_tag = EquilibriumType.limit_cycle.name
 
             elif np.any(np.real(eig_vals[real_eig_inds] > 0.0)):
-                char_tag = 'Saddle Point'
+                char_tag = EquilibriumType.saddle.name
             else:
-                char_tag = 'Undetermined'
+                char_tag = EquilibriumType.undetermined.name
 
             solution_dict['Stability Characteristic'] = char_tag
 
@@ -600,7 +608,8 @@ class ProbabilityNet(NetworkABC):
             char = sol_dic['Stability Characteristic']
             sols = sol_dic['Minima Values']
 
-            if char != 'Saddle Point' and error <= tol:
+            if char is not EquilibriumType.saddle.name and error <= tol:
+            # if error <= tol:
                 i += 1
                 if verbose and unique_sols is False:
                     print(f'Soln {i}, {char}, {sols}, {np.round(error, sol_round)}')
@@ -615,7 +624,9 @@ class ProbabilityNet(NetworkABC):
             solsy, inds_solsy = np.unique(np.round(solsM, sol_round), axis=0, return_index=True)
             if verbose:
                 for i, si in enumerate(inds_solsy):
-                    print(f'Soln {i}: {sol_char_list[si]}, {solsM[si]}, error: {sol_char_error[si]}')
+                    print(f'Soln {i}: {sol_char_list[si]}, '
+                          f'{solsy[si]}, '
+                          f'error: {np.round(sol_char_error[si], 6)}')
 
             solsM_return = np.asarray(solsM)[inds_solsy].T
 
@@ -632,26 +643,31 @@ class ProbabilityNet(NetworkABC):
 
         return solsM_return, sol_dicts_list
 
-    def handle_constrained_nodes(self,
-                                 constr_inds: list[int] | None,
-                                 constr_vals: list[float] | None,
-    ) -> tuple[list[int], list[float]]:
+    def _handle_constrained_nodes(self,
+                                  constr_inds: list[int] | None,
+                                  constr_vals: list[float] | None,
+                                  signal_constr_vals: list[float] | None = None
+                                  ) -> tuple[list[int], list[float]]:
         '''
         Networks will often have nodes without regulation that need to
         be constrained during optimization. This helper-method augments
         these naturally-occuring nodes with any additional constraints
         supplied by the user.
         '''
-        len_constr = len(self._constrained_nodes)
-        zero_constr = np.zeros(len_constr).tolist()
+        len_constr = len(self.signal_node_inds)
+
+        if signal_constr_vals is None: # default to zero
+            sig_vals = np.zeros(len_constr).tolist()
+        else:
+            sig_vals = signal_constr_vals
 
         if len_constr != 0:
             if constr_inds is None or constr_vals is None:
-                constrained_inds = self._constrained_nodes.copy()
-                constrained_vals = zero_constr
+                constrained_inds = self.signal_node_inds.copy()
+                constrained_vals = sig_vals
             else:
-                constrained_inds = constr_inds + self._constrained_nodes.copy()
-                constrained_vals = constr_vals + zero_constr
+                constrained_inds = constr_inds + self.signal_node_inds.copy()
+                constrained_vals = constr_vals + sig_vals
         else:
             constrained_inds = constr_inds*1
             constrained_vals = constr_vals*1

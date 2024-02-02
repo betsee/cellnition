@@ -84,10 +84,10 @@ class NetworkABC(object, metaclass=ABCMeta):
             an edge. As p_edge increases, the number of network edges increases drammatically.
         '''
         # Set some basic features of the network that may be overridden later:
-        self._N_nodes = N_Nodes
-        self._nodes_index = [i for i in range(self._N_nodes)]
+        self.N_nodes = N_Nodes
+        self._nodes_index = [i for i in range(self.N_nodes)]
         self.regular_node_inds = self._nodes_index
-        self.nodes_list = [f'G{i}' for i in range(self._N_nodes)]
+        self.nodes_list = [f'G{i}' for i in range(self.N_nodes)]
 
         # Initialize some object state variables:
         self._reduced_dims = False # Indicate that model is full dimensions
@@ -97,6 +97,8 @@ class NetworkABC(object, metaclass=ABCMeta):
         self.edge_types = None
         self.edges_index = None
 
+        self.p_min = 1.0e-6 # small nonzero element for working with Hill versions
+
     def build_network_from_edges(self, edges: list[tuple]):
         '''
 
@@ -104,9 +106,9 @@ class NetworkABC(object, metaclass=ABCMeta):
         self._graph_type = GraphType.user
         self.edges_list = edges
         self.GG = nx.DiGraph(self.edges_list)
-        self._N_edges = len(self.edges_list)
+        self.N_edges = len(self.edges_list)
         self.nodes_list = sorted(self.GG.nodes())
-        self._N_nodes = len(self.nodes_list)  # re-assign the node number in case specification was wrong
+        self.N_nodes = len(self.nodes_list)  # re-assign the node number in case specification was wrong
 
         self._make_node_edge_indices()
 
@@ -164,7 +166,7 @@ class NetworkABC(object, metaclass=ABCMeta):
             alpha = 1.0 - b_param - g_param
 
             # Generate a scale free graph with the settings:
-            GGo = nx.scale_free_graph(self._N_nodes,
+            GGo = nx.scale_free_graph(self.N_nodes,
                                       alpha=alpha,
                                       beta=b_param,
                                       gamma=g_param,
@@ -175,7 +177,7 @@ class NetworkABC(object, metaclass=ABCMeta):
 
         elif graph_type is GraphType.random:
             # generate a random Erdos-Renyi network
-            GGo = nx.erdos_renyi_graph(self._N_nodes,
+            GGo = nx.erdos_renyi_graph(self.N_nodes,
                                        p_edge,
                                        seed=None,
                                        directed=True)
@@ -185,13 +187,13 @@ class NetworkABC(object, metaclass=ABCMeta):
 
         # obtain the unique edges only:
         self.edges_list = list(set(GGo.edges()))
-        self._N_edges = len(self.edges_list)
+        self.N_edges = len(self.edges_list)
 
         # As the scale_free_graph function can return duplicate edges, get rid of these
         # by re-defining the graph with the unique edges only:
         GG = nx.DiGraph(self.edges_list)
 
-        self.nodes_list = np.arange(self._N_nodes).tolist()
+        self.nodes_list = np.arange(self.N_nodes).tolist()
         self.GG = GG
         self.edges_index = self.edges_list
         self.nodes_index = self.nodes_list
@@ -276,7 +278,7 @@ class NetworkABC(object, metaclass=ABCMeta):
         a_out = list(self.GG.adjacency())
 
         # Adjacency matrix (outward connection directed)
-        self.A_out = np.zeros((self._N_nodes, self._N_nodes))
+        self.A_out = np.zeros((self.N_nodes, self.N_nodes))
         for nde_ni, nde_j_dict in a_out:
             nde_i = self.nodes_list.index(nde_ni) # get the index in case nodes are names
             for nde_nj, _ in nde_j_dict.items():
@@ -306,7 +308,7 @@ class NetworkABC(object, metaclass=ABCMeta):
 
             # Next, define a difference matrix for the network -- this calculates the difference between node i and j
             # as an edge parameter when it is dotted with a parameter defined on nodes:
-            self.D_diff = np.zeros((self._N_edges, self._N_nodes))
+            self.D_diff = np.zeros((self.N_edges, self.N_nodes))
             for ei, (nde_i, nde_j) in enumerate(self.edges_index):
                 self.D_diff[ei, nde_i] = 1
                 self.D_diff[ei, nde_j] = -1
@@ -330,7 +332,7 @@ class NetworkABC(object, metaclass=ABCMeta):
             # hierarchical at zero demo coeff and zero incoherence).
 
         else:
-            self.hier_node_level = np.zeros(self._N_nodes)
+            self.hier_node_level = np.zeros(self.N_nodes)
             self.hier_incoherence = 0.0
             self.dem_coeff = 0.0
 
@@ -397,7 +399,7 @@ class NetworkABC(object, metaclass=ABCMeta):
 
         edge_types_o = [EdgeType.A, EdgeType.I]
         edge_prob = [p_acti, p_inhi]
-        edge_types = np.random.choice(edge_types_o, self._N_edges, p=edge_prob)
+        edge_types = np.random.choice(edge_types_o, self.N_edges, p=edge_prob)
 
         if set_selfloops_acti: # if self-loops of the network are forced to be activators:
             edge_types[self.selfloop_edge_inds] = EdgeType.A
@@ -541,7 +543,7 @@ class NetworkABC(object, metaclass=ABCMeta):
             else:
                 raise Exception("Edge type not found.")
 
-        self._N_edges = len(self.edges_list)
+        self.N_edges = len(self.edges_list)
 
     def read_node_info_from_graph(self):
         '''
@@ -732,7 +734,7 @@ class NetworkABC(object, metaclass=ABCMeta):
         '''
         Nt = len(tvect)
 
-        c_signals = np.zeros((Nt, self._N_nodes))  # Initialize matrix holding the signal sequences
+        c_signals = np.zeros((Nt, self.N_nodes))  # Initialize matrix holding the signal sequences
 
         for si, (ts, te), (smin, smax) in zip(sig_inds, sig_times, sig_mag):
             c_signals[:, si] += self.pulses(tvect,

@@ -64,14 +64,14 @@ class GeneKnockout(object):
 
         if save_file_basename is not None:
             save_file_list = [f'{save_file_basename}_allc.csv']
-            save_file_list.extend([f'{save_file_basename}_ko_c{i}.csv' for i in range(self._pnet._N_nodes)])
+            save_file_list.extend([f'{save_file_basename}_ko_c{i}.csv' for i in range(self._pnet.N_nodes)])
 
         else:
             save_file_list = [None]
-            save_file_list.extend([None for i in range(self._pnet._N_nodes)])
+            save_file_list.extend([None for i in range(self._pnet.N_nodes)])
 
-        constrained_inds, constrained_vals = self._pnet.handle_constrained_nodes(constraint_inds,
-                                                                           constraint_vals)
+        constrained_inds, constrained_vals = self._pnet._handle_constrained_nodes(constraint_inds,
+                                                                                  constraint_vals)
 
 
         solsM, sol_M0_char, sols_0 = self._pnet.solve_probability_equms(constraint_inds=constrained_inds,
@@ -126,7 +126,7 @@ class GeneKnockout(object):
         ko_M = None
         for i, ko_aro in enumerate(knockout_sol_set):
             if len(ko_aro) == 0:
-                ko_ar = np.asarray([np.zeros(self._pnet._N_nodes)]).T
+                ko_ar = np.asarray([np.zeros(self._pnet.N_nodes)]).T
             else:
                 ko_ar = ko_aro
 
@@ -163,7 +163,7 @@ class GeneKnockout(object):
         # make a time-step update vector so we can update any sensors as
         # an absolute reading (dt = 1.0) while treating the kinetics of the
         # other node types:
-        dtv = 1.0e-3 * np.ones(self._pnet._N_nodes)
+        dtv = 1.0e-3 * np.ones(self._pnet.N_nodes)
         dtv[self._pnet.sensor_node_inds] = 1.0
 
         wild_type_sim = False
@@ -243,7 +243,7 @@ class GeneKnockout(object):
                 if len(solsMio):
                     solsMi = solsMio
                 else:
-                    solsMi = np.asarray([np.zeros(self._pnet._N_nodes)]).T
+                    solsMi = np.asarray([np.zeros(self._pnet.N_nodes)]).T
                 axi.imshow(solsMi, aspect="equal", vmax=vmax, vmin=vmin, cmap=cmap)
                 axi.axis('off')
                 if i != 0:

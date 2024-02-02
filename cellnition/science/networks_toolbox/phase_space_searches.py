@@ -238,7 +238,7 @@ def param_space_search(pnet: ProbabilityNet,
 
     beta_lin_set = []
 
-    for edj_i in range(pnet._N_edges):
+    for edj_i in range(pnet.N_edges):
         beta_lin_set.append(beta_lin*1) # append the beta-vector choices for each edge
 
     # Create a set of matrices specifying the concentration grid for each

@@ -34,11 +34,11 @@ class GraphType(Enum):
     user = 'User Defined'
 
 class EquilibriumType(Enum):
-    attractor = 'Stable Attractor'
-    repellor = 'Stable Repellor'
-    limit_cycle = 'Stable Limit Cycle'
+    attractor = 'Attractor'
+    repellor = 'Repellor'
+    limit_cycle = 'Limit Cycle'
     cycle = 'Limit Cycle'
-    saddle = 'Saddle Attractor'
+    saddle = 'Saddle'
     undetermined = 'Undetermined'
 
 class InterFuncType(Enum):

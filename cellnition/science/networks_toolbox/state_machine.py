@@ -180,7 +180,7 @@ class StateMachine(object):
             as possible transitions for states.
 
         '''
-        c_zeros = np.zeros(self._gmod._N_nodes)  # start everything out low
+        c_zeros = np.zeros(self._gmod.N_nodes)  # start everything out low
 
         # Create a steady-state solutions matrix that is stacked with the
         # 'zero' or 'base' state:

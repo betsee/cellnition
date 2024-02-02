@@ -344,7 +344,7 @@ class NetworkWorkflow(object):
                         )
 
         # Highlight the existance of a "core" graph:
-        cycle_tags = np.zeros(pnet._N_nodes)
+        cycle_tags = np.zeros(pnet.N_nodes)
         cycle_tags[pnet.nodes_in_cycles] = 1.0
 
         gp=plot_network(pnet.nodes_list,
@@ -376,7 +376,7 @@ class NetworkWorkflow(object):
                 N_reduced_dims = len(pnet._dcdt_vect_reduced_s)
 
             elif pnet._solved_analytically:
-                N_reduced_dims = pnet._N_nodes
+                N_reduced_dims = pnet.N_nodes
 
             else:  # otherwise assign it to NaN
                 N_reduced_dims = np.nan
@@ -456,8 +456,8 @@ class NetworkWorkflow(object):
                       'Base File': fname_base,
                       'Graph Type': pnet._graph_type.name,
                       'N Cycles': pnet.N_cycles,
-                      'N Nodes': pnet._N_nodes,
-                      'N Edges': pnet._N_edges,
+                      'N Nodes': pnet.N_nodes,
+                      'N Edges': pnet.N_edges,
                       'Out-Degree Max': pnet.out_dmax,
                       'In-Degree Max': pnet.in_dmax,
                       'Democracy Coefficient': pnet.dem_coeff,
