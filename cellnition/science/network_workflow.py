@@ -262,7 +262,6 @@ class NetworkWorkflow(object):
                    update_string: str|None = None,
                    node_type_dict: dict|None = None,
                    extra_verbose: bool=False,
-                   p_min: float=1.0e-8,
                    coupling_type: CouplingType=CouplingType.mixed
                    ):
         '''
@@ -300,7 +299,6 @@ class NetworkWorkflow(object):
                                                           constraint_vals=constraint_vals,
                                                           constraint_inds=constraint_inds,
                                                           coupling_type=coupling_type,
-                                                          p_min=p_min
                                                           )
 
                 i_max = (np.asarray(numsols) == np.max(numsols)).nonzero()[0]
@@ -401,7 +399,6 @@ class NetworkWorkflow(object):
                                                                   n_base=n_base,
                                                                   beta_base=beta_base,
                                                                   N_space=N_search_space,
-                                                                  pmin=p_min,
                                                                   search_tol=sol_search_tol,
                                                                   sol_tol=sol_unique_tol,
                                                                   N_round_sol=N_round_unique_sol,
@@ -436,7 +433,6 @@ class NetworkWorkflow(object):
                                                                        save_file_basename=None,
                                                                        constraint_vals=constraint_vals,
                                                                        constraint_inds=constraint_inds,
-                                                                       p_min=p_min
                                                                        )
 
                 ko_file = f'knockoutArrays{fname_base}.png'

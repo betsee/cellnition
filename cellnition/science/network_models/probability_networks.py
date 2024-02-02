@@ -418,7 +418,7 @@ class ProbabilityNet(NetworkABC):
     def generate_state_space(self,
                              c_inds: list[int],
                              N_space: int,
-                             pmin: float=1.0e-25) -> tuple[ndarray, list, ndarray]:
+                             ) -> tuple[ndarray, list, ndarray]:
         '''
         Generate a discrete state space over the range of probabilities of
         each individual gene in the network.
@@ -426,7 +426,7 @@ class ProbabilityNet(NetworkABC):
         c_lins = []
 
         for i in c_inds:
-            c_lins.append(np.linspace(pmin, 1.0, N_space))
+            c_lins.append(np.linspace(self.p_min, 1.0, N_space))
 
         cGrid = np.meshgrid(*c_lins)
 
@@ -447,12 +447,12 @@ class ProbabilityNet(NetworkABC):
                                 n_base: float = 15.0,
                                 beta_base: float = 0.25,
                                 N_space: int = 2,
-                                pmin: float=1.0e-9,
                                 search_tol: float=1.0e-15,
                                 sol_tol: float=1.0e-1,
                                 N_round_sol: int = 2,
                                 verbose: bool=True,
-                                save_file: str|None = None
+                                save_file: str|None = None,
+                                return_saddles: bool = False
                                 ):
         '''
         Solve for the equilibrium points of gene product probabilities in
@@ -475,7 +475,7 @@ class ProbabilityNet(NetworkABC):
         else:
             unconstrained_inds = np.setdiff1d(self._nodes_index, constrained_inds).tolist()
 
-        M_pstates, _, _ = self.generate_state_space(unconstrained_inds, N_space, pmin)
+        M_pstates, _, _ = self.generate_state_space(unconstrained_inds, N_space)
 
         sol_Mo = []
 
@@ -507,19 +507,19 @@ class ProbabilityNet(NetworkABC):
 
         sol_M = np.asarray(sol_Mo)[unique_inds]
 
-        stable_sol_M, sol_M_char = self._find_attractor_sols(sol_M,
+        stable_sol_M, sol_M_char = self.find_attractor_sols(sol_M,
                                                              dcdt_vect_f,
                                                              dcdt_jac_f,
                                                              function_args,
                                                              constrained_inds=constrained_inds,
                                                              tol= sol_tol,
                                                              verbose = verbose,
-                                                             unique_sols = True,
                                                              sol_round = N_round_sol,
-                                                             save_file = save_file)
+                                                             save_file = save_file,
+                                                             return_saddles=return_saddles)
 
         return stable_sol_M, sol_M_char, sol_M
-    def _find_attractor_sols(self,
+    def find_attractor_sols(self,
                              sols_0: list|ndarray,
                              dcdt_vect_f: Callable,
                              jac_f: Callable,
@@ -527,9 +527,9 @@ class ProbabilityNet(NetworkABC):
                              constrained_inds: list | None = None,
                              tol: float=1.0e-1,
                              verbose: bool=True,
-                             unique_sols: bool = True,
                              sol_round: int = 1,
-                             save_file: str|None = None
+                             save_file: str|None = None,
+                             return_saddles: bool = False
                              ):
         '''
 
@@ -568,7 +568,6 @@ class ProbabilityNet(NetworkABC):
             # get the indices of eigenvalues that have only real components:
             real_eig_inds = (np.imag(eig_vals) == 0.0).nonzero()[0]
 
-            # FIXME: this should be enumeration
             # If all eigenvalues are real and they're all negative:
             if len(real_eig_inds) == len(eig_vals) and np.all(np.real(eig_vals) <= 0.0):
                 char_tag = EquilibriumType.attractor.name
@@ -608,27 +607,36 @@ class ProbabilityNet(NetworkABC):
             char = sol_dic['Stability Characteristic']
             sols = sol_dic['Minima Values']
 
-            if char is not EquilibriumType.saddle.name and error <= tol:
-            # if error <= tol:
-                i += 1
-                if verbose and unique_sols is False:
-                    print(f'Soln {i}, {char}, {sols}, {np.round(error, sol_round)}')
-                solsM.append(sols)
-                sol_char_list.append(char)
-                sol_char_error.append(error)
+            if return_saddles is False:
+                if char is not EquilibriumType.saddle.name and error <= tol:
+                    i += 1
+                    if verbose:
+                        print(f'Soln {i}, {char}, {np.round(sols, sol_round)}, {np.round(error, sol_round)}')
+                    solsM.append(sols)
+                    sol_char_list.append(char)
+                    sol_char_error.append(error)
+            else:
+                if error <= tol:
+                    i += 1
+                    if verbose:
+                        print(f'Soln {i}, {char}, {np.round(sols, sol_round)}, {np.round(error, sol_round)}')
+                    solsM.append(sols)
+                    sol_char_list.append(char)
+                    sol_char_error.append(error)
 
         solsM_return = np.asarray(solsM).T
+        sol_char_list_return = np.asarray(sol_char_list).T
 
-        if unique_sols and len(solsM) != 0:
-            # round the sols to avoid degenerates and return indices to the unique solutions:
-            solsy, inds_solsy = np.unique(np.round(solsM, sol_round), axis=0, return_index=True)
-            if verbose:
-                for i, si in enumerate(inds_solsy):
-                    print(f'Soln {i}: {sol_char_list[si]}, '
-                          f'{solsy[si]}, '
-                          f'error: {np.round(sol_char_error[si], 6)}')
-
-            solsM_return = np.asarray(solsM)[inds_solsy].T
+        # if unique_sols and len(solsM) != 0:
+        #     # round the sols to avoid degenerates and return indices to the unique solutions:
+        #     solsy, inds_solsy = np.unique(np.round(solsM, sol_round), axis=0, return_index=True)
+        #     if verbose:
+        #         for i, si in enumerate(inds_solsy):
+        #             print(f'Soln {i}: {sol_char_list[si]}, '
+        #                   f'{solsy[si]}, '
+        #                   f'error: {np.round(sol_char_error[si], 6)}')
+        #
+        #     solsM_return = np.asarray(solsM)[inds_solsy].T
 
         if save_file is not None:
             solsMi = np.asarray(solsM)
@@ -641,7 +649,7 @@ class ProbabilityNet(NetworkABC):
                 for si in solsMi.T:
                     csvwriter.writerow(si)  # write the soln data rows for each gene
 
-        return solsM_return, sol_dicts_list
+        return solsM_return, sol_char_list_return
 
     def _handle_constrained_nodes(self,
                                   constr_inds: list[int] | None,

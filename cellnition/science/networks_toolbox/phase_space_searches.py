@@ -28,7 +28,6 @@ def multistability_search(pnet: ProbabilityNet,
                           constraint_vals: list[float]|None = None,
                           constraint_inds: list[int]|None = None,
                           coupling_type: CouplingType = CouplingType.mixed,
-                          p_min: float=1.0e-8
                           ) -> tuple[list, list]:
     '''
     By randomly generating sets of different edge interaction types (i.e. activator or inhibitor), find
@@ -121,7 +120,6 @@ def multistability_search(pnet: ProbabilityNet,
                                                                  n_base=n_base,
                                                                  beta_base=beta_base,
                                                                  N_space=N_space,
-                                                                 pmin=p_min,
                                                                  search_tol=search_tol,
                                                                  sol_tol=sol_tol,
                                                                  N_round_sol=N_round_unique_sol,
@@ -158,7 +156,6 @@ def param_space_search(pnet: ProbabilityNet,
                        verbose: bool=True,
                        constraint_vals: list[float] | None = None,
                        constraint_inds: list[int] | None = None,
-                       p_min: float=1.0e-8
                        ) -> tuple[ndarray, list]:
     '''
     Search parameter space of a model to find parameter combinations that give different multistable
@@ -266,7 +263,6 @@ def param_space_search(pnet: ProbabilityNet,
                                                                  n_base=n_base,
                                                                  beta_base=beta_set_i,
                                                                  N_space=N_search,
-                                                                 pmin=p_min,
                                                                  search_tol=search_tol,
                                                                  sol_tol=sol_tol,
                                                                  N_round_sol=N_unique_sol_round,

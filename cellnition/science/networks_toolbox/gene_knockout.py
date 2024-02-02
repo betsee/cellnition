@@ -47,7 +47,6 @@ class GeneKnockout(object):
                                save_file_basename: str | None = None,
                                constraint_vals: list[float]|None = None,
                                constraint_inds: list[int]|None = None,
-                               p_min: float=1.0e-8
                                ):
         '''
         Performs a sequential knockout of all genes in the network, computing all possible steady-state
@@ -80,7 +79,6 @@ class GeneKnockout(object):
                                                                         n_base=n_base,
                                                                         beta_base=beta_base,
                                                                         N_space=Ns,
-                                                                        pmin=p_min,
                                                                         search_tol=tol,
                                                                         sol_tol=sol_tol,
                                                                         N_round_sol=round_unique_sol
@@ -110,7 +108,6 @@ class GeneKnockout(object):
                                                                         n_base=n_base,
                                                                         beta_base=beta_base,
                                                                         N_space=Ns,
-                                                                        pmin=p_min,
                                                                         search_tol=tol,
                                                                         sol_tol=sol_tol,
                                                                         N_round_sol=round_unique_sol,

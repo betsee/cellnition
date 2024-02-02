@@ -9,14 +9,17 @@ set and corresponding GeneNetworkModel.
 '''
 
 import itertools
+from collections import OrderedDict
 import numpy as np
 from numpy import ndarray
 from matplotlib import colors
 from matplotlib import colormaps
 import networkx as nx
 from networkx import MultiDiGraph
-from cellnition.science.network_models.network_abc import NetworkABC
+from cellnition.science.network_models.probability_networks import ProbabilityNet
+from cellnition.science.network_models.network_enums import EquilibriumType
 import pygraphviz as pgv
+from pygraphviz import AGraph
 
 class StateMachine(object):
     '''
@@ -47,23 +50,230 @@ class StateMachine(object):
         A set of steady-state solutions from _gmod.
     '''
 
-    def __init__(self, gmod: NetworkABC, solsM: ndarray):
+    def __init__(self, pnet: ProbabilityNet):
         '''
         Initialize the StateMachine.
 
         Parameters
         ----------
-        gmod : NetworkABC
+        pnet : NetworkABC
             An instance of NetworkABC with an analytical model built.
 
         solsM : ndarray
             A set of unique steady-state solutions from the GeneNetworkModel.
             These will be the states of the StateMachine.
         '''
-        self._gmod = gmod
-        self._solsM = solsM
+        self._pnet = pnet
 
         self.G_states = None # The state transition network
+
+    def steady_state_solutions_search(self,
+                                      beta_base: float | list = 0.25,
+                                      n_base: float | list = 15.0,
+                                      d_base: float | list = 1.0,
+                                      verbose: bool=True,
+                                      return_saddles: bool=True,
+                                      N_space: int=3,
+                                      search_tol: float=1.0e-15,
+                                      sol_tol: float=1.0e-2,
+                                      N_round_sol: int=1,
+                                      ):
+        '''
+        Search through all possible combinations of signal node values
+        and collect and identify all equilibrium points of the system.
+
+        '''
+        # FIXME: do we want this to have additional node constraints?
+
+        sig_lin = [1.0e-6, 1.0]
+        sig_lin_set = [sig_lin for i in self._pnet.signal_node_inds]
+
+        sigGrid = np.meshgrid(*sig_lin_set)
+
+        N_vocab = len(sigGrid[0].ravel())
+
+        sig_test_set = np.zeros((N_vocab, len(self._pnet.signal_node_inds)))
+
+        for i, sigM in enumerate(sigGrid):
+            sig_test_set[:, i] = sigM.ravel()
+
+        solsM_allo = []
+        charM_allo = []
+        sols_list = []
+
+        for sigis in sig_test_set:
+            print(f'Signals: {np.round(sigis, 1)}')
+            solsM, sol_M_char, sol_0 = self._pnet.solve_probability_equms(constraint_inds=None,
+                                                                    constraint_vals=None,
+                                                                    signal_constr_vals=sigis.tolist(),
+                                                                    d_base=d_base,
+                                                                    n_base=n_base,
+                                                                    beta_base=beta_base,
+                                                                    N_space=N_space,
+                                                                    search_tol=search_tol,
+                                                                    sol_tol=sol_tol,
+                                                                    N_round_sol=N_round_sol,
+                                                                    verbose=verbose,
+                                                                    return_saddles=return_saddles
+                                                                    )
+
+
+            solsM_allo.append(solsM)  # append all unique sols
+            charM_allo.append(sol_M_char)  # append the sol stability characterization tags
+            sols_list.append(solsM)
+            if verbose:
+                print('----')
+
+        # Perform a merger of sols into one array and find only the unique solutions
+        solsM_all = np.zeros((self._pnet.N_nodes, 1))  # include the zero state
+        charM_all = [EquilibriumType.undetermined.name]  # set the zero state to undetermined by default
+
+        for i, (soli, chari) in enumerate(zip(solsM_allo, charM_allo)):
+            solsM_all = np.hstack((solsM_all, soli))
+            charM_all.extend(chari)
+
+            # _, inds_solsM_all_unique = np.unique(np.round(solsM_all, 1), axis=1, return_index=True)
+        _, inds_solsM_all_unique = np.unique(np.round(solsM_all, 1)[self._pnet.nonsignal_node_inds, :], axis=1,
+                                             return_index=True)
+
+        solsM_all = solsM_all[:, inds_solsM_all_unique]
+        charM_all = np.asarray(charM_all)[inds_solsM_all_unique]
+
+        if np.zeros(self._pnet.N_nodes).T in np.round(solsM_all, 1).T:
+            zer_index = np.round(solsM_all, 1).T.tolist().index(np.zeros(self._pnet.N_nodes).T.tolist())
+            if charM_all[
+                zer_index] == EquilibriumType.undetermined.name:  # if it hasn't been alogrithmically set already...
+                charM_all.T[zer_index] = EquilibriumType.attractor.name  # update the state to an attractor
+
+        else:
+            charM_all[0] = EquilibriumType.saddle.name  # update the state to a saddle node
+
+        # set of all states referencing only the hub nodes; rounded to one decimal:
+        state_set = np.round(solsM_all[self._pnet.nonsignal_node_inds, :].T, 1).tolist()
+
+        states_dict = OrderedDict()
+        for sigi in sig_test_set:
+            states_dict[tuple(sigi)] = {'States': [], 'Stability': []}
+
+        for sigi, state_subseto in zip(sig_test_set, sols_list):
+            state_subset = state_subseto[self._pnet.nonsignal_node_inds, :]
+            for target_state in np.round(state_subset, 1).T.tolist():
+                if target_state in state_set:
+                    state_match_index = state_set.index(target_state)
+                    states_dict[tuple(sigi)]['States'].append(state_match_index)
+                    states_dict[tuple(sigi)]['Stability'].append(charM_all[state_match_index])
+                else:
+                    print('match not found!')
+                    states_dict[tuple(sigi)]['States'].append(np.nan)
+                    states_dict[tuple(sigi)]['Stability'].append(np.nan)
+
+        return solsM_all, charM_all, sols_list, states_dict
+
+    def infer_state_transition_network(self,
+                                       states_dict: dict,
+                                       save_graph_filename: str|None=None,
+                                       graph_layout: str='dot')->AGraph:
+        '''
+        Using a states_dict prepared in a state space search, infer the
+        state transition network based on overlapping nonsignal node indices
+        between two sets.
+
+        '''
+        # Try to make a nested graph:
+        G = pgv.AGraph(strict=False,
+                       splines=True,
+                       directed=True,
+                       concentrate=False,
+                       compound=True,
+                       dpi=300)
+
+        # We first need to make all the subgraphs:
+        for trans_sigs_i, states_dict_i in states_dict.items():
+
+            states_set_i = states_dict_i['States']
+            states_char_i = states_dict_i['Stability']
+
+            trans_label_io = ''
+            for ii in trans_sigs_i:
+                trans_label_io += str(int(ii))
+
+            trans_label_i = int(trans_label_io, 2)
+
+            G.add_subgraph(name=f'cluster_{trans_label_i}', label=f'Held at S{trans_label_i}')
+
+        # Then get the way this specific graph will order them:
+        subg_list = [subg.name for subg in G.subgraphs()]
+
+        for i, (trans_sigs_i, states_dict_i) in enumerate(states_dict.items()):
+
+            states_set_i = states_dict_i['States']
+            states_char_i = states_dict_i['Stability']
+
+            trans_label_io = ''
+            for ii in trans_sigs_i:
+                trans_label_io += str(int(ii))
+
+            trans_label_i = int(trans_label_io, 2)
+
+            G_sub = G.subgraphs()[subg_list.index(f'cluster_{trans_label_i}')]
+
+            if len(states_set_i) > 1:
+
+                for trans_sigs_j, states_dict_j in states_dict.items():
+
+                    states_set_j = states_dict_j['States']
+                    states_char_j = states_dict_j['Stability']
+
+                    trans_label_jo = ''
+                    for ii in trans_sigs_j:
+                        trans_label_jo += str(int(ii))
+                    trans_label_j = int(trans_label_jo, 2)
+
+                    if trans_sigs_i != trans_sigs_j:
+                        shared_states = np.intersect1d(states_set_i, states_set_j)
+
+                        if len(shared_states) == 1:
+
+                            sj = shared_states[0]
+                            nde_j = f'{trans_label_i}.{sj}'
+                            G_sub.add_node(nde_j, label=f'State {sj}')
+
+                            for si in states_set_i:
+                                nde_i = f'{trans_label_i}.{si}'
+                                G_sub.add_node(nde_i, label=f'State {si}')
+                                G_sub.add_edge(nde_i, nde_j, label=f'S{trans_label_j}')
+
+                        elif len(
+                                shared_states) > 1:  # allow for a 3rd level of hierarchy...we don't know what it means yet...
+                            for sj in shared_states:
+                                nde_j = f'{trans_label_i}.{sj}'
+                                G_sub.add_node(nde_j, label=f'State {sj}')
+
+                                for si in states_set_i:
+                                    nde_i = f'{trans_label_i}.{si}'
+                                    G_sub.add_node(nde_i, label=f'State {si}')
+                                    G_sub.add_edge(nde_i, nde_j, label=f'S{trans_label_j}')
+
+            else:
+                for si in states_set_i:
+                    nde_i = f'{trans_label_i}.{si}'
+                    G_sub.add_node(nde_i, label=f'State {si}')
+
+        # Finally, we add in transitions between the "held" states:
+        for nde_i in G.nodes():
+            assert len(nde_i) >= 3
+            ni = nde_i[2:]
+            for nde_j in G.nodes():
+                nj = nde_j[2:]
+                if ni == nj and nde_i != nde_j:
+                    G.add_edge(nde_i, nde_j)
+
+        if save_graph_filename is not None:
+            G.layout(prog=graph_layout)
+            G.draw(save_graph_filename)
+
+        return G
+
 
     def _order_states_by_distance(self):
         '''
@@ -180,7 +390,7 @@ class StateMachine(object):
             as possible transitions for states.
 
         '''
-        c_zeros = np.zeros(self._gmod.N_nodes)  # start everything out low
+        c_zeros = np.zeros(self._pnet.N_nodes)  # start everything out low
 
         # Create a steady-state solutions matrix that is stacked with the
         # 'zero' or 'base' state:
@@ -203,14 +413,14 @@ class StateMachine(object):
             if len(sigi) > 1:
                 str_lab = ''
                 for i, nss in enumerate(sigi):
-                    ss = self._gmod.nodes_list[nss]
+                    ss = self._pnet.nodes_list[nss]
                     if i == 0:
                         str_lab += f'{ss}'
                     else:
                         str_lab += f'*{ss}'
                 signal_labels.append(str_lab)
             else:
-                ss = self._gmod.nodes_list[sigi[0]]
+                ss = self._pnet.nodes_list[sigi[0]]
                 signal_labels.append(f'{ss}')
 
         for stateio, cvecto in enumerate(solsM_with0.T):  # start the system off in each of the states
@@ -222,19 +432,19 @@ class StateMachine(object):
                 sig_mags = [(sig_base, sig_active) for ss in sigi]
 
                 # Run the time simulation:
-                concs_time, tvect = self._gmod.run_time_sim(tend,
-                                                      dt,
-                                                      cvecti,
-                                                      sigi,
-                                                      sig_times,
-                                                      sig_mags,
-                                                      dt_samp=dt_samp,
-                                                      constrained_inds=constrained_inds,
-                                                      constrained_vals=constrained_vals,
-                                                      d_base=d_base,
-                                                      n_base=n_base,
-                                                      beta_base=beta_base
-                                                      )
+                concs_time, tvect = self._pnet.run_time_sim(tend,
+                                                            dt,
+                                                            cvecti,
+                                                            sigi,
+                                                            sig_times,
+                                                            sig_mags,
+                                                            dt_samp=dt_samp,
+                                                            constrained_inds=constrained_inds,
+                                                            constrained_vals=constrained_vals,
+                                                            d_base=d_base,
+                                                            n_base=n_base,
+                                                            beta_base=beta_base
+                                                            )
 
                 it_30low = (tvect <= sig_tstart - delta_window).nonzero()[0]
                 it_30high = (tvect >= sig_tstart - 2 * delta_window).nonzero()[0]
