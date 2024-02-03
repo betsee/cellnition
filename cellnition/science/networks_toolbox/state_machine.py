@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# --------------------( LICENSE                           )--------------------
+# --------------------( LICENSE                            )--------------------
 # Copyright (c) 2023-2024 Alexis Pietak.
 # See "LICENSE" for further details.
 
@@ -7,18 +7,22 @@
 This module builds and plots a state transition diagram from a solution
 set and corresponding GeneNetworkModel.
 '''
+
 import os
 import itertools
-from collections import OrderedDict
 import numpy as np
+import networkx as nx
+import pygraphviz as pgv
+from cellnition.science.network_models.probability_networks import (
+    ProbabilityNet)
+from cellnition.science.network_models.network_enums import EquilibriumType
+from cellnition._util.path.utilpathmake import FileRelative
+from cellnition._util.path.utilpathself import get_data_png_glyph_stability_dir
+from collections import OrderedDict
 from numpy import ndarray
 from matplotlib import colors
 from matplotlib import colormaps
-import networkx as nx
 from networkx import MultiDiGraph
-from cellnition.science.network_models.probability_networks import ProbabilityNet
-from cellnition.science.network_models.network_enums import EquilibriumType
-import pygraphviz as pgv
 from pygraphviz import AGraph
 
 class StateMachine(object):
@@ -63,22 +67,22 @@ class StateMachine(object):
             A set of unique steady-state solutions from the GeneNetworkModel.
             These will be the states of the StateMachine.
         '''
-        self._pnet = pnet
 
+        self._pnet = pnet
         self.G_states = None # The state transition network
 
         # Path to load image assets:
-        # FIXME: this needs to be internal to the project
-        glyph_path = '/home/pietakio/Dropbox/Levin_2023/CellnitionAssets/StabilityGlyphs/large'
-        attractor_fname = os.path.join(glyph_path, 'glyph_attractor.png')
-        limitcycle_fname = os.path.join(glyph_path, 'glyph_limit_cycle.png')
-        saddle_fname = os.path.join(glyph_path, 'glyph_saddle.png')
+        GLYPH_DIR = get_data_png_glyph_stability_dir()
+        attractor_fname = FileRelative(GLYPH_DIR, 'glyph_attractor.png')
+        limitcycle_fname = FileRelative(GLYPH_DIR, 'glyph_limit_cycle.png')
+        saddle_fname = FileRelative(GLYPH_DIR, 'glyph_saddle.png')
 
         # Associate each equilibrium type with an image file
-        self._node_image_dict = {EquilibriumType.attractor.name: attractor_fname,
-                           EquilibriumType.limit_cycle.name: limitcycle_fname,
-                           EquilibriumType.saddle.name: saddle_fname
-                           }
+        self._node_image_dict = {
+            EquilibriumType.attractor.name: str(attractor_fname),
+            EquilibriumType.limit_cycle.name: str(limitcycle_fname),
+            EquilibriumType.saddle.name: str(saddle_fname),
+        }
 
     def steady_state_solutions_search(self,
                                       beta_base: float | list = 0.25,

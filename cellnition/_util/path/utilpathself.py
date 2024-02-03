@@ -107,14 +107,17 @@ def get_data_dir() -> Path:
 
 
 @callable_cached
-def get_data_png_dir() -> Path:
+def get_data_png_glyph_stability_dir() -> Path:
     '''
     :mod:`Path` encapsulating the absolute dirname of the **project-wide
-    portable network graphics (PNG) subdirectory** (i.e., directory containing
-    ``.png``-suffixed files describing lossless but *not* scalable images) if
-    found *or* raise an exception otherwise.
+    portable network graphics (PNG) stability glyph subdirectory** (i.e.,
+    directory containing ``.png``-suffixed files describing lossless but *not*
+    scalable images intended to be embedded in GraphViz-driven visualizations of
+    stability networks) if found *or* raise an exception otherwise.
     '''
-    return DirRelative(get_data_dir(), 'png')
+
+    # Transverse transcription!
+    return DirRelative(get_data_png_dir(), 'glyph_stability')
 
 
 @callable_cached
