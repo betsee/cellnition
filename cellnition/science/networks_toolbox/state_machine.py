@@ -7,7 +7,7 @@
 This module builds and plots a state transition diagram from a solution
 set and corresponding GeneNetworkModel.
 '''
-
+import os
 import itertools
 from collections import OrderedDict
 import numpy as np
@@ -66,6 +66,19 @@ class StateMachine(object):
         self._pnet = pnet
 
         self.G_states = None # The state transition network
+
+        # Path to load image assets:
+        # FIXME: this needs to be internal to the project
+        glyph_path = '/home/pietakio/Dropbox/Levin_2023/CellnitionAssets/StabilityGlyphs/large'
+        attractor_fname = os.path.join(glyph_path, 'glyph_attractor.png')
+        limitcycle_fname = os.path.join(glyph_path, 'glyph_limit_cycle.png')
+        saddle_fname = os.path.join(glyph_path, 'glyph_saddle.png')
+
+        # Associate each equilibrium type with an image file
+        self._node_image_dict = {EquilibriumType.attractor.name: attractor_fname,
+                           EquilibriumType.limit_cycle.name: limitcycle_fname,
+                           EquilibriumType.saddle.name: saddle_fname
+                           }
 
     def steady_state_solutions_search(self,
                                       beta_base: float | list = 0.25,
@@ -271,6 +284,152 @@ class StateMachine(object):
         if save_graph_filename is not None:
             G.layout(prog=graph_layout)
             G.draw(save_graph_filename)
+
+        return G
+
+
+    def plot_inferred_state_transition_network(self,
+                                              states_dict: dict,
+                                              solsM_all: ndarray|list,
+                                              save_file: str|None = None,
+                                              graph_layout: str='dot'
+                                              ):
+        '''
+
+        '''
+        # FIXME: we probably also want the option to just plot a subset of the state dict?
+        img_pos = 'bc'  # position of the glyph in the node
+        subcluster_font = 'DejaVu Sans Bold'
+        node_shape = 'ellipse'
+        clr_map = 'rainbow_r'
+        nde_font_color = 'Black'
+        hex_transparency = '80'
+
+        # Try to make a nested graph:
+        G = pgv.AGraph(strict=False,
+                       fontname=subcluster_font,
+                       splines=True,
+                       directed=True,
+                       concentrate=False,
+                       compound=True,
+                       dpi=300)
+
+        cmap = colormaps[clr_map]
+        norm = colors.Normalize(vmin=0, vmax=solsM_all.shape[1])
+
+        # We first need to make all the subgraphs:
+        for trans_sigs_i, states_dict_i in states_dict.items():
+
+            trans_label_io = ''
+            for ii in trans_sigs_i:
+                trans_label_io += str(int(ii))
+
+            trans_label_i = int(trans_label_io, 2)
+
+            G.add_subgraph(name=f'cluster_{trans_label_i}', label=f'Held at S{trans_label_i}')
+
+        # Then get the way this specific graph will order them:
+        subg_list = [subg.name for subg in G.subgraphs()]
+
+        for trans_sigs_i, states_dict_i in states_dict.items():
+
+            states_set_i = states_dict_i['States']
+            states_char_i = states_dict_i['Stability']
+
+            trans_label_io = ''
+            for ii in trans_sigs_i:
+                trans_label_io += str(int(ii))
+
+            trans_label_i = int(trans_label_io, 2)
+
+            G_sub = G.subgraphs()[subg_list.index(f'cluster_{trans_label_i}')]
+
+            if len(states_set_i) > 1:
+
+                for trans_sigs_j, states_dict_j in states_dict.items():
+
+                    states_set_j = states_dict_j['States']
+                    states_char_j = states_dict_j['Stability']
+
+                    trans_label_jo = ''
+                    for ii in trans_sigs_j:
+                        trans_label_jo += str(int(ii))
+                    trans_label_j = int(trans_label_jo, 2)
+
+                    if trans_sigs_i != trans_sigs_j:
+                        shared_states = np.intersect1d(states_set_i, states_set_j)
+
+                        if len(shared_states) >= 1:  # allow for a 3rd level of hierarchy...we don't know what it means yet...
+                            for sj in shared_states:
+                                lini_sj = states_set_j.index(sj)  # get the index of sj in the original list
+                                char_sj = states_char_j[lini_sj]  # so we can get the equ'm char of sj
+
+                                nde_j = f'{trans_label_i}.{sj}'
+
+                                nde_color = colors.rgb2hex(cmap(norm(sj)))
+                                nde_color += '80'  # add some transparancy to the node
+
+                                G_sub.add_node(nde_j,
+                                               label=f'State {sj}',
+                                               labelloc='t',
+                                               image=self._node_image_dict[char_sj],
+                                               imagepos=img_pos,
+                                               shape=node_shape,
+                                               fontcolor=nde_font_color,
+                                               style='filled',
+                                               fillcolor=nde_color)
+
+                                for si in states_set_i:
+                                    lini_si = states_set_i.index(si)  # get the index of si in the original list
+                                    char_si = states_char_i[lini_si]  # so we can get the equ'm char of si
+
+                                    nde_color = colors.rgb2hex(cmap(norm(si)))
+                                    nde_color += hex_transparency  # add some transparancy to the node
+
+                                    nde_i = f'{trans_label_i}.{si}'
+                                    G_sub.add_node(nde_i,
+                                                   label=f'State {si}',
+                                                   labelloc='t',
+                                                   image=self._node_image_dict[char_si],
+                                                   imagepos=img_pos,
+                                                   shape=node_shape,
+                                                   fontcolor=nde_font_color,
+                                                   style='filled',
+                                                   fillcolor=nde_color)
+
+                                    G_sub.add_edge(nde_i, nde_j, label=f'S{trans_label_j}')
+
+            else:
+                for si in states_set_i:
+                    lini_si = states_set_i.index(si)  # get the index of si in the original list
+                    char_si = states_char_i[lini_si]  # so we can get the equ'm char of si
+
+                    nde_color = colors.rgb2hex(cmap(norm(si)))
+                    nde_color += '80'  # add some transparancy to the node
+
+                    nde_i = f'{trans_label_i}.{si}'
+                    G_sub.add_node(nde_i,
+                                   label=f'State {si}',
+                                   labelloc='t',
+                                   image=self._node_image_dict[char_si],
+                                   imagepos=img_pos,
+                                   shape=node_shape,
+                                   fontcolor=nde_font_color,
+                                   style='filled',
+                                   fillcolor=nde_color)
+
+        # Finally, we add in transitions between the "held" states:
+        for nde_i in G.nodes():
+            assert len(nde_i) >= 3
+            ni = nde_i[2:]
+            for nde_j in G.nodes():
+                nj = nde_j[2:]
+                if ni == nj and nde_i != nde_j:
+                    G.add_edge(nde_i, nde_j)
+
+        if save_file is not None:
+            G.layout(prog=graph_layout)
+            G.draw(save_file)
 
         return G
 
@@ -492,7 +651,7 @@ class StateMachine(object):
 
         self.G_states = G_states # save the state transition diagram.
 
-    def plot_transition_network(self,
+    def plot_transition_network_o(self,
                                 save_graph_net: str):
         '''
         Plot the state transition diagram as a graphviz object,
