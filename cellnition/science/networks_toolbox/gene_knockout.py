@@ -47,6 +47,7 @@ class GeneKnockout(object):
                                save_file_basename: str | None = None,
                                constraint_vals: list[float]|None = None,
                                constraint_inds: list[int]|None = None,
+                               signal_constr_vals: list | None = None
                                ):
         '''
         Performs a sequential knockout of all genes in the network, computing all possible steady-state
@@ -75,6 +76,7 @@ class GeneKnockout(object):
 
         solsM, sol_M0_char, sols_0 = self._pnet.solve_probability_equms(constraint_inds=constrained_inds,
                                                                         constraint_vals=constrained_vals,
+                                                                        signal_constr_vals=signal_constr_vals,
                                                                         d_base=d_base,
                                                                         n_base=n_base,
                                                                         beta_base=beta_base,
@@ -104,6 +106,7 @@ class GeneKnockout(object):
 
             solsM, sol_M0_char, sols_1 = self._pnet.solve_probability_equms(constraint_inds=cinds,
                                                                         constraint_vals=cvals,
+                                                                        signal_constr_vals=signal_constr_vals,
                                                                         d_base=d_base,
                                                                         n_base=n_base,
                                                                         beta_base=beta_base,
@@ -134,86 +137,86 @@ class GeneKnockout(object):
 
         return knockout_sol_set, ko_M
 
-    def gene_knockout_time_solve(self,
-                                 tend: float,
-                                 dt: float,
-                                 cvecti_o: ndarray|list,
-                                 dt_samp: float|None = None,
-                                 d_base: float = 1.0,
-                                 n_base: float = 3.0,
-                                 beta_base: float = 4.0,
-                                 constraint_vals: list[float] | None = None,
-                                 constraint_inds: list[int] | None = None,
-                                 ):
-        '''
-
-        '''
-
-        # Let's try knockouts as a time-sim thing:
-        Nt = int(tend / dt)
-
-        tvect = np.linspace(0.0, tend, Nt)
-
-        conc_timevect_ko = []
-        knockout_sol_set = [] # matrix storing solutions at steady state
-
-        # make a time-step update vector so we can update any sensors as
-        # an absolute reading (dt = 1.0) while treating the kinetics of the
-        # other node types:
-        dtv = 1.0e-3 * np.ones(self._pnet.N_nodes)
-        dtv[self._pnet.sensor_node_inds] = 1.0
-
-        wild_type_sim = False
-        for i in self._pnet.regular_node_inds:  # Step through each regular gene index
-            cvecti = cvecti_o.copy()  # start all nodes off at the supplied initial conditions
-
-            if wild_type_sim is False: # perform a wild-type simulation
-                c_vect_time, tvectr = self._pnet.run_time_sim(tend,
-                                                         dt,
-                                                         cvecti,
-                                                         sig_inds=None,
-                                                         sig_times=None,
-                                                         sig_mag=None,
-                                                         dt_samp=dt_samp,
-                                                         constrained_inds=constraint_inds,
-                                                         constrained_vals=constraint_vals,
-                                                         d_base=d_base,
-                                                         n_base=n_base,
-                                                         beta_base=beta_base
-                                                         )
-
-                knockout_sol_set.append(1*c_vect_time[-1])  # append the wt steady-state to knockout ss solutions array
-                conc_timevect_ko.append(c_vect_time)
-                wild_type_sim = True # set to true so it's not done again
-
-            cvecti = cvecti_o.copy()  # reset nodes back to the supplied initial conditions
-
-            # Now alter node values as signals
-            tsig = [(tvect[int(Nt/2)], 2*tend)]  # start and end time for the silencing
-            isig = [i] # index for silencing
-            magsig = [(1.0, 0.0)] # magnitude of signal switch before and after
-
-            c_vect_time, tvectr = self._pnet.run_time_sim(tend,
-                                                     dt,
-                                                     cvecti,
-                                                     sig_inds=tsig,
-                                                     sig_times=isig,
-                                                     sig_mag=magsig,
-                                                     dt_samp=dt_samp,
-                                                     constrained_inds=constraint_inds,
-                                                     constrained_vals=constraint_vals,
-                                                     d_base=d_base,
-                                                     n_base=n_base,
-                                                     beta_base=beta_base
-                                                     )
-
-            knockout_sol_set.append(1 * c_vect_time[-1])  # append the wt steady-state to knockout ss solutions array
-            conc_timevect_ko.append(c_vect_time)
-
-        knockout_sol_set = np.asarray(knockout_sol_set).T
-        conc_timevect_ko = np.asarray(conc_timevect_ko)
-
-        return tvectr, conc_timevect_ko, knockout_sol_set
+    # def gene_knockout_time_solve(self,
+    #                              tend: float,
+    #                              dt: float,
+    #                              cvecti_o: ndarray|list,
+    #                              dt_samp: float|None = None,
+    #                              d_base: float = 1.0,
+    #                              n_base: float = 3.0,
+    #                              beta_base: float = 4.0,
+    #                              constraint_vals: list[float] | None = None,
+    #                              constraint_inds: list[int] | None = None,
+    #                              ):
+    #     '''
+    #
+    #     '''
+    #
+    #     # Let's try knockouts as a time-sim thing:
+    #     Nt = int(tend / dt)
+    #
+    #     tvect = np.linspace(0.0, tend, Nt)
+    #
+    #     conc_timevect_ko = []
+    #     knockout_sol_set = [] # matrix storing solutions at steady state
+    #
+    #     # make a time-step update vector so we can update any sensors as
+    #     # an absolute reading (dt = 1.0) while treating the kinetics of the
+    #     # other node types:
+    #     dtv = 1.0e-3 * np.ones(self._pnet.N_nodes)
+    #     dtv[self._pnet.sensor_node_inds] = 1.0
+    #
+    #     wild_type_sim = False
+    #     for i in self._pnet.regular_node_inds:  # Step through each regular gene index
+    #         cvecti = cvecti_o.copy()  # start all nodes off at the supplied initial conditions
+    #
+    #         if wild_type_sim is False: # perform a wild-type simulation
+    #             c_vect_time, tvectr = self._pnet.run_time_sim(tend,
+    #                                                      dt,
+    #                                                      cvecti,
+    #                                                      sig_inds=None,
+    #                                                      sig_times=None,
+    #                                                      sig_mag=None,
+    #                                                      dt_samp=dt_samp,
+    #                                                      constrained_inds=constraint_inds,
+    #                                                      constrained_vals=constraint_vals,
+    #                                                      d_base=d_base,
+    #                                                      n_base=n_base,
+    #                                                      beta_base=beta_base
+    #                                                      )
+    #
+    #             knockout_sol_set.append(1*c_vect_time[-1])  # append the wt steady-state to knockout ss solutions array
+    #             conc_timevect_ko.append(c_vect_time)
+    #             wild_type_sim = True # set to true so it's not done again
+    #
+    #         cvecti = cvecti_o.copy()  # reset nodes back to the supplied initial conditions
+    #
+    #         # Now alter node values as signals
+    #         tsig = [(tvect[int(Nt/2)], 2*tend)]  # start and end time for the silencing
+    #         isig = [i] # index for silencing
+    #         magsig = [(1.0, 0.0)] # magnitude of signal switch before and after
+    #
+    #         c_vect_time, tvectr = self._pnet.run_time_sim(tend,
+    #                                                  dt,
+    #                                                  cvecti,
+    #                                                  sig_inds=tsig,
+    #                                                  sig_times=isig,
+    #                                                  sig_mag=magsig,
+    #                                                  dt_samp=dt_samp,
+    #                                                  constrained_inds=constraint_inds,
+    #                                                  constrained_vals=constraint_vals,
+    #                                                  d_base=d_base,
+    #                                                  n_base=n_base,
+    #                                                  beta_base=beta_base
+    #                                                  )
+    #
+    #         knockout_sol_set.append(1 * c_vect_time[-1])  # append the wt steady-state to knockout ss solutions array
+    #         conc_timevect_ko.append(c_vect_time)
+    #
+    #     knockout_sol_set = np.asarray(knockout_sol_set).T
+    #     conc_timevect_ko = np.asarray(conc_timevect_ko)
+    #
+    #     return tvectr, conc_timevect_ko, knockout_sol_set
 
     def plot_knockout_arrays(self, knockout_sol_set: list | ndarray, figsave: str=None):
             '''

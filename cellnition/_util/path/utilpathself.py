@@ -132,4 +132,16 @@ def get_data_svg_dir() -> Path:
     # Perverse pomposity!
     return DirRelative(get_data_dir(), 'svg')
 
+@callable_cached
+def get_data_png_dir() -> Path:
+    '''
+    :mod:`Path` encapsulating the absolute dirname of the **project-wide
+    scalable vector graphics (SVG) subdirectory** (i.e., directory containing
+    ``.svg``-suffixed files describing losslessly scalable images) if found *or*
+    raise an exception otherwise.
+    '''
+
+    # Perverse pomposity!
+    return DirRelative(get_data_dir(), 'png')
+
 # ....................{ GETTERS ~ data : file : png        }....................

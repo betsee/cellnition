@@ -285,7 +285,7 @@ class ProbabilityNet(NetworkABC):
         # The add_terms need to be normalized to keep concentrations between 0 and 1:
         self._add_terms = sp.hadamard_product(self._n_add_edges, add_terms_i)
 
-        self._mul_terms = sp.Matrix(np.product(M_funk_mul_s, axis=1))
+        self._mul_terms = sp.Matrix(np.prod(M_funk_mul_s, axis=1))
 
         self._dcdt_vect_s = []
         for i in range(self.N_nodes):

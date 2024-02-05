@@ -124,7 +124,6 @@ class TrinodeNet(LibNet):
 
         self.add_interactions = True
 
-
 class BasicTrinodeNet(LibNet):
 
     def __init__(self, activator_signals: bool=True):
@@ -153,7 +152,6 @@ class BasicTrinodeNet(LibNet):
         self.node_type_dict = {'S': NodeType.signal}
 
         self.add_interactions = True
-
 
 class PentanodeNet(LibNet):
 
@@ -187,7 +185,6 @@ class PentanodeNet(LibNet):
         # self.node_type_dict = None
 
         self.add_interactions = True
-
 
 class TrinodeNetLoaded(LibNet):
 
@@ -224,7 +221,6 @@ class TrinodeNetLoaded(LibNet):
         # self.node_type_dict = None
 
         self.add_interactions = True
-
 
 class QuadStateNet(LibNet):
 

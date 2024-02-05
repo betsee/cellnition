@@ -27,6 +27,7 @@ def multistability_search(pnet: ProbabilityNet,
                           search_tol: float = 1.0e-15,
                           constraint_vals: list[float]|None = None,
                           constraint_inds: list[int]|None = None,
+                          signal_constr_vals: list|None = None,
                           coupling_type: CouplingType = CouplingType.mixed,
                           ) -> tuple[list, list]:
     '''
@@ -116,6 +117,7 @@ def multistability_search(pnet: ProbabilityNet,
 
         solsM, sol_M0_char, sol_0 = pnet.solve_probability_equms(constraint_inds=constraint_inds,
                                                                  constraint_vals=constraint_vals,
+                                                                 signal_constr_vals=signal_constr_vals,
                                                                  d_base=d_base,
                                                                  n_base=n_base,
                                                                  beta_base=beta_base,
@@ -156,6 +158,7 @@ def param_space_search(pnet: ProbabilityNet,
                        verbose: bool=True,
                        constraint_vals: list[float] | None = None,
                        constraint_inds: list[int] | None = None,
+                       signal_constr_vals: list|None = None
                        ) -> tuple[ndarray, list]:
     '''
     Search parameter space of a model to find parameter combinations that give different multistable
@@ -259,6 +262,7 @@ def param_space_search(pnet: ProbabilityNet,
 
         solsM, sol_M0_char, sol_0 = pnet.solve_probability_equms(constraint_inds=constraint_inds,
                                                                  constraint_vals=constraint_vals,
+                                                                 signal_constr_vals=signal_constr_vals,
                                                                  d_base=1.0,
                                                                  n_base=n_base,
                                                                  beta_base=beta_set_i,

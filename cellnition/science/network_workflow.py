@@ -259,6 +259,7 @@ class NetworkWorkflow(object):
                    sol_ko_tol: float = 1.0e-1,
                    constraint_vals: list[float]|None = None,
                    constraint_inds: list[int]|None = None,
+                   signal_constr_vals: list | None = None,
                    update_string: str|None = None,
                    node_type_dict: dict|None = None,
                    extra_verbose: bool=False,
@@ -298,6 +299,7 @@ class NetworkWorkflow(object):
                                                           search_tol=sol_search_tol,
                                                           constraint_vals=constraint_vals,
                                                           constraint_inds=constraint_inds,
+                                                           signal_constr_vals=signal_constr_vals,
                                                           coupling_type=coupling_type,
                                                           )
 
@@ -395,6 +397,7 @@ class NetworkWorkflow(object):
 
             solsM, sol_M0_char, sol_0 = pnet.solve_probability_equms(constraint_inds=constraint_inds,
                                                                   constraint_vals=constraint_vals,
+                                                                  signal_constr_vals=signal_constr_vals,
                                                                   d_base=d_base,
                                                                   n_base=n_base,
                                                                   beta_base=beta_base,
@@ -433,6 +436,7 @@ class NetworkWorkflow(object):
                                                                        save_file_basename=None,
                                                                        constraint_vals=constraint_vals,
                                                                        constraint_inds=constraint_inds,
+                                                                       signal_constr_vals=signal_constr_vals
                                                                        )
 
                 ko_file = f'knockoutArrays{fname_base}.png'
