@@ -76,12 +76,20 @@ class StateMachine(object):
         attractor_fname = FileRelative(GLYPH_DIR, 'glyph_attractor.png')
         limitcycle_fname = FileRelative(GLYPH_DIR, 'glyph_limit_cycle.png')
         saddle_fname = FileRelative(GLYPH_DIR, 'glyph_saddle.png')
+        attractor_limitcycle_fname = FileRelative(GLYPH_DIR, 'glyph_attractor_limit_cycle.png')
+        repellor_limitcycle_fname = FileRelative(GLYPH_DIR, 'glyph_repellor_limit_cycle.png')
+        repellor_fname = FileRelative(GLYPH_DIR, 'glyph_repellor.png')
+        unknown_fname = FileRelative(GLYPH_DIR, 'glyph_unknown.png')
 
         # Associate each equilibrium type with an image file
         self._node_image_dict = {
             EquilibriumType.attractor.name: str(attractor_fname),
             EquilibriumType.limit_cycle.name: str(limitcycle_fname),
             EquilibriumType.saddle.name: str(saddle_fname),
+            EquilibriumType.attractor_limit_cycle.name: str(attractor_limitcycle_fname),
+            EquilibriumType.repellor_limit_cycle.name: str(repellor_limitcycle_fname),
+            EquilibriumType.repellor.name: str(repellor_fname),
+            EquilibriumType.undetermined.name: str(unknown_fname)
         }
 
     def steady_state_solutions_search(self,
@@ -103,13 +111,13 @@ class StateMachine(object):
         # FIXME: do we want this to have additional node constraints?
 
         sig_lin = [1.0e-6, 1.0]
-        sig_lin_set = [sig_lin for i in self._pnet.signal_node_inds]
+        sig_lin_set = [sig_lin for i in self._pnet.input_node_inds]
 
         sigGrid = np.meshgrid(*sig_lin_set)
 
         N_vocab = len(sigGrid[0].ravel())
 
-        sig_test_set = np.zeros((N_vocab, len(self._pnet.signal_node_inds)))
+        sig_test_set = np.zeros((N_vocab, len(self._pnet.input_node_inds)))
 
         for i, sigM in enumerate(sigGrid):
             sig_test_set[:, i] = sigM.ravel()
@@ -150,7 +158,7 @@ class StateMachine(object):
             charM_all.extend(chari)
 
             # _, inds_solsM_all_unique = np.unique(np.round(solsM_all, 1), axis=1, return_index=True)
-        _, inds_solsM_all_unique = np.unique(np.round(solsM_all, 1)[self._pnet.nonsignal_node_inds, :], axis=1,
+        _, inds_solsM_all_unique = np.unique(np.round(solsM_all, 1)[self._pnet.noninput_node_inds, :], axis=1,
                                              return_index=True)
 
         solsM_all = solsM_all[:, inds_solsM_all_unique]
@@ -166,14 +174,14 @@ class StateMachine(object):
             charM_all[0] = EquilibriumType.saddle.name  # update the state to a saddle node
 
         # set of all states referencing only the hub nodes; rounded to one decimal:
-        state_set = np.round(solsM_all[self._pnet.nonsignal_node_inds, :].T, 1).tolist()
+        state_set = np.round(solsM_all[self._pnet.noninput_node_inds, :].T, 1).tolist()
 
         states_dict = OrderedDict()
         for sigi in sig_test_set:
             states_dict[tuple(sigi)] = {'States': [], 'Stability': []}
 
         for sigi, state_subseto in zip(sig_test_set, sols_list):
-            state_subset = state_subseto[self._pnet.nonsignal_node_inds, :]
+            state_subset = state_subseto[self._pnet.noninput_node_inds, :]
             for target_state in np.round(state_subset, 1).T.tolist():
                 if target_state in state_set:
                     state_match_index = state_set.index(target_state)
@@ -258,7 +266,7 @@ class StateMachine(object):
                             for si in states_set_i:
                                 nde_i = f'{trans_label_i}.{si}'
                                 G_sub.add_node(nde_i, label=f'State {si}')
-                                G_sub.add_edge(nde_i, nde_j, label=f'S{trans_label_j}')
+                                G_sub.add_edge(nde_i, nde_j, label=f'I{trans_label_j}')
 
                         elif len(
                                 shared_states) > 1:  # allow for a 3rd level of hierarchy...we don't know what it means yet...
@@ -269,7 +277,7 @@ class StateMachine(object):
                                 for si in states_set_i:
                                     nde_i = f'{trans_label_i}.{si}'
                                     G_sub.add_node(nde_i, label=f'State {si}')
-                                    G_sub.add_edge(nde_i, nde_j, label=f'S{trans_label_j}')
+                                    G_sub.add_edge(nde_i, nde_j, label=f'I{trans_label_j}')
 
             else:
                 for si in states_set_i:
@@ -330,7 +338,7 @@ class StateMachine(object):
 
             trans_label_i = int(trans_label_io, 2)
 
-            G.add_subgraph(name=f'cluster_{trans_label_i}', label=f'Held at S{trans_label_i}')
+            G.add_subgraph(name=f'cluster_{trans_label_i}', label=f'Held at I{trans_label_i}')
 
         # Then get the way this specific graph will order them:
         subg_list = [subg.name for subg in G.subgraphs()]
@@ -401,7 +409,7 @@ class StateMachine(object):
                                                    style='filled',
                                                    fillcolor=nde_color)
 
-                                    G_sub.add_edge(nde_i, nde_j, label=f'S{trans_label_j}')
+                                    G_sub.add_edge(nde_i, nde_j, label=f'I{trans_label_j}')
 
             else:
                 for si in states_set_i:

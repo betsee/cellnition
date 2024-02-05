@@ -242,7 +242,7 @@ class ProbabilityNet(NetworkABC):
 
         # Initialize a list of node indices that should be constrained (removed from solution searches)
         # due to their lack of regulation:
-        self.signal_node_inds = []
+        self.input_node_inds = []
 
         if A_add_s.shape != (self.N_nodes, self.N_nodes):
             raise Exception("Shape of A_add_s is not in terms of network node number!")
@@ -291,7 +291,7 @@ class ProbabilityNet(NetworkABC):
         for i in range(self.N_nodes):
             if self._add_terms[i] == 0 and self._mul_terms[i] == 1: # if there's no add term and no mul term
                 self._dcdt_vect_s.append(0) # set the rate of change of this unregulated node to zero
-                self.signal_node_inds.append(i) # append this node to the list of nodes that should be constrained
+                self.input_node_inds.append(i) # append this node to the list of nodes that should be constrained
             elif self._add_terms[i] == 0 and self._mul_terms[i] != 1: # remove the null add term to avoid nulling all growth
                 self._dcdt_vect_s.append(self._d_vect_s[i] * self._mul_terms[i] -
                                          self._c_vect_s[i] * self._d_vect_s[i])
@@ -312,7 +312,7 @@ class ProbabilityNet(NetworkABC):
         self._A_mul_s = A_mul_s
 
         # get the "regular" nodes:
-        self.nonsignal_node_inds = np.setdiff1d(self.nodes_index, self.signal_node_inds)
+        self.noninput_node_inds = np.setdiff1d(self.nodes_index, self.input_node_inds)
 
     def make_numerical_params(self,
                        d_base: float|list[float]=1.0,
@@ -564,33 +564,38 @@ class ProbabilityNet(NetworkABC):
             eig_vals = np.round(np.real(eig_valso), 1) + np.round(np.imag(eig_valso), 1) * 1j
 
             solution_dict['Jacobian Eigenvalues'] = eig_vals
+            # print(eig_vals)
 
             # get the indices of eigenvalues that have only real components:
             real_eig_inds = (np.imag(eig_vals) == 0.0).nonzero()[0]
 
-            # If all eigenvalues are real and they're all negative:
+            # If all eigenvalues are real and they're all negative then its an attractor:
             if len(real_eig_inds) == len(eig_vals) and np.all(np.real(eig_vals) <= 0.0):
                 char_tag = EquilibriumType.attractor.name
 
-            # If all eigenvalues are real and they're all positive:
+            # If all eigenvalues are real and they're all positive then its a repellor:
             elif len(real_eig_inds) == len(eig_vals) and np.all(np.real(eig_vals) > 0.0):
                 char_tag = EquilibriumType.repellor.name
 
-            # If there are no real eigenvalues we only know its a limit cycle but can't say
-            # anything certain about stability:
-            elif len(real_eig_inds) == 0 and np.all(np.real(eig_vals) <= 0.0):
-                char_tag = EquilibriumType.limit_cycle.name
-
-            # If there are no real eigenvalues and a mix of real component sign, we only know its a limit cycle but can't say
-            # anything certain about stability:
-            elif len(real_eig_inds) == 0 and np.any(np.real(eig_vals) > 0.0):
-                char_tag = EquilibriumType.limit_cycle.name
-
-            elif np.all(np.real(eig_vals[real_eig_inds]) <= 0.0):
-                char_tag = EquilibriumType.limit_cycle.name
-
-            elif np.any(np.real(eig_vals[real_eig_inds] > 0.0)):
+            # If all eigenvalues are real and they're a mix of positive and negative, then it's a saddle:
+            elif len(real_eig_inds) == len(eig_vals) and np.any(np.real(eig_vals[real_eig_inds] > 0.0)):
                 char_tag = EquilibriumType.saddle.name
+
+            # If there are imaginary eigenvalue components and all real components are less than zero we
+            # have a stable limit cycle:
+            elif np.any(np.imag(eig_vals) != 0.0) and np.all(np.real(eig_vals) <= 0.0):
+                char_tag = EquilibriumType.attractor_limit_cycle.name
+
+            # If there are imaginary eigenvalue components and all real components are less than zero we
+            # have a stable limit cycle:
+            elif np.any(np.imag(eig_vals) != 0.0) and np.all(np.real(eig_vals) > 0.0):
+                char_tag = EquilibriumType.repellor_limit_cycle.name
+
+            # If there are imaginary eigenvalues and a mix of real component signs, we only know its a limit cycle but can't say
+            # anything certain about stability:
+            elif np.any(np.imag(eig_vals) != 0.0) and np.any(np.real(eig_vals) > 0.0):
+                char_tag = EquilibriumType.limit_cycle.name
+
             else:
                 char_tag = EquilibriumType.undetermined.name
 
@@ -627,17 +632,6 @@ class ProbabilityNet(NetworkABC):
         solsM_return = np.asarray(solsM).T
         sol_char_list_return = np.asarray(sol_char_list).T
 
-        # if unique_sols and len(solsM) != 0:
-        #     # round the sols to avoid degenerates and return indices to the unique solutions:
-        #     solsy, inds_solsy = np.unique(np.round(solsM, sol_round), axis=0, return_index=True)
-        #     if verbose:
-        #         for i, si in enumerate(inds_solsy):
-        #             print(f'Soln {i}: {sol_char_list[si]}, '
-        #                   f'{solsy[si]}, '
-        #                   f'error: {np.round(sol_char_error[si], 6)}')
-        #
-        #     solsM_return = np.asarray(solsM)[inds_solsy].T
-
         if save_file is not None:
             solsMi = np.asarray(solsM)
             header = [f'State {i}' for i in range(solsMi.shape[0])]
@@ -662,7 +656,7 @@ class ProbabilityNet(NetworkABC):
         these naturally-occuring nodes with any additional constraints
         supplied by the user.
         '''
-        len_constr = len(self.signal_node_inds)
+        len_constr = len(self.input_node_inds)
 
         if signal_constr_vals is None: # default to zero
             sig_vals = np.zeros(len_constr).tolist()
@@ -671,10 +665,10 @@ class ProbabilityNet(NetworkABC):
 
         if len_constr != 0:
             if constr_inds is None or constr_vals is None:
-                constrained_inds = self.signal_node_inds.copy()
+                constrained_inds = self.input_node_inds.copy()
                 constrained_vals = sig_vals
             else:
-                constrained_inds = constr_inds + self.signal_node_inds.copy()
+                constrained_inds = constr_inds + self.input_node_inds.copy()
                 constrained_vals = constr_vals + sig_vals
         else:
             constrained_inds = constr_inds*1

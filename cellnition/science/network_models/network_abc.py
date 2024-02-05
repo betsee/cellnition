@@ -491,10 +491,10 @@ class NetworkABC(object, metaclass=ABCMeta):
         # aliases for convenience:
         # combine signals with factors as they have a similar 'setability' condition
         # from the outside
-        self.signal_node_inds = self.node_type_inds[NodeType.signal.name] + self.node_type_inds[NodeType.factor.name]
+        self.input_node_inds = self.node_type_inds[NodeType.signal.name] + self.node_type_inds[NodeType.factor.name]
         self.sensor_node_inds = self.node_type_inds[NodeType.sensor.name]
         self.process_node_inds = self.node_type_inds[NodeType.process.name]
-        self.nonsignal_node_inds = np.setdiff1d(self.nodes_index, self.signal_node_inds).tolist()
+        self.noninput_node_inds = np.setdiff1d(self.nodes_index, self.input_node_inds).tolist()
 
     def edges_from_path(self, path_nodes: list|ndarray) -> list:
         '''
@@ -663,7 +663,7 @@ class NetworkABC(object, metaclass=ABCMeta):
 
                 # Create a set of signal node indices to the reduced c_vect array:
                 self.signal_reduced_inds = []
-                for si in self.signal_node_inds:
+                for si in self.input_node_inds:
                     if si in self.c_master_i:
                         self.signal_reduced_inds.append(self.c_master_i.index(si))
 

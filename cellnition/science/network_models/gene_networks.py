@@ -653,8 +653,8 @@ class GeneNetworkModel(NetworkABC):
             signal_inds = self.signal_reduced_inds
             nonsignal_inds = self.nonsignal_reduced_inds
         else:
-            signal_inds = self.signal_node_inds
-            nonsignal_inds = self.nonsignal_node_inds
+            signal_inds = self.input_node_inds
+            nonsignal_inds = self.noninput_node_inds
 
         if include_signals is False:
             # Create a c_vect sampled to the non-signal nodes:
@@ -1048,7 +1048,7 @@ class GeneNetworkModel(NetworkABC):
 
             if c_signals is not None:
                 # manually set the signal node values:
-                cvecti[self.signal_node_inds] = c_signals[ti, self.signal_node_inds]
+                cvecti[self.input_node_inds] = c_signals[ti, self.input_node_inds]
 
             if dt_samp is None:
                 concs_time.append(cvecti * 1)

@@ -36,8 +36,9 @@ class GraphType(Enum):
 class EquilibriumType(Enum):
     attractor = 'Attractor'
     repellor = 'Repellor'
+    attractor_limit_cycle = 'Attractor Limit Cycle'
+    repellor_limit_cycle = 'Repellor Limit Cycle'
     limit_cycle = 'Limit Cycle'
-    cycle = 'Limit Cycle'
     saddle = 'Saddle'
     undetermined = 'Undetermined'
 

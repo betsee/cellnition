@@ -115,7 +115,7 @@ def test_grn_workflow_libgraph(tmp_path) -> None:
                                 sol_unique_tol=1.0e-1,
                                 sol_ko_tol=1.0e-1,
                                 constraint_vals=[0.0, 0.0, 0.0],  # *signal vals
-                                constraint_inds=gmod.signal_node_inds.copy(),  # * signal inds
+                                constraint_inds=gmod.input_node_inds.copy(),  # * signal inds
                                 update_string=None,  # * with string
                                 pure_gene_edges_only=False,  # * True
                                 node_type_dict=libg.node_type_dict,  # * None
@@ -246,7 +246,7 @@ def test_grn_workflow_readfromfile(tmp_path) -> None:
                                 sol_unique_tol=1.0e-1,
                                 sol_ko_tol=1.0e-1,
                                 constraint_vals=[0.0, 0.0, 0.0],  # *signal vals
-                                constraint_inds=gmod.signal_node_inds.copy(),  # * signal inds
+                                constraint_inds=gmod.input_node_inds.copy(),  # * signal inds
                                 update_string=None,  # * with string
                                 pure_gene_edges_only=False,  # * True
                                 node_type_dict=libg.node_type_dict,  # * None
