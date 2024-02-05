@@ -72,7 +72,6 @@ def test_state_machine(tmp_path) -> None:
                                                 graph_layout='dot'
                                                 )
 
-
 def test_osmo_model() -> None:
     '''
 
@@ -107,7 +106,6 @@ def test_osmo_model() -> None:
     # Need to calculate solutions over the full domain first, then find solutinos that match the region criteria:
     Vss_vect = ocell.osmo_vol_steady_state(MM.ravel(), NN.ravel(), p.Y_wall, p.d_wall, p)
 
-
 def test_grn_workflow_libgraph(tmp_path) -> None:
     '''
     Test a network (GRN) workflow on a graph loaded
@@ -133,6 +131,15 @@ def test_grn_workflow_libgraph(tmp_path) -> None:
 
     interfunctype = InterFuncType.logistic
 
+    if interfunctype is InterFuncType.logistic:
+        d_base = 1.0
+        n_base = 15.0
+        beta_base = 0.25
+    else:
+        d_base = 1.0
+        n_base = 3.0
+        beta_base = 5.0
+
     pnet, update_string, fname_base = netflow.make_network_from_edges(libg.edges,
                                                                       edge_types=libg.edge_types,
                                                                       interaction_function_type=interfunctype,
@@ -146,9 +153,9 @@ def test_grn_workflow_libgraph(tmp_path) -> None:
                                    i_frame=0,
                                    verbose=False,
                                    reduce_dims=False,
-                                   beta_base=0.25,
-                                   n_base=15.0,
-                                   d_base=1.0,
+                                   beta_base=beta_base,
+                                   n_base=n_base,
+                                   d_base=d_base,
                                    edge_types=libg.edge_types,
                                    edge_type_search=True,
                                    edge_type_search_iterations=3,
@@ -167,147 +174,162 @@ def test_grn_workflow_libgraph(tmp_path) -> None:
                                    extra_verbose=False,
                                    coupling_type=CouplingType.mixed
                                    )
-#
-# def test_grn_workflow_sfgraph(tmp_path) -> None:
-#     '''
-#     Test a random gene regulatory network (GRN) workflow.
-#
-#     Parameters
-#     ----------
-#     tmp_path : pathlib.Path
-#         Abstract path encapsulating a temporary directory unique to this unit
-#         test, created in the base temporary directory.
-#     '''
-#     from cellnition.science.network_workflow import NetworkWorkflow
-#
-#     # Absolute or relative dirname of a test-specific temporary directory to
-#     # which "NetworkWorkflow" will emit GraphML and other files.
-#     save_path = str(tmp_path)
-#
-#     sim = NetworkWorkflow(save_path)
-#
-#     N_nodes = 5
-#     bi = 0.8
-#     gi = 0.15
-#     delta_in = 0.1
-#     delta_out = 0.0
-#     iframe = 0
-#
-#     # randomly generate a scale-free graph:
-#     gmod, update_string, fname_base = sim.scalefree_graph_gen(N_nodes,
-#                                                               bi,
-#                                                               gi,
-#                                                               delta_in,
-#                                                               delta_out,
-#                                                               iframe)
-#
-#     graph_data = sim.work_frame(gmod,
-#                                 save_path,
-#                                 fname_base,
-#                                 i_frame=0,
-#                                 verbose=True,
-#                                 reduce_dims=False,  # * True
-#                                 beta_base=2.0,  # * also use vector
-#                                 n_base=3.0,
-#                                 d_base=1.0,
-#                                 coi=0.0,
-#                                 ki=10.0,
-#                                 add_interactions=True,  # * False
-#                                 edge_types=None,  # None
-#                                 edge_type_search=True,  # * True
-#                                 edge_type_search_iterations=3,
-#                                 find_solutions=True,  # * False
-#                                 knockout_experiments=True,  # *True
-#                                 sol_search_tol=1.0e-15,
-#                                 N_search_space=2,
-#                                 N_round_sol=6,
-#                                 N_round_unique_sol=1,
-#                                 sol_unique_tol=1.0e-1,
-#                                 sol_ko_tol=1.0e-1,
-#                                 constraint_vals = None,  # *signal vals
-#                                 constraint_inds = None,  # * signal inds
-#                                 update_string=update_string,  # * with string
-#                                 pure_gene_edges_only=False,  # * True
-#                                 node_type_dict=None,  # * None
-#                                 solver_method='Root',  # * 'Powell'
-#                                 extra_verbose=True
-#                                 )
-#
-# def test_grn_workflow_readfromfile(tmp_path) -> None:
-#     '''
-#
-#     '''
-#     import os
-#     from cellnition.science.network_workflow import NetworkWorkflow
-#     from cellnition.science.network_models.network_enums import GraphType
-#     from cellnition.science.network_models.network_library import QuadStateNet
-#     from cellnition.science.network_models.gene_networks import GeneNetworkModel
-#
-#     # Absolute or relative dirname of a test-specific temporary directory to
-#     # which "NetworkWorkflow" will emit GraphML and other files.
-#     save_path = str(tmp_path)
-#
-#     # libg = QuadStateNet()
-#     # libg = FullQuadStateNet()
-#     libg = QuadStateNet()
-#
-#     gmod = GeneNetworkModel(libg.N_nodes,
-#                             edges=libg.edges,
-#                             graph_type=GraphType.user
-#                             )  # This will be a straight-up GRN model
-#
-#     fname_base = libg.name
-#
-#     gmod.build_analytical_model(
-#         edge_types=libg.edge_types,
-#         add_interactions=libg.add_interactions,
-#         node_type_dict=libg.node_type_dict,
-#         pure_gene_edges_only=False
-#     )
-#
-#     sim = NetworkWorkflow(save_path)
-#
-#     graph_data = sim.work_frame(gmod,
-#                                 save_path,
-#                                 fname_base,
-#                                 i_frame=0,
-#                                 verbose=True,
-#                                 reduce_dims=False,  # * True
-#                                 beta_base=2.0,  # * also use vector
-#                                 n_base=3.0,
-#                                 d_base=1.0,
-#                                 coi=0.0,
-#                                 ki=10.0,
-#                                 add_interactions=True,  # * False
-#                                 edge_types=libg.edge_types,  # None
-#                                 edge_type_search=False,  # * True
-#                                 edge_type_search_iterations=3,
-#                                 find_solutions=False,  # * False
-#                                 knockout_experiments=False,  # *True
-#                                 sol_search_tol=1.0e-15,
-#                                 N_search_space=2,
-#                                 N_round_sol=6,
-#                                 N_round_unique_sol=1,
-#                                 sol_unique_tol=1.0e-1,
-#                                 sol_ko_tol=1.0e-1,
-#                                 constraint_vals=[0.0, 0.0, 0.0],  # *signal vals
-#                                 constraint_inds=gmod.input_node_inds.copy(),  # * signal inds
-#                                 update_string=None,  # * with string
-#                                 pure_gene_edges_only=False,  # * True
-#                                 node_type_dict=libg.node_type_dict,  # * None
-#                                 solver_method='Root',  # * 'Powell'
-#                                 extra_verbose=True
-#                                 )
-#
-#
-#
-#     filename = os.path.join(save_path, 'network_QuadStateNet.gml')
-#
-#     gmod, updatestr, fnbase = sim.read_graph_from_file(filename,
-#                                                        add_interactions=True,
-#                                                        build_analytical=True,
-#                                                        i=0)
-#
+
+def test_grn_workflow_sfgraph(tmp_path) -> None:
+    '''
+    Test generation of a randomly generated scale-free gene regulatory network model.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Abstract path encapsulating a temporary directory unique to this unit
+        test, created in the base temporary directory.
+    '''
+    from cellnition.science.network_models.network_enums import CouplingType, InterFuncType
+    from cellnition.science.network_workflow import NetworkWorkflow
+
+    # Absolute or relative dirname of a test-specific temporary directory to
+    # which "NetworkWorkflow" will emit GraphML and other files.
+    save_path = str(tmp_path)
+
+    netflow = NetworkWorkflow(save_path)
+
+    N_nodes = 5
+    bi = 0.8
+    gi = 0.15
+    delta_in = 0.1
+    delta_out = 0.0
+    iframe = 0
+
+    # randomly generate a scale-free graph:
+    pnet, update_string, fname_base = netflow.scalefree_graph_gen(N_nodes,
+                                                                  bi,
+                                                                  gi,
+                                                                  delta_in,
+                                                                  delta_out,
+                                                                  iframe,
+                                                                  interaction_function_type=InterFuncType.logistic,
+                                                                  coupling_type=CouplingType.mixed)
+
+def test_grn_workflow_bingraph(tmp_path) -> None:
+    '''
+    Test generation of a randomly generated binomial gene regulatory network model.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Abstract path encapsulating a temporary directory unique to this unit
+        test, created in the base temporary directory.
+    '''
+    from cellnition.science.network_models.network_enums import CouplingType, InterFuncType
+    from cellnition.science.network_workflow import NetworkWorkflow
+
+    # Absolute or relative dirname of a test-specific temporary directory to
+    # which "NetworkWorkflow" will emit GraphML and other files.
+    save_path = str(tmp_path)
+
+    netflow = NetworkWorkflow(save_path)
+
+    N_nodes = 5
+    p_edge = 0.2
+    iframe = 0
+
+    # randomly generate a scale-free graph:
+    pnet, update_string, fname_base = netflow.binomial_graph_gen(N_nodes,
+                                                                  p_edge,
+                                                                  iframe,
+                                                                  interaction_function_type=InterFuncType.logistic,
+                                                                  coupling_type=CouplingType.mixed)
+
+def test_grn_workflow_readwritefromfile(tmp_path) -> None:
+    '''
+    Test writing and reading a network model to file.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Abstract path encapsulating a temporary directory unique to this unit
+        test, created in the base temporary directory.
+
+    '''
+    import os
+    from cellnition.science.network_workflow import NetworkWorkflow
+    from cellnition.science.network_models.network_enums import CouplingType, InterFuncType
+
+    # Absolute or relative dirname of a test-specific temporary directory to
+    # which "NetworkWorkflow" will emit GraphML and other files.
+    save_path = str(tmp_path)
+
+    netflow = NetworkWorkflow(save_path)
+
+    N_nodes = 5
+    bi = 0.8
+    gi = 0.15
+    delta_in = 0.1
+    delta_out = 0.0
+    iframe = 0
+
+    interfunctype = InterFuncType.logistic
+    couplingtype = CouplingType.mixed
+
+    if interfunctype is InterFuncType.logistic:
+        d_base = 1.0
+        n_base = 15.0
+        beta_base = 0.25
+    else:
+        d_base = 1.0
+        n_base = 3.0
+        beta_base = 5.0
+
+    # randomly generate a scale-free graph:
+    pnet, update_string, fname_base = netflow.scalefree_graph_gen(N_nodes,
+                                                                  bi,
+                                                                  gi,
+                                                                  delta_in,
+                                                                  delta_out,
+                                                                  iframe,
+                                                                  interaction_function_type=interfunctype,
+                                                                  coupling_type=couplingtype)
+
+    # get random edge types:
+    edge_types = pnet.get_edge_types()
+
+
+    graph_dat = netflow.work_frame(pnet,
+                                   save_path,
+                                   fname_base,
+                                   i_frame=0,
+                                   verbose=False,
+                                   reduce_dims=False,
+                                   beta_base=beta_base,
+                                   n_base=n_base,
+                                   d_base=d_base,
+                                   edge_types=edge_types,
+                                   edge_type_search=False,
+                                   edge_type_search_iterations=3,
+                                   find_solutions=False,
+                                   knockout_experiments=False,
+                                   sol_search_tol=1.0e-15,
+                                   N_search_space=3,
+                                   N_round_unique_sol=1,
+                                   sol_unique_tol=1.0e-1,
+                                   sol_ko_tol=1.0e-1,
+                                   constraint_vals=None,
+                                   constraint_inds=None,
+                                   signal_constr_vals=None,
+                                   update_string=update_string,
+                                   node_type_dict=None,
+                                   extra_verbose=False,
+                                   coupling_type=couplingtype
+                                   )
+
+
+
+    filename = os.path.join(save_path, f'network_{fname_base}.gml')
+
+    gmod, updatestr, fnbase = netflow.read_graph_from_file(filename, interaction_function_type=interfunctype,
+                             coupling_type=couplingtype, i=0)
+
 def test_network_library(tmp_path) -> None:
     '''
     Test the :mod:`cellnition.science.network_library` submodule.

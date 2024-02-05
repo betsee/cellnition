@@ -404,7 +404,7 @@ class NetworkABC(object, metaclass=ABCMeta):
         if set_selfloops_acti: # if self-loops of the network are forced to be activators:
             edge_types[self.selfloop_edge_inds] = EdgeType.A
 
-        return edge_types
+        return edge_types.tolist()
 
     def set_edge_types(self, edge_types: list|ndarray):
         '''
