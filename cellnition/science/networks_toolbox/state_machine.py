@@ -196,115 +196,7 @@ class StateMachine(object):
                     states_dict[tuple(sigi)]['States'].append(np.nan)
                     states_dict[tuple(sigi)]['Stability'].append(np.nan)
 
-
-
-        return solsM_all, charM_all, sols_list, states_dict
-
-    # def infer_state_transition_network(self,
-    #                                    states_dict: dict,
-    #                                    save_graph_filename: str|None=None,
-    #                                    graph_layout: str='dot')->AGraph:
-    #     '''
-    #     Using a states_dict prepared in a state space search, infer the
-    #     state transition network based on overlapping nonsignal node indices
-    #     between two sets.
-    #
-    #     '''
-    #     # Try to make a nested graph:
-    #     G = pgv.AGraph(strict=False,
-    #                    splines=True,
-    #                    directed=True,
-    #                    concentrate=False,
-    #                    compound=True,
-    #                    dpi=300)
-    #
-    #     # We first need to make all the subgraphs:
-    #     for trans_sigs_i, states_dict_i in states_dict.items():
-    #
-    #         states_set_i = states_dict_i['States']
-    #         states_char_i = states_dict_i['Stability']
-    #
-    #         trans_label_io = ''
-    #         for ii in trans_sigs_i:
-    #             trans_label_io += str(int(ii))
-    #
-    #         trans_label_i = int(trans_label_io, 2)
-    #
-    #         G.add_subgraph(name=f'cluster_{trans_label_i}', label=f'Held at I{trans_label_i}')
-    #
-    #     # Then get the way this specific graph will order them:
-    #     subg_list = [subg.name for subg in G.subgraphs()]
-    #
-    #     for i, (trans_sigs_i, states_dict_i) in enumerate(states_dict.items()):
-    #
-    #         states_set_i = states_dict_i['States']
-    #         states_char_i = states_dict_i['Stability']
-    #
-    #         trans_label_io = ''
-    #         for ii in trans_sigs_i:
-    #             trans_label_io += str(int(ii))
-    #
-    #         trans_label_i = int(trans_label_io, 2)
-    #
-    #         G_sub = G.subgraphs()[subg_list.index(f'cluster_{trans_label_i}')]
-    #
-    #         if len(states_set_i) > 1:
-    #
-    #             for trans_sigs_j, states_dict_j in states_dict.items():
-    #
-    #                 states_set_j = states_dict_j['States']
-    #                 states_char_j = states_dict_j['Stability']
-    #
-    #                 trans_label_jo = ''
-    #                 for ii in trans_sigs_j:
-    #                     trans_label_jo += str(int(ii))
-    #                 trans_label_j = int(trans_label_jo, 2)
-    #
-    #                 if trans_sigs_i != trans_sigs_j:
-    #                     shared_states = np.intersect1d(states_set_i, states_set_j)
-    #
-    #                     if len(shared_states) == 1:
-    #
-    #                         sj = shared_states[0]
-    #                         nde_j = f'{trans_label_i}.{sj}'
-    #                         G_sub.add_node(nde_j, label=f'State {sj}')
-    #
-    #                         for si in states_set_i:
-    #                             nde_i = f'{trans_label_i}.{si}'
-    #                             G_sub.add_node(nde_i, label=f'State {si}')
-    #                             G_sub.add_edge(nde_i, nde_j, label=f'I{trans_label_j}')
-    #
-    #                     elif len(
-    #                             shared_states) > 1:  # allow for a 3rd level of hierarchy...we don't know what it means yet...
-    #                         for sj in shared_states:
-    #                             nde_j = f'{trans_label_i}.{sj}'
-    #                             G_sub.add_node(nde_j, label=f'State {sj}')
-    #
-    #                             for si in states_set_i:
-    #                                 nde_i = f'{trans_label_i}.{si}'
-    #                                 G_sub.add_node(nde_i, label=f'State {si}')
-    #                                 G_sub.add_edge(nde_i, nde_j, label=f'I{trans_label_j}')
-    #
-    #         else:
-    #             for si in states_set_i:
-    #                 nde_i = f'{trans_label_i}.{si}'
-    #                 G_sub.add_node(nde_i, label=f'State {si}')
-    #
-    #     # Finally, we add in transitions between the "held" states:
-    #     for nde_i in G.nodes():
-    #         assert len(nde_i) >= 3
-    #         ni = nde_i[2:]
-    #         for nde_j in G.nodes():
-    #             nj = nde_j[2:]
-    #             if ni == nj and nde_i != nde_j:
-    #                 G.add_edge(nde_i, nde_j)
-    #
-    #     if save_graph_filename is not None:
-    #         G.layout(prog=graph_layout)
-    #         G.draw(save_graph_filename)
-    #
-    #     return G
-
+        return solsM_all, charM_all, sols_list, states_dict, sig_test_set
 
     def infer_state_transition_network(self,
                                               states_dict: dict,
@@ -464,7 +356,8 @@ class StateMachine(object):
         for soli in solsM_all.T:
             # calculate the "distance" between the two solutions
             # and append to the distance list:
-            dist_list.append(np.sqrt(np.sum((zer_sol - soli) ** 2)))
+            dist_list.append(np.sqrt(np.sum((zer_sol[self._pnet.noninput_node_inds] -
+                                             soli[self._pnet.noninput_node_inds]) ** 2)))
 
         inds_sort = np.argsort(dist_list)
 
