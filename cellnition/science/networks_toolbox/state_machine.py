@@ -198,16 +198,195 @@ class StateMachine(object):
 
         return solsM_all, charM_all, sols_list, states_dict, sig_test_set
 
-    def infer_state_transition_network(self,
-                                              states_dict: dict,
-                                              solsM_all: ndarray|list,
-                                              save_file: str|None = None,
-                                              graph_layout: str='dot'
-                                              ):
+    def create_transition_network(self,
+                                  states_dict: dict,
+                                  sig_test_set: list|ndarray,
+                                  solsM_all: ndarray|list,
+                                  dt: float = 1.0e-3,
+                                  tend: float = 100.0,
+                                  space_sig: float = 30.0,
+                                  delta_sig: float = 30.0,
+                                  t_relax: float = 15.0,
+                                  dt_samp: float=0.15,
+                                  verbose: bool = True,
+                                  match_tol: float = 0.05,
+                                  d_base: float = 1.0,
+                                  n_base: float = 15.0,
+                                  beta_base: float = 0.25
+                                  ) -> tuple[set, MultiDiGraph]:
+        '''
+        Build a state transition matrix/diagram by starting the system
+        in different states and seeing which state it ends up in after
+        a time simulation. This method iterates through all 'signal'
+        nodes of a network and sets them to the sigmax level, harvesting
+        the new steady-state reached after perturbing the network.
+
+        Parameters
+        ----------
+        dt: float = 1.0e-3
+            Timestep for the time simulation.
+
+        tend: float = 100.0
+            End time for the time simulation. This must be long
+            enough to allow the system to reach the second steady-state.
+
+        sig_tstart: float = 33.0
+            The time to start the signal perturbation. Care must be taken
+            to ensure enough time is allotted prior to starting the perturbation
+            for the system to have reached an initial steady state.
+
+        sig_tend: float = 66.0
+            The time to end the signal perturbation.
+
+        sig_base: float = 1.0
+            Baseline magnitude of the signal node.
+
+        sig_active: float = 1.0
+            Magnitude of the signal pulse during the perturbation.
+
+        delta_window: float = 1.0
+            Time to sample prior to the application of the signal perturbation,
+            in which the initial steady-state is collected.
+
+        verbose: bool = True
+            Print out log statements (True)?
+
+        tol: float = 1.0e-6
+            Tolerance, below which a state is accepted as a match. If the state
+            match error is above tol, it is added to the matrix as a new state.
+
+        '''
+
+        # States for perturbation of the zero state inputs
+        # Let's start the system off in the zero vector, then
+        # temporarily perturb the system with each signal set and see what the final state is after
+        # the perturbation.
+
+        sig_inds = self._pnet.input_node_inds
+        N_sigs = len(sig_inds)
+
+        # We want all signals on at the same time (we want the sim to end before
+        # the signal changes again:
+        sig_times = [(space_sig, delta_sig + space_sig) for i in range(N_sigs)]
+
+        transition_edges_set = set()
+
+        num_step = 0
+
+        # We first want to step through all 'held' signals and potentially multistable states:
+        for sig_base_set, sc_dict in states_dict.items():
+
+            states_set = sc_dict['States']
+
+            # Get an integer label for the 'bitstring' of signal node inds defining the base:
+            base_input_label = self._get_integer_label(sig_base_set)
+
+            # We then step through all possible perturbation signals:
+            for sig_val_set in sig_test_set:
+
+                # Get an integer label for the 'bitstring' of signal node inds on perturbation:
+                pert_input_label = self._get_integer_label(sig_val_set)
+
+                # we want the signals to go from zero to the new held state defined in sig_val set:
+                sig_mags = [(sigb, sigi) for sigb, sigi in zip(sig_base_set, sig_val_set)]
+
+                # We want to use each state in states_set as the initial condition:
+                for si in states_set:
+                    num_step += 1
+
+                    cvecti = 1 * solsM_all[:, si]
+
+                    ctime, tvect = self._pnet.run_time_sim(tend, dt, cvecti.copy(),
+                                                     sig_inds=sig_inds,
+                                                     sig_times=sig_times,
+                                                     sig_mag=sig_mags,
+                                                     dt_samp=dt_samp,
+                                                     constrained_inds=None,
+                                                     constrained_vals=None,
+                                                     d_base=d_base,
+                                                     n_base=n_base,
+                                                     beta_base=beta_base
+                                                     )
+
+                    # Create sampling windows in time: FIXME: do only once!
+                    window1 = (0.0 + t_relax, sig_times[0][0])
+                    window2 = (sig_times[0][0] + t_relax, sig_times[0][1])
+                    window3 = (sig_times[0][1] + t_relax, tend)
+                    # get the indices for each window time:
+                    inds_win1 = (
+                    self._get_index_from_val(tvect, window1[0], dt_samp),
+                    self._get_index_from_val(tvect, window1[1], dt_samp))
+                    inds_win2 = (
+                    self._get_index_from_val(tvect, window2[0], dt_samp),
+                    self._get_index_from_val(tvect, window2[1], dt_samp))
+                    inds_win3 = (
+                    self._get_index_from_val(tvect, window3[0], dt_samp),
+                    self._get_index_from_val(tvect, window3[1], dt_samp))
+
+                    c_initial = np.mean(ctime[inds_win1[0]:inds_win1[1], :], axis=0)
+                    # var_c_initial = np.sum(np.std(ctime[inds_win1[0]:inds_win1[1], :], axis=0))
+                    initial_state, match_error_initial = self._find_state_match(solsM_all[self._pnet.noninput_node_inds, :],
+                                                                          c_initial[self._pnet.noninput_node_inds])
+
+                    if match_error_initial > match_tol: # if state is unmatched, flag it with a nan
+                        initial_state = np.nan
+
+                    c_held = np.mean(ctime[inds_win2[0]:inds_win2[1], :], axis=0)
+                    # var_c_held = np.sum(np.std(ctime[inds_win2[0]:inds_win2[1], :], axis=0))
+                    held_state, match_error_held = self._find_state_match(solsM_all[self._pnet.noninput_node_inds, :],
+                                                                    c_held[self._pnet.noninput_node_inds])
+
+                    if match_error_held > match_tol: # if state is unmatched, flag it
+                        held_state = np.nan
+
+                    c_final = np.mean(ctime[inds_win3[0]:inds_win3[1], :], axis=0)
+                    # var_c_final = np.sum(np.std(ctime[inds_win3[0]:inds_win3[1], :], axis=0))
+                    final_state, match_error_final = self._find_state_match(solsM_all[self._pnet.noninput_node_inds, :],
+                                                                      c_final[self._pnet.noninput_node_inds])
+
+                    if match_error_final > match_tol: # if state is unmatched, flag it
+                        final_state = np.nan
+
+                    if verbose:
+                        print(num_step)
+                        print(f'Transition State {initial_state} to {held_state} via {pert_input_label}')
+                        print(f'Transition State {held_state} to {final_state} via {base_input_label}')
+                        print('------')
+
+                    transition_edges_set.add((initial_state, held_state, pert_input_label))
+                    transition_edges_set.add((held_state, final_state, base_input_label))
+
+        # The first thing we do after the construction of the
+        # transition edges set is make a multidigraph and
+        # use networkx to pre-process & simplify it, removing inaccessible states
+        # (states with no non-self input degree)
+
+        # Create the multidigraph:
+        GG = nx.MultiDiGraph()
+
+        for ndei, ndej, trans_label_ij in list(transition_edges_set):
+            GG.add_edge(ndei, ndej, key=f'I{trans_label_ij}')
+
+        # Remove nodes that have no input degree other than their own self-loop:
+        nodes_with_selfloops = list(nx.nodes_with_selfloops(GG))
+        for node_lab, node_in_deg in list(GG.in_degree()):
+            if (node_in_deg == 1 and node_lab in nodes_with_selfloops) or node_in_deg == 0:
+                GG.remove_node(node_lab)
+
+        return transition_edges_set, GG
+
+    def plot_state_transition_network(self,
+                                      nodes_list: list,
+                                      edges_list: list,
+                                      charM_all: list|ndarray,
+                                      save_file: str|None = None,
+                                      graph_layout: str='dot'
+                                      ):
         '''
 
         '''
         # FIXME: we probably also want the option to just plot a subset of the state dict?
+        # FIXME: Should these be options in the method?
         img_pos = 'bc'  # position of the glyph in the node
         subcluster_font = 'DejaVu Sans Bold'
         node_shape = 'ellipse'
@@ -221,121 +400,33 @@ class StateMachine(object):
                        splines=True,
                        directed=True,
                        concentrate=False,
-                       compound=True,
+                       # compound=True,
                        dpi=300)
 
         cmap = colormaps[clr_map]
-        norm = colors.Normalize(vmin=0, vmax=solsM_all.shape[1])
+        norm = colors.Normalize(vmin=0, vmax=len(nodes_list))
+        # Add all the nodes:
+        for nde_i in nodes_list:
+            nde_index = nodes_list.index(nde_i)
+            nde_color = colors.rgb2hex(cmap(norm(nde_index)))
+            nde_color += hex_transparency  # add some transparancy to the node
 
-        # We first need to make all the subgraphs:
-        for trans_sigs_i, states_dict_i in states_dict.items():
+            char_i = charM_all[nde_i] # Get the stability characterization for this state
 
-            trans_label_io = ''
-            for ii in trans_sigs_i:
-                trans_label_io += str(int(ii))
+            G.add_node(nde_i,
+                           label=f'State {nde_i}',
+                           labelloc='t',
+                           image=self._node_image_dict[char_i],
+                           imagepos=img_pos,
+                           shape=node_shape,
+                           fontcolor=nde_font_color,
+                           style='filled',
+                           fillcolor=nde_color)
 
-            trans_label_i = int(trans_label_io, 2)
 
-            G.add_subgraph(name=f'cluster_{trans_label_i}', label=f'Held at I{trans_label_i}')
-
-        # Then get the way this specific graph will order them:
-        subg_list = [subg.name for subg in G.subgraphs()]
-
-        for trans_sigs_i, states_dict_i in states_dict.items():
-
-            states_set_i = states_dict_i['States']
-            states_char_i = states_dict_i['Stability']
-
-            trans_label_io = ''
-            for ii in trans_sigs_i:
-                trans_label_io += str(int(ii))
-
-            trans_label_i = int(trans_label_io, 2)
-
-            G_sub = G.subgraphs()[subg_list.index(f'cluster_{trans_label_i}')]
-
-            if len(states_set_i) > 1:
-
-                for trans_sigs_j, states_dict_j in states_dict.items():
-
-                    states_set_j = states_dict_j['States']
-                    states_char_j = states_dict_j['Stability']
-
-                    trans_label_jo = ''
-                    for ii in trans_sigs_j:
-                        trans_label_jo += str(int(ii))
-                    trans_label_j = int(trans_label_jo, 2)
-
-                    if trans_sigs_i != trans_sigs_j:
-                        shared_states = np.intersect1d(states_set_i, states_set_j)
-
-                        if len(shared_states) >= 1:  # allow for a 3rd level of hierarchy...we don't know what it means yet...
-                            for sj in shared_states:
-                                lini_sj = states_set_j.index(sj)  # get the index of sj in the original list
-                                char_sj = states_char_j[lini_sj]  # so we can get the equ'm char of sj
-
-                                nde_j = f'{trans_label_i}.{sj}'
-
-                                nde_color = colors.rgb2hex(cmap(norm(sj)))
-                                nde_color += '80'  # add some transparancy to the node
-
-                                G_sub.add_node(nde_j,
-                                               label=f'State {sj}',
-                                               labelloc='t',
-                                               image=self._node_image_dict[char_sj],
-                                               imagepos=img_pos,
-                                               shape=node_shape,
-                                               fontcolor=nde_font_color,
-                                               style='filled',
-                                               fillcolor=nde_color)
-
-                                for si in states_set_i:
-                                    lini_si = states_set_i.index(si)  # get the index of si in the original list
-                                    char_si = states_char_i[lini_si]  # so we can get the equ'm char of si
-
-                                    nde_color = colors.rgb2hex(cmap(norm(si)))
-                                    nde_color += hex_transparency  # add some transparancy to the node
-
-                                    nde_i = f'{trans_label_i}.{si}'
-                                    G_sub.add_node(nde_i,
-                                                   label=f'State {si}',
-                                                   labelloc='t',
-                                                   image=self._node_image_dict[char_si],
-                                                   imagepos=img_pos,
-                                                   shape=node_shape,
-                                                   fontcolor=nde_font_color,
-                                                   style='filled',
-                                                   fillcolor=nde_color)
-
-                                    G_sub.add_edge(nde_i, nde_j, label=f'I{trans_label_j}')
-
-            else:
-                for si in states_set_i:
-                    lini_si = states_set_i.index(si)  # get the index of si in the original list
-                    char_si = states_char_i[lini_si]  # so we can get the equ'm char of si
-
-                    nde_color = colors.rgb2hex(cmap(norm(si)))
-                    nde_color += '80'  # add some transparancy to the node
-
-                    nde_i = f'{trans_label_i}.{si}'
-                    G_sub.add_node(nde_i,
-                                   label=f'State {si}',
-                                   labelloc='t',
-                                   image=self._node_image_dict[char_si],
-                                   imagepos=img_pos,
-                                   shape=node_shape,
-                                   fontcolor=nde_font_color,
-                                   style='filled',
-                                   fillcolor=nde_color)
-
-        # Finally, we add in transitions between the "held" states:
-        for nde_i in G.nodes():
-            assert len(nde_i) >= 3
-            ni = nde_i[2:]
-            for nde_j in G.nodes():
-                nj = nde_j[2:]
-                if ni == nj and nde_i != nde_j:
-                    G.add_edge(nde_i, nde_j)
+        # Add all the edges:
+        for nde_i, nde_j, trans_ij in edges_list:
+            G.add_edge(nde_i, nde_j, label=trans_ij)
 
         if save_file is not None:
             G.layout(prog=graph_layout)
@@ -366,7 +457,76 @@ class StateMachine(object):
 
         return solsM_all, charM_all
 
-    def find_state_match(self,
+    def _get_index_from_val(self, val_vect: ndarray, val: float, val_overlap: float):
+        '''
+        Given a value in an array, this method returns the index
+        of the closest value in the array.
+
+        Parameters
+        -----------
+        val_vect : ndarray
+            The vector of values to which the closest index to val is sought.
+
+        val: float
+            A value for which the closest matched index in val_vect is to be
+            returned.
+
+        val_overlap: float
+            An amount of overlap to include in search windows to ensure the
+            search will return at least one index.
+        '''
+        inds_l = (val_vect <= val + val_overlap).nonzero()[0]
+        inds_h = (val_vect >= val - val_overlap).nonzero()[0]
+        indo = np.intersect1d(inds_l, inds_h)
+        if len(indo):
+            ind = indo[0]
+        else:
+            raise Exception("No matching index was found.")
+
+        return ind
+
+    def _get_integer_label(self, sig_set: tuple|list|ndarray) -> int:
+        '''
+        Given a list of digits representing a bit string
+        (i.e. a list of values close to zero or 1), this method
+        treats the list as a binary bit-string and returns the
+        base-2 integer representation of the bit-string.
+
+        Parameters
+        ----------
+        sig_set : list[float|int]
+            The list containing floats or ints that are taken to represent
+            a bit string.
+
+        Returns
+        -------
+        An integer representation of the binary bit-string.
+
+        '''
+        base_str = ''
+        for sigi in sig_set:
+            base_str += str(int(sigi))
+        return int(base_str, 2)
+
+    def get_state_distance_matrix(self, solsM_all):
+        '''
+        Returns a matrix representing the L2 norm 'distance'
+        between each state in the array of all possible states.
+
+        '''
+        num_sols = solsM_all.shape[1]
+        state_distance_M = np.zeros((num_sols, num_sols))
+        for i in range(num_sols):
+            for j in range(num_sols):
+                # d_states = np.sqrt(np.sum((solsM_all[:,i] - solsM_all[:, j])**2))
+                d_states = np.sqrt(
+                    np.sum((solsM_all[self._pnet.noninput_node_inds, i] -
+                            solsM_all[self._pnet.noninput_node_inds, j]) ** 2))
+                state_distance_M[i, j] = d_states
+
+        return state_distance_M
+
+    def _find_state_match(self,
                          solsM: ndarray,
                          cvecti: list | ndarray) -> tuple:
         '''
@@ -404,225 +564,4 @@ class StateMachine(object):
         return state_best_match, errM[state_best_match]
 
 
-    # def create_transition_network(self,
-    #                               signal_node_inds: list[int],
-    #                               dt: float = 1.0e-3,
-    #                               tend: float = 100.0,
-    #                               sig_tstart: float = 33.0,
-    #                               sig_tend: float = 66.0,
-    #                               sig_base: float = 0.0,
-    #                               sig_active: float = 1.0,
-    #                               delta_window: float = 1.0,
-    #                               dt_samp: float=0.15,
-    #                               verbose: bool = True,
-    #                               tol: float = 1.0e-6,
-    #                               do_combos: bool=False,
-    #                               constrained_inds: list | None = None,
-    #                               constrained_vals: list | None = None,
-    #                               d_base: float = 1.0,
-    #                               n_base: float = 15.0,
-    #                               beta_base: float = 0.25
-    #                               ):
-    #     '''
-    #     Build a state transition matrix/diagram by starting the system
-    #     in different states and seeing which state it ends up in after
-    #     a time simulation. This method iterates through all 'signal'
-    #     nodes of a network and sets them to the sigmax level, harvesting
-    #     the new steady-state reached after perturbing the network.
-    #
-    #     Parameters
-    #     ----------
-    #     signal_node_inds : list[int]
-    #         List specifing the nodes to be peturbed in the creation of this state
-    #         transition network.
-    #
-    #     dt: float = 1.0e-3
-    #         Timestep for the time simulation.
-    #
-    #     tend: float = 100.0
-    #         End time for the time simulation. This must be long
-    #         enough to allow the system to reach the second steady-state.
-    #
-    #     sig_tstart: float = 33.0
-    #         The time to start the signal perturbation. Care must be taken
-    #         to ensure enough time is allotted prior to starting the perturbation
-    #         for the system to have reached an initial steady state.
-    #
-    #     sig_tend: float = 66.0
-    #         The time to end the signal perturbation.
-    #
-    #     sig_base: float = 1.0
-    #         Baseline magnitude of the signal node.
-    #
-    #     sig_active: float = 1.0
-    #         Magnitude of the signal pulse during the perturbation.
-    #
-    #     delta_window: float = 1.0
-    #         Time to sample prior to the application of the signal perturbation,
-    #         in which the initial steady-state is collected.
-    #
-    #     verbose: bool = True
-    #         Print out log statements (True)?
-    #
-    #     tol: float = 1.0e-6
-    #         Tolerance, below which a state is accepted as a match. If the state
-    #         match error is above tol, it is added to the matrix as a new state.
-    #
-    #     do_combos : bool = False
-    #         Consider combinations of all signal nodes in the network (e.g. s2, s0 + s1, s0 + s1 +s2)
-    #         as possible transitions for states.
-    #
-    #     '''
-    #     c_zeros = np.zeros(self._pnet.N_nodes)  # start everything out low
-    #
-    #     # Create a steady-state solutions matrix that is stacked with the
-    #     # 'zero' or 'base' state:
-    #     solsM_with0 = np.column_stack((c_zeros, self._solsM))
-    #
-    #     G_states = MultiDiGraph()
-    #     # G_states = DiGraph()
-    #
-    #     if do_combos is False: # Just do perturbations in terms of each signal node
-    #         signal_inds = [[sigi] for sigi in signal_node_inds]
-    #     else: # Do perturbations as all possible combinations (without replacement) or each signal node
-    #         lensig = len(signal_node_inds)
-    #         signal_inds = []
-    #         for i in range(0, lensig):
-    #             signal_inds.extend([list(sigis) for sigis in itertools.combinations(signal_node_inds, i + 1)])
-    #
-    #     # Make string labels for each of the signals:
-    #     signal_labels = []
-    #     for sigi in signal_inds:
-    #         if len(sigi) > 1:
-    #             str_lab = ''
-    #             for i, nss in enumerate(sigi):
-    #                 ss = self._pnet.nodes_list[nss]
-    #                 if i == 0:
-    #                     str_lab += f'{ss}'
-    #                 else:
-    #                     str_lab += f'*{ss}'
-    #             signal_labels.append(str_lab)
-    #         else:
-    #             ss = self._pnet.nodes_list[sigi[0]]
-    #             signal_labels.append(f'{ss}')
-    #
-    #     for stateio, cvecto in enumerate(solsM_with0.T):  # start the system off in each of the states
-    #
-    #         # For each signal in the network:
-    #         for si, sigi in enumerate(signal_inds):
-    #             cvecti = cvecto.copy()  # reset the state to the desired starting state
-    #             sig_times = [(sig_tstart, sig_tend) for ss in sigi]
-    #             sig_mags = [(sig_base, sig_active) for ss in sigi]
-    #
-    #             # Run the time simulation:
-    #             concs_time, tvect = self._pnet.run_time_sim(tend,
-    #                                                         dt,
-    #                                                         cvecti,
-    #                                                         sigi,
-    #                                                         sig_times,
-    #                                                         sig_mags,
-    #                                                         dt_samp=dt_samp,
-    #                                                         constrained_inds=constrained_inds,
-    #                                                         constrained_vals=constrained_vals,
-    #                                                         d_base=d_base,
-    #                                                         n_base=n_base,
-    #                                                         beta_base=beta_base
-    #                                                         )
-    #
-    #             it_30low = (tvect <= sig_tstart - delta_window).nonzero()[0]
-    #             it_30high = (tvect >= sig_tstart - 2 * delta_window).nonzero()[0]
-    #             it_30 = np.intersect1d(it_30low, it_30high)[0]
-    #
-    #             concs_before = concs_time[it_30, :]
-    #             concs_after = concs_time[-1, :]
-    #
-    #             if stateio == 0 and si == 0:  # If we're on the zeros vector we've transitioned from {0} to some new state:
-    #                 statejo, errio = self.find_state_match(solsM_with0, concs_before)
-    #                 if errio < tol:
-    #                     G_states.add_edge(0, statejo, transition=-1)
-    #
-    #                 else:  # otherwise it's not a match so add the new state to the system:
-    #                     solsM_with0 = np.column_stack((solsM_with0, concs_before))
-    #                     statejo, errio = self.find_state_match(solsM_with0, concs_before)
-    #                     G_states.add_edge(0, statejo, transition=-1)
-    #
-    #                 if verbose:
-    #                     print(f'From state 0 spontaneously to state {statejo}')
-    #
-    #             statei, erri = self.find_state_match(solsM_with0, concs_before)
-    #             statej, errj = self.find_state_match(solsM_with0, concs_after)
-    #
-    #             # FIXME: this doesn't work to add in states as we go -- results in
-    #             # a mess!
-    #             if erri > tol:
-    #                 solsM_with0 = np.column_stack((solsM_with0, concs_before))
-    #                 statei, erri = self.find_state_match(solsM_with0, concs_before)
-    #
-    #             if errj > tol:
-    #                 solsM_with0 = np.column_stack((solsM_with0, concs_after))
-    #                 statej, errj = self.find_state_match(solsM_with0, concs_after)
-    #
-    #             if statei != statej:  # stop putting on the self-edges:
-    #                 G_states.add_edge(statei, statej, transition=signal_labels[si])
-    #                 if verbose:
-    #                     print(f'From state {statei} with signal {signal_labels[si]} to state {statej}')
-    #
-    #     self._signal_inds = signal_inds # save the list of signal inds
-    #     self._signal_labels = signal_labels # save the list of node labels corresponding to the signals
-    #
-    #     self._solsM = solsM_with0 # re-assign the solutions matrix with zero and any addition
-    #     # states located during the creation of the steady-state network diagram.
-    #
-    #     self.G_states = G_states # save the state transition diagram.
-    #
-    # def plot_transition_network_o(self,
-    #                             save_graph_net: str):
-    #     '''
-    #     Plot the state transition diagram as a graphviz object,
-    #     which unfortunately can't be directly displayed but is saved
-    #     to disk as an image file.
-    #
-    #     Parameters
-    #     ----------
-    #     save_graph_net : str
-    #         The path and filename to save the network as an image file.
-    #
-    #     '''
-    #
-    #     edgedata_Gstates = nx.get_edge_attributes(self.G_states, "transition")
-    #     nodes_Gstates = list(self.G_states.nodes)
-    #
-    #     cmap = colormaps['rainbow_r']
-    #     norm = colors.Normalize(vmin=0, vmax=self._solsM.shape[1])
-    #
-    #     G = pgv.AGraph(strict=False,
-    #                    splines=True,
-    #                    directed=True,
-    #                    concentrate=False,
-    #                    dpi=300)
-    #
-    #     for ni, nde_stateo in enumerate(nodes_Gstates):
-    #         nde_color = colors.rgb2hex(cmap(norm(ni)))
-    #         nde_color += '80'  # add some transparancy to the node
-    #         nde_font_color = 'Black'
-    #
-    #         nde_state = f'State {nde_stateo}'
-    #
-    #         G.add_node(nde_state,
-    #                    style='filled',
-    #                    fillcolor=nde_color,
-    #                    fontcolor=nde_font_color,
-    #                    )
-    #
-    #     for (eio, ejo, em), etranso in edgedata_Gstates.items():
-    #         ei = f'State {eio}'
-    #         ej = f'State {ejo}'
-    #         if etranso == -1:
-    #             etrans = 'Spont.'
-    #         else:
-    #             etrans = etranso
-    #         G.add_edge(ei, ej, label=etrans)
-    #
-    #     G.layout(prog='dot')  # default to dot
-    #
-    #     G.draw(save_graph_net)
+
