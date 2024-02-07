@@ -53,6 +53,7 @@ def test_state_machine(tmp_path) -> None:
         beta_base = 5.0
 
     save_file = os.path.join(save_path, f'transnet_{fname_base}.png')
+    save_file_pert = os.path.join(save_path, f'pertnet_{fname_base}.png')
 
     smach = StateMachine(pnet) # Instantiate a state machine
 
@@ -65,7 +66,6 @@ def test_state_machine(tmp_path) -> None:
                                 search_tol=1.0e-15,
                                 sol_tol=1.0e-2,
                                 N_round_sol=1,
-                                order_states=True,
                                 dt=5.0e-3,
                                 tend=80.0,
                                 space_sig=25.0,
@@ -73,9 +73,12 @@ def test_state_machine(tmp_path) -> None:
                                 t_relax=10.0,
                                 dt_samp=0.15,
                                 match_tol=0.05,
-                                save_file=save_file,
+                                save_transition_net_image=save_file,
+                                save_perturbation_net_image=save_file_pert,
                                 graph_layout='dot'
                                 )
+
+    dist_M = smach.get_state_distance_matrix(smach.solsM_all)
 
 def test_osmo_model() -> None:
     '''

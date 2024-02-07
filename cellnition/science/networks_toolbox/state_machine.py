@@ -95,25 +95,26 @@ class StateMachine(object):
         }
 
     def run_state_machine(self, beta_base: float | list = 0.25,
-                                      n_base: float | list = 15.0,
-                                      d_base: float | list = 1.0,
-                                      verbose: bool=True,
-                                      return_saddles: bool=True,
-                                      N_space: int=3,
-                                      search_tol: float=1.0e-15,
-                                      sol_tol: float=1.0e-2,
-                                      N_round_sol: int=1,
-                                      order_states: bool = True,
-                                      dt: float = 1.0e-3,
-                                      tend: float = 100.0,
-                                      space_sig: float = 30.0,
-                                      delta_sig: float = 30.0,
-                                      t_relax: float = 15.0,
-                                      dt_samp: float = 0.15,
-                                      match_tol: float = 0.05,
-                                      save_file: str | None = None,
-                                      graph_layout: str = 'dot'
-                                        ) -> MultiDiGraph:
+                          n_base: float | list = 15.0,
+                          d_base: float | list = 1.0,
+                          verbose: bool=True,
+                          return_saddles: bool=True,
+                          N_space: int=3,
+                          search_tol: float=1.0e-15,
+                          sol_tol: float=1.0e-2,
+                          N_round_sol: int=1,
+                          dt: float = 1.0e-3,
+                          tend: float = 100.0,
+                          space_sig: float = 30.0,
+                          delta_sig: float = 30.0,
+                          t_relax: float = 15.0,
+                          dt_samp: float = 0.15,
+                          match_tol: float = 0.05,
+                          save_transition_net_image: str | None = None,
+                          save_perturbation_net_image: str|None = None,
+                          graph_layout: str = 'dot',
+                          remove_inaccessible_states: bool = True
+                          ) -> MultiDiGraph:
         '''
         Run all steps to generate a state transition network and associated
         network image.
@@ -132,9 +133,16 @@ class StateMachine(object):
                                                             N_space=N_space,
                                                             search_tol=search_tol,
                                                             sol_tol=sol_tol,
-                                                            N_round_sol=N_round_sol,
-                                                            order_states=order_states
+                                                            N_round_sol=N_round_sol
                                                             )
+
+        # save entities to the object:
+        self.solsM_all = solsM_all
+        self.charM_all = charM_all
+        self.sols_list = sols_list
+        self.states_dict = states_dict
+        self.sig_test_set = sig_test_set # should be called "input space states"
+
         # Create the edges of the transition network:
         transition_edges_set, pert_edges_set, G_nx = self.create_transition_network(states_dict, sig_test_set, solsM_all,
                                                                      dt=dt,
@@ -148,19 +156,33 @@ class StateMachine(object):
                                                                      d_base=d_base,
                                                                      n_base=n_base,
                                                                      beta_base=beta_base,
+                                                                     remove_inaccessible_states=remove_inaccessible_states
                                                                      )
 
-        if save_file is not None: # save an image of the network to file:
+        self.transition_edges_set = transition_edges_set
+        self.pert_edges_set = pert_edges_set
+        self.G_nx = G_nx
+
+        if save_perturbation_net_image:
+            nodes_list = sorted(G_nx.nodes())
+            # Generate a perturbation network plot
+            G_pert = self.plot_state_perturbation_network(self.pert_edges_set,
+                                                           self.states_dict,
+                                                           nodes_list=nodes_list,
+                                                           save_file=save_perturbation_net_image,
+                                                          graph_layout=graph_layout)
+
+        if save_transition_net_image is not None: # save an image of the network to file:
             # get nodes and edges list:
             nodes_list = sorted(G_nx.nodes())
             edges_list = list(G_nx.edges)
 
             G_gv = self.plot_state_transition_network(nodes_list,
-                                                       edges_list,
-                                                       charM_all,
-                                                       save_file=save_file,
-                                                       graph_layout=graph_layout
-                                                       )
+                                                      edges_list,
+                                                      charM_all,
+                                                      save_file=save_transition_net_image,
+                                                      graph_layout=graph_layout
+                                                      )
 
         return G_nx
 
@@ -175,7 +197,6 @@ class StateMachine(object):
                                       search_tol: float=1.0e-15,
                                       sol_tol: float=1.0e-2,
                                       N_round_sol: int=1,
-                                      order_states: bool = True
                                       ):
         '''
         Search through all possible combinations of signal node values
@@ -231,8 +252,10 @@ class StateMachine(object):
             solsM_all = np.hstack((solsM_all, soli))
             charM_all.extend(chari)
 
-            # _, inds_solsM_all_unique = np.unique(np.round(solsM_all, 1), axis=1, return_index=True)
-        _, inds_solsM_all_unique = np.unique(np.round(solsM_all, 1)[self._pnet.noninput_node_inds, :], axis=1,
+        # _, inds_solsM_all_unique = np.unique(np.round(solsM_all, N_round_sol)[self._pnet.noninput_node_inds, :], axis=1,
+        #                                      return_index=True)
+
+        _, inds_solsM_all_unique = np.unique(np.round(solsM_all, N_round_sol), axis=1,
                                              return_index=True)
 
         solsM_all = solsM_all[:, inds_solsM_all_unique]
@@ -247,18 +270,22 @@ class StateMachine(object):
         else:
             charM_all[0] = EquilibriumType.saddle.name  # update the state to a saddle node
 
-        if order_states: # order states as distance from the zero vector:
-            solsM_all, charM_all = self._order_states_by_distance(solsM_all, charM_all)
+        # if order_states: # order states as distance from the zero vector:
+        #     solsM_all, charM_all = self._order_states_by_distance(solsM_all, charM_all)
 
-        # set of all states referencing only the hub nodes; rounded to one decimal:
-        state_set = np.round(solsM_all[self._pnet.noninput_node_inds, :].T, 1).tolist()
+        # # set of all states referencing only the hub nodes; rounded to one decimal:
+        # state_set = np.round(solsM_all[self._pnet.noninput_node_inds, :].T, 1).tolist()
+
+        # set of all states referencing all nodes; rounded to one decimal:
+        state_set = np.round(solsM_all.T, 1).tolist()
 
         states_dict = OrderedDict()
         for sigi in sig_test_set:
             states_dict[tuple(sigi)] = {'States': [], 'Stability': []}
 
         for sigi, state_subseto in zip(sig_test_set, sols_list):
-            state_subset = state_subseto[self._pnet.noninput_node_inds, :]
+            # state_subset = state_subseto[self._pnet.noninput_node_inds, :]
+            state_subset = state_subseto
             for target_state in np.round(state_subset, 1).T.tolist():
                 if target_state in state_set:
                     state_match_index = state_set.index(target_state)
@@ -275,17 +302,18 @@ class StateMachine(object):
                                   states_dict: dict,
                                   sig_test_set: list|ndarray,
                                   solsM_all: ndarray|list,
-                                  dt: float = 1.0e-3,
-                                  tend: float = 100.0,
-                                  space_sig: float = 30.0,
-                                  delta_sig: float = 30.0,
-                                  t_relax: float = 15.0,
-                                  dt_samp: float=0.15,
+                                  dt: float = 5.0e-3,
+                                  tend: float = 80.0,
+                                  space_sig: float = 25.0,
+                                  delta_sig: float = 25.0,
+                                  t_relax: float = 10.0,
+                                  dt_samp: float=0.1,
                                   verbose: bool = True,
                                   match_tol: float = 0.05,
                                   d_base: float = 1.0,
                                   n_base: float = 15.0,
-                                  beta_base: float = 0.25
+                                  beta_base: float = 0.25,
+                                  remove_inaccessible_states: bool=True
                                   ) -> tuple[set, set, MultiDiGraph]:
         '''
         Build a state transition matrix/diagram by starting the system
@@ -366,7 +394,8 @@ class StateMachine(object):
 
                 # We want to use each state in states_set as the initial condition:
                 for si in states_set:
-                    cvecti = 1 * solsM_all[:, si]
+                    # Initial state vector: add the small non-zero amount to prevent 0/0 in Hill functions:
+                    cvecti = 1 * solsM_all[:, si] + self._pnet.p_min
 
                     ctime, tvect = self._pnet.run_time_sim(tend, dt, cvecti.copy(),
                                                      sig_inds=sig_inds,
@@ -397,24 +426,27 @@ class StateMachine(object):
 
                     c_initial = np.mean(ctime[inds_win1[0]:inds_win1[1], :], axis=0)
                     # var_c_initial = np.sum(np.std(ctime[inds_win1[0]:inds_win1[1], :], axis=0))
-                    initial_state, match_error_initial = self._find_state_match(solsM_all[self._pnet.noninput_node_inds, :],
-                                                                          c_initial[self._pnet.noninput_node_inds])
+                    # initial_state, match_error_initial = self._find_state_match(solsM_all[self._pnet.noninput_node_inds, :],
+                    #                                                       c_initial[self._pnet.noninput_node_inds])
+                    initial_state, match_error_initial = self._find_state_match(solsM_all, c_initial)
 
                     if match_error_initial > match_tol: # if state is unmatched, flag it with a nan
                         initial_state = np.nan
 
                     c_held = np.mean(ctime[inds_win2[0]:inds_win2[1], :], axis=0)
                     # var_c_held = np.sum(np.std(ctime[inds_win2[0]:inds_win2[1], :], axis=0))
-                    held_state, match_error_held = self._find_state_match(solsM_all[self._pnet.noninput_node_inds, :],
-                                                                    c_held[self._pnet.noninput_node_inds])
+                    # held_state, match_error_held = self._find_state_match(solsM_all[self._pnet.noninput_node_inds, :],
+                    #                                                 c_held[self._pnet.noninput_node_inds])
+                    held_state, match_error_held = self._find_state_match(solsM_all, c_held)
 
                     if match_error_held > match_tol: # if state is unmatched, flag it
                         held_state = np.nan
 
                     c_final = np.mean(ctime[inds_win3[0]:inds_win3[1], :], axis=0)
                     # var_c_final = np.sum(np.std(ctime[inds_win3[0]:inds_win3[1], :], axis=0))
-                    final_state, match_error_final = self._find_state_match(solsM_all[self._pnet.noninput_node_inds, :],
-                                                                      c_final[self._pnet.noninput_node_inds])
+                    # final_state, match_error_final = self._find_state_match(solsM_all[self._pnet.noninput_node_inds, :],
+                    #                                                   c_final[self._pnet.noninput_node_inds])
+                    final_state, match_error_final = self._find_state_match(solsM_all, c_final)
 
                     if match_error_final > match_tol: # if state is unmatched, flag it
                         final_state = np.nan
@@ -427,7 +459,6 @@ class StateMachine(object):
                                 print(num_step)
                                 print(f'Perturbed Transition from State {initial_state} to {final_state} via '
                                       f'{pert_input_label}')
-                                print('------')
 
                         else:
                             if verbose:
@@ -443,7 +474,7 @@ class StateMachine(object):
                             print(num_step)
                             print(f'Transition State {initial_state} to {held_state} via {pert_input_label}')
                             print(f'Transition State {held_state} to {final_state} via {base_input_label}')
-                            print('------')
+
 
                     else:
                         if verbose:
@@ -452,6 +483,8 @@ class StateMachine(object):
                                   f'Match errors {match_error_initial, match_error_held, match_error_final}')
 
                     num_step += 1
+                    if verbose:
+                        print('------')
 
         # The first thing we do after the construction of the
         # transition edges set is make a multidigraph and
@@ -464,11 +497,12 @@ class StateMachine(object):
         for ndei, ndej, trans_label_ij in list(transition_edges_set):
             GG.add_edge(ndei, ndej, key=f'I{trans_label_ij}')
 
-        # Remove nodes that have no input degree other than their own self-loop:
-        nodes_with_selfloops = list(nx.nodes_with_selfloops(GG))
-        for node_lab, node_in_deg in list(GG.in_degree()):
-            if (node_in_deg == 1 and node_lab in nodes_with_selfloops) or node_in_deg == 0:
-                GG.remove_node(node_lab)
+        if remove_inaccessible_states:
+            # Remove nodes that have no input degree other than their own self-loop:
+            nodes_with_selfloops = list(nx.nodes_with_selfloops(GG))
+            for node_lab, node_in_deg in list(GG.in_degree()):
+                if (node_in_deg == 1 and node_lab in nodes_with_selfloops) or node_in_deg == 0:
+                    GG.remove_node(node_lab)
 
         return transition_edges_set, perturbation_edges_set, GG
 
@@ -525,6 +559,111 @@ class StateMachine(object):
         # Add all the edges:
         for nde_i, nde_j, trans_ij in edges_list:
             G.add_edge(nde_i, nde_j, label=trans_ij)
+
+        if save_file is not None:
+            G.layout(prog=graph_layout)
+            G.draw(save_file)
+
+        return G
+
+    def plot_state_perturbation_network(self,
+                                       pert_edges_set: set,
+                                       states_dict: dict,
+                                       nodes_list: list|None=None,
+                                       save_file: str|None = None,
+                                       graph_layout: str = 'dot'):
+        '''
+        This network plotting and generation function is based on the concept
+        that an input node state can be associated with several gene network
+        states if the network has multistability. Here we create a graph with
+        subgraphs, where each subgraph represents the possible states for a
+        held input node state. In the case of multistability, temporary
+        perturbations to the held state can result in transitions between
+        the multistable state (resulting in a memory and path-dependency). The
+        graph indicates which input signal perturbation leads to which state
+        transition via the edge label. Input signal states are represented as
+        integers, where the integer codes for a binary bit string of signal state values.
+
+        Parameters
+        ----------
+        pert_edges_set : set
+            Tuples of state i, state j, perturbation input integer, base input integer, generated
+            by create_transition_network.
+
+        states_dict: dict
+            Dictionary of states and their stability characterization tags for each input signal set.
+
+        nodes_list : list|None = None
+            A list of nodes to include in the network. This is useful to filter out inaccessible states,
+            if desired.
+
+        save_file : str|None = None
+            A file to save the network image to. If None, no image is saved.
+
+        graph_layout : str = 'dot'
+            Layout for the graph when saving to image.
+
+        '''
+        img_pos = 'bc'  # position of the glyph in the node
+        subcluster_font = 'DejaVu Sans Bold'
+        node_shape = 'ellipse'
+        clr_map = 'rainbow_r'
+        nde_font_color = 'Black'
+        hex_transparency = '80'
+        mono_edge = False
+
+        # Try to make a nested graph:
+        G = pgv.AGraph(strict=mono_edge,
+                       fontname=subcluster_font,
+                       splines=True,
+                       directed=True,
+                       concentrate=False,
+                       compound=True,
+                       dpi=300)
+
+        cmap = colormaps[clr_map]
+        norm = colors.Normalize(vmin=0, vmax=len(nodes_list))
+
+        # First add all solution sets to subgraphs of the network
+        for sig_base_set, sc_dict in states_dict.items():
+
+            states_set = sc_dict['States']
+            states_char = sc_dict['Stability']
+
+            # Get an integer label for the 'bitstring' of signal node inds defining the base:
+            base_input_label = self._get_integer_label(sig_base_set)
+
+            Gsub = G.add_subgraph(name=f'cluster_{base_input_label}', label=f'Held at I{base_input_label}')
+
+            # print(f'Held at I{base_input_label}:')
+
+            for st_i, chr_i in zip(states_set, states_char):
+                if st_i in nodes_list:
+                    subnode_name = st_i
+
+                    nde_index = nodes_list.index(st_i)
+                    nde_color = colors.rgb2hex(cmap(norm(nde_index)))
+                    nde_color += hex_transparency  # add some transparancy to the node
+
+                    Gsub.add_node(subnode_name,
+                                  label=f'State {st_i}',
+                                  labelloc='t',
+                                  image=self._node_image_dict[chr_i],
+                                  imagepos=img_pos,
+                                  shape=node_shape,
+                                  fontcolor=nde_font_color,
+                                  style='filled',
+                                  fillcolor=nde_color
+                                  )
+                    # print(f'State {st_i}, Stability: {chr_i}')
+            # print('----')
+
+        for ndi, ndj, transI, baseI in pert_edges_set:
+
+            if ndi in nodes_list and ndj in nodes_list:
+                subnode_i = ndi
+                subnode_j = ndj
+                G.add_edge(subnode_i, subnode_j, label=f'I{transI}')
 
         if save_file is not None:
             G.layout(prog=graph_layout)

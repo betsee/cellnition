@@ -495,6 +495,9 @@ class ProbabilityNet(NetworkABC):
                                col_deriv=False,
                                )
 
+            # Find any roots below zero and constrain them to 0.0:
+            sol_roots[(sol_roots < 0.0).nonzero()] = 0.0
+
             c_eqms = np.zeros(self.N_nodes)
             c_eqms[unconstrained_inds] = sol_roots
 
