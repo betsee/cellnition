@@ -24,12 +24,12 @@ def test_state_machine(tmp_path) -> None:
     state transition network inference module with a library network.
     '''
     import os
-    from cellnition.science.network_models.network_library import TrinodeNet
+    from cellnition.science.network_models.network_library import BasicBinodeNet
     from cellnition.science.network_workflow import NetworkWorkflow
     from cellnition.science.networks_toolbox.state_machine import StateMachine
     from cellnition.science.network_models.network_enums import InterFuncType, CouplingType
 
-    libg = TrinodeNet() # generate the library-derived network
+    libg = BasicBinodeNet() # generate the library-derived network
 
     save_path = str(tmp_path) # temporary directory to write to
     netflow = NetworkWorkflow(save_path) # instantiate network work flow object
@@ -52,25 +52,30 @@ def test_state_machine(tmp_path) -> None:
         n_base = 3.0
         beta_base = 5.0
 
+    save_file = os.path.join(save_path, f'transnet_{fname_base}.png')
+
     smach = StateMachine(pnet) # Instantiate a state machine
 
-    # perform an input state space search:
-    solsM_all, charM_all, sols_list, states_dict, _ = smach.steady_state_solutions_search(beta_base=beta_base,
-                                                                                       n_base=n_base,
-                                                                                       d_base=d_base,
-                                                                                       verbose=False,
-                                                                                       return_saddles=True,
-                                                                                       N_space=2,
-                                                                                       search_tol=1.0e-15,
-                                                                                       sol_tol=1.0e-2,
-                                                                                       N_round_sol=1,
-                                                                                       )
-    # generate the inferred state transition network
-    save_graph = os.path.join(save_path, 'Hier_State_Machine.png')
-    Gnet = smach.infer_state_transition_network(states_dict, solsM_all,
-                                                save_file=save_graph,
-                                                graph_layout='dot'
-                                                )
+    G = smach.run_state_machine(beta_base=beta_base,
+                                n_base=n_base,
+                                d_base=d_base,
+                                verbose=False,
+                                return_saddles=True,
+                                N_space=2,
+                                search_tol=1.0e-15,
+                                sol_tol=1.0e-2,
+                                N_round_sol=1,
+                                order_states=True,
+                                dt=5.0e-3,
+                                tend=80.0,
+                                space_sig=25.0,
+                                delta_sig=25.0,
+                                t_relax=10.0,
+                                dt_samp=0.15,
+                                match_tol=0.05,
+                                save_file=save_file,
+                                graph_layout='dot'
+                                )
 
 def test_osmo_model() -> None:
     '''

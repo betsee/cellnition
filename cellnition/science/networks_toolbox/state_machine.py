@@ -25,6 +25,8 @@ from matplotlib import colormaps
 from networkx import MultiDiGraph
 from pygraphviz import AGraph
 
+# FIXME: allow this to save the transition network to gml files as well as to load them
+
 class StateMachine(object):
     '''
     Build and plots a state transition diagram from a solution set and
@@ -91,6 +93,77 @@ class StateMachine(object):
             EquilibriumType.repellor.name: str(repellor_fname),
             EquilibriumType.undetermined.name: str(unknown_fname)
         }
+
+    def run_state_machine(self, beta_base: float | list = 0.25,
+                                      n_base: float | list = 15.0,
+                                      d_base: float | list = 1.0,
+                                      verbose: bool=True,
+                                      return_saddles: bool=True,
+                                      N_space: int=3,
+                                      search_tol: float=1.0e-15,
+                                      sol_tol: float=1.0e-2,
+                                      N_round_sol: int=1,
+                                      order_states: bool = True,
+                                      dt: float = 1.0e-3,
+                                      tend: float = 100.0,
+                                      space_sig: float = 30.0,
+                                      delta_sig: float = 30.0,
+                                      t_relax: float = 15.0,
+                                      dt_samp: float = 0.15,
+                                      match_tol: float = 0.05,
+                                      save_file: str | None = None,
+                                      graph_layout: str = 'dot'
+                                        ) -> MultiDiGraph:
+        '''
+        Run all steps to generate a state transition network and associated
+        network image.
+        '''
+
+        # Run a search through input space to obtain all unique steady states and their equ'm characterization:
+        (solsM_all,
+         charM_all,
+         sols_list,
+         states_dict,
+         sig_test_set) = self.steady_state_solutions_search(beta_base=beta_base,
+                                                            n_base=n_base,
+                                                            d_base=d_base,
+                                                            verbose=verbose,
+                                                            return_saddles=return_saddles,
+                                                            N_space=N_space,
+                                                            search_tol=search_tol,
+                                                            sol_tol=sol_tol,
+                                                            N_round_sol=N_round_sol,
+                                                            order_states=order_states
+                                                            )
+        # Create the edges of the transition network:
+        transition_edges_set, pert_edges_set, G_nx = self.create_transition_network(states_dict, sig_test_set, solsM_all,
+                                                                     dt=dt,
+                                                                     tend=tend,
+                                                                     space_sig=space_sig,
+                                                                     delta_sig=delta_sig,
+                                                                     t_relax=t_relax,
+                                                                     dt_samp=dt_samp,
+                                                                     verbose=verbose,
+                                                                     match_tol=match_tol,
+                                                                     d_base=d_base,
+                                                                     n_base=n_base,
+                                                                     beta_base=beta_base,
+                                                                     )
+
+        if save_file is not None: # save an image of the network to file:
+            # get nodes and edges list:
+            nodes_list = sorted(G_nx.nodes())
+            edges_list = list(G_nx.edges)
+
+            G_gv = self.plot_state_transition_network(nodes_list,
+                                                       edges_list,
+                                                       charM_all,
+                                                       save_file=save_file,
+                                                       graph_layout=graph_layout
+                                                       )
+
+        return G_nx
+
 
     def steady_state_solutions_search(self,
                                       beta_base: float | list = 0.25,
@@ -213,7 +286,7 @@ class StateMachine(object):
                                   d_base: float = 1.0,
                                   n_base: float = 15.0,
                                   beta_base: float = 0.25
-                                  ) -> tuple[set, MultiDiGraph]:
+                                  ) -> tuple[set, set, MultiDiGraph]:
         '''
         Build a state transition matrix/diagram by starting the system
         in different states and seeing which state it ends up in after
@@ -270,6 +343,7 @@ class StateMachine(object):
         sig_times = [(space_sig, delta_sig + space_sig) for i in range(N_sigs)]
 
         transition_edges_set = set()
+        perturbation_edges_set = set()
 
         num_step = 0
 
@@ -292,8 +366,6 @@ class StateMachine(object):
 
                 # We want to use each state in states_set as the initial condition:
                 for si in states_set:
-                    num_step += 1
-
                     cvecti = 1 * solsM_all[:, si]
 
                     ctime, tvect = self._pnet.run_time_sim(tend, dt, cvecti.copy(),
@@ -347,14 +419,39 @@ class StateMachine(object):
                     if match_error_final > match_tol: # if state is unmatched, flag it
                         final_state = np.nan
 
-                    if verbose:
-                        print(num_step)
-                        print(f'Transition State {initial_state} to {held_state} via {pert_input_label}')
-                        print(f'Transition State {held_state} to {final_state} via {base_input_label}')
-                        print('------')
+                    if initial_state != final_state: # add this to the perturbed transitions
+                        if initial_state is not np.nan and final_state is not np.nan:
+                            perturbation_edges_set.add((initial_state, final_state, pert_input_label, base_input_label))
 
-                    transition_edges_set.add((initial_state, held_state, pert_input_label))
-                    transition_edges_set.add((held_state, final_state, base_input_label))
+                            if verbose:
+                                print(num_step)
+                                print(f'Perturbed Transition from State {initial_state} to {final_state} via '
+                                      f'{pert_input_label}')
+                                print('------')
+
+                        else:
+                            if verbose:
+                                print(f'Warning: {initial_state} to {final_state} via {pert_input_label} not added \n '
+                                      f'as state match not found! \n'
+                                      f'Match errors {match_error_initial, match_error_final}')
+
+                    if initial_state is not np.nan and held_state is not np.nan and final_state is not np.nan:
+                        transition_edges_set.add((initial_state, held_state, pert_input_label))
+                        transition_edges_set.add((held_state, final_state, base_input_label))
+
+                        if verbose:
+                            print(num_step)
+                            print(f'Transition State {initial_state} to {held_state} via {pert_input_label}')
+                            print(f'Transition State {held_state} to {final_state} via {base_input_label}')
+                            print('------')
+
+                    else:
+                        if verbose:
+                            print(f'Warning: {initial_state} to {held_state} via {pert_input_label} not added \n '
+                                  f'as state match not found! \n'
+                                  f'Match errors {match_error_initial, match_error_held, match_error_final}')
+
+                    num_step += 1
 
         # The first thing we do after the construction of the
         # transition edges set is make a multidigraph and
@@ -373,14 +470,15 @@ class StateMachine(object):
             if (node_in_deg == 1 and node_lab in nodes_with_selfloops) or node_in_deg == 0:
                 GG.remove_node(node_lab)
 
-        return transition_edges_set, GG
+        return transition_edges_set, perturbation_edges_set, GG
 
     def plot_state_transition_network(self,
                                       nodes_list: list,
                                       edges_list: list,
                                       charM_all: list|ndarray,
                                       save_file: str|None = None,
-                                      graph_layout: str='dot'
+                                      graph_layout: str='dot',
+                                      mono_edge: bool = False
                                       ):
         '''
 
@@ -395,7 +493,7 @@ class StateMachine(object):
         hex_transparency = '80'
 
         # Try to make a nested graph:
-        G = pgv.AGraph(strict=False,
+        G = pgv.AGraph(strict=mono_edge,
                        fontname=subcluster_font,
                        splines=True,
                        directed=True,
