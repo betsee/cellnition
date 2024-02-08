@@ -679,14 +679,13 @@ class ProbabilityNet(NetworkABC):
 
         return constrained_inds, constrained_vals
 
+
     def run_time_sim(self,
-                     tend: float,
-                     dt: float,
+                     tvect: ndarray|list,
+                     tvectr: ndarray|list,
                      cvecti: ndarray|list,
                      sig_inds: ndarray|list|None = None,
-                     sig_times: ndarray | list | None = None,
-                     sig_mag: ndarray | list | None = None,
-                     dt_samp: float|None = None,
+                     sig_vals: list | ndarray | None = None,
                      constrained_inds: list | None = None,
                      constrained_vals: list | None = None,
                      d_base: float = 1.0,
@@ -696,30 +695,14 @@ class ProbabilityNet(NetworkABC):
         '''
 
         '''
-        Nt = int(tend/dt)
-        tvect = np.linspace(0.0, tend, Nt)
 
-        if sig_inds is not None:
-            c_signals = self.make_signals_matrix(tvect, sig_inds, sig_times, sig_mag)
-        else:
-            c_signals = None
+        dt = tvect[1] - tvect[0]
+
+        if sig_inds is None or sig_vals is None:
+            sig_inds = []
+            sig_vals = []
 
         concs_time = []
-
-        # sampling compression
-        if dt_samp is not None:
-            sampr = int(dt_samp / dt)
-            tvect_samp = tvect[0::sampr]
-            tvectr = tvect_samp
-        else:
-            tvect_samp = None
-            tvectr = tvect
-
-        # make a time-step update vector so we can update any sensors as
-        # an absolute reading (dt = 1.0) while treating the kinetics of the
-        # other node types:
-        # dtv = dt * np.ones(self._N_nodes)
-        # dtv[self.sensor_node_inds] = 1.0
 
         dcdt_vect_f, dcdt_jac_f = self.create_numerical_dcdt(constrained_inds=constrained_inds,
                                                              constrained_vals=constrained_vals)
@@ -733,18 +716,14 @@ class ProbabilityNet(NetworkABC):
             dcdt = np.asarray(dcdt_vect_f(cvecti, *function_args))
             cvecti += dt * dcdt
 
-            if c_signals is not None:
-                # manually set the signal node values:
-                cvecti[sig_inds] = c_signals[ti, sig_inds]
+            # manually set the signal node values:
+            cvecti[sig_inds] = sig_vals[ti, sig_inds]
 
-            if dt_samp is None:
+            if tt in tvectr:
                 concs_time.append(cvecti * 1)
-            else:
-                if tt in tvect_samp:
-                    concs_time.append(cvecti * 1)
 
         concs_time = np.asarray(concs_time)
 
-        return concs_time, tvectr
+        return concs_time
 
 

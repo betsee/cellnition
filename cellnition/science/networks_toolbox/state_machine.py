@@ -298,7 +298,7 @@ class StateMachine(object):
 
         return solsM_all, charM_all, sols_list, states_dict, sig_test_set
 
-    def get_input_signals_from_label_dict(self, sig_test_set: ndarray|list):
+    def _get_input_signals_from_label_dict(self, sig_test_set: ndarray | list):
         '''
 
         '''
@@ -390,6 +390,24 @@ class StateMachine(object):
 
         num_step = 0
 
+        # Get the full time vector and the sampled time vector (tvectr)
+        tvect, tvectr = self._pnet.make_time_vects(tend, dt, dt_samp)
+
+        # Create sampling windows in time:
+        window1 = (0.0 + t_relax, sig_times[0][0])
+        window2 = (sig_times[0][0] + t_relax, sig_times[0][1])
+        window3 = (sig_times[0][1] + t_relax, tend)
+        # get the indices for each window time:
+        inds_win1 = (
+            self._get_index_from_val(tvectr, window1[0], dt_samp),
+            self._get_index_from_val(tvectr, window1[1], dt_samp))
+        inds_win2 = (
+            self._get_index_from_val(tvectr, window2[0], dt_samp),
+            self._get_index_from_val(tvectr, window2[1], dt_samp))
+        inds_win3 = (
+            self._get_index_from_val(tvectr, window3[0], dt_samp),
+            self._get_index_from_val(tvectr, window3[1], dt_samp))
+
         # We first want to step through all 'held' signals and potentially multistable states:
         for sig_base_set, sc_dict in states_dict.items():
 
@@ -412,32 +430,17 @@ class StateMachine(object):
                     # Initial state vector: add the small non-zero amount to prevent 0/0 in Hill functions:
                     cvecti = 1 * solsM_all[:, si] + self._pnet.p_min
 
-                    ctime, tvect = self._pnet.run_time_sim(tend, dt, cvecti.copy(),
-                                                     sig_inds=sig_inds,
-                                                     sig_times=sig_times,
-                                                     sig_mag=sig_mags,
-                                                     dt_samp=dt_samp,
-                                                     constrained_inds=None,
-                                                     constrained_vals=None,
-                                                     d_base=d_base,
-                                                     n_base=n_base,
-                                                     beta_base=beta_base
-                                                     )
+                    c_signals = self._pnet.make_pulsed_signals_matrix(tvect, sig_inds, sig_times, sig_mags)
 
-                    # Create sampling windows in time: FIXME: do only once!
-                    window1 = (0.0 + t_relax, sig_times[0][0])
-                    window2 = (sig_times[0][0] + t_relax, sig_times[0][1])
-                    window3 = (sig_times[0][1] + t_relax, tend)
-                    # get the indices for each window time:
-                    inds_win1 = (
-                    self._get_index_from_val(tvect, window1[0], dt_samp),
-                    self._get_index_from_val(tvect, window1[1], dt_samp))
-                    inds_win2 = (
-                    self._get_index_from_val(tvect, window2[0], dt_samp),
-                    self._get_index_from_val(tvect, window2[1], dt_samp))
-                    inds_win3 = (
-                    self._get_index_from_val(tvect, window3[0], dt_samp),
-                    self._get_index_from_val(tvect, window3[1], dt_samp))
+                    ctime = self._pnet.run_time_sim(tvect, tvectr, cvecti.copy(),
+                                                           sig_inds=sig_inds,
+                                                           sig_vals=c_signals,
+                                                           constrained_inds=None,
+                                                           constrained_vals=None,
+                                                           d_base=d_base,
+                                                           n_base=n_base,
+                                                           beta_base=beta_base
+                                                           )
 
                     c_initial = np.mean(ctime[inds_win1[0]:inds_win1[1], :], axis=0)
                     # var_c_initial = np.sum(np.std(ctime[inds_win1[0]:inds_win1[1], :], axis=0))
@@ -526,6 +529,90 @@ class StateMachine(object):
             nx.write_gml(GG, save_graph_file)
 
         return transition_edges_set, perturbation_edges_set, GG
+
+    def sim_time_trajectory(self,
+                            starting_state: int,
+                            solsM_all: ndarray,
+                            input_list: list[str],
+                            sig_test_set: list|ndarray,
+                            dt: float=1.0e-3,
+                            dt_samp: float=0.1,
+                            input_hold_duration: float = 30.0,
+                            t_wait: float = 10.0,
+                            verbose: bool = True,
+                            match_tol: float = 0.05,
+                            d_base: float = 1.0,
+                            n_base: float = 15.0,
+                            beta_base: float = 0.25,
+                            ):
+        '''
+        Use a provided starting state and a list of input signals to hold for
+        a specified duration to simulate a time trajectory of the state machine.
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        '''
+        c_vecti = solsM_all[:, starting_state] # get the starting state concentrations
+        sig_inds = self._pnet.input_node_inds
+
+        N_phases = len(input_list)
+        end_t = N_phases * input_hold_duration
+
+        phase_time_tuples = [(i * input_hold_duration, (i + 1) * input_hold_duration) for i in range(N_phases)]
+
+        # Get the full time vector and the sampled time vector (tvectr)
+        tvect, tvectr = self._pnet.make_time_vects(end_t, dt, dt_samp)
+
+        # list of tuples with indices defining start and stop of phase averaging region (for state maching solutions)
+        c_ave_phase_inds = []
+        for ts, te in phase_time_tuples:
+            rtinds = self._pnet.get_interval_inds(tvectr, ts, te, t_wait=t_wait)
+            c_ave_phase_inds.append((rtinds[0], rtinds[-1]))
+
+        # Get the dictionary that allows us to convert between input signal labels and actual held signal values:
+        signal_lookup_dict = self._get_input_signals_from_label_dict(sig_test_set)
+
+        # Generate a signals matrix:
+        sig_M = np.zeros((len(tvect), self._pnet.N_nodes))
+
+        for sig_label, (ts, te) in zip(input_list, phase_time_tuples):
+            # Get the indices for the time this phase is active:
+            tinds_phase = self._pnet.get_interval_inds(tvect, ts, te, t_wait=0.0)
+
+            sig_vals = signal_lookup_dict[sig_label]
+
+            for si, sigv in zip(sig_inds, sig_vals):
+                sig_M[tinds_phase, si] = sigv
+
+        # now we're ready to run the time sim:
+        ctime = self._pnet.run_time_sim(tvect, tvectr, c_vecti.copy(),
+                                        sig_inds=sig_inds,
+                                        sig_vals=sig_M,
+                                        constrained_inds=None,
+                                        constrained_vals=None,
+                                        d_base=d_base,
+                                        n_base=n_base,
+                                        beta_base=beta_base
+                                        )
+
+        # now we want to state match based on average concentrations in each held-input phase:
+        matched_states = []
+        for i, (si, ei) in enumerate(c_ave_phase_inds):
+            c_ave = np.mean(ctime[si:ei, :], axis=0)
+            state_match, match_error = self._find_state_match(solsM_all, c_ave)
+            if match_error < match_tol:
+                matched_states.append(state_match)
+                if verbose:
+                    print(f'Phase {i} state matched to State {state_match} with input {input_list[i]}')
+            else:
+                matched_states.append(np.nan)
+                if verbose:
+                    print(f'Warning! Phase {i} state matched not found (match error: {match_error})!')
+
+        return tvectr, ctime, matched_states
 
     def plot_state_transition_network(self,
                                       nodes_listo: list,

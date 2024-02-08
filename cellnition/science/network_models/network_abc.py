@@ -759,11 +759,11 @@ class NetworkABC(object, metaclass=ABCMeta):
 
         return ipulse_inds
 
-    def make_signals_matrix(self,
-                            tvect: list|ndarray,
-                            sig_inds: list|ndarray,
-                            sig_times: list|ndarray,
-                            sig_mag: list|ndarray):
+    def make_pulsed_signals_matrix(self,
+                                   tvect: list|ndarray,
+                                   sig_inds: list|ndarray,
+                                   sig_times: list|ndarray,
+                                   sig_mag: list|ndarray):
         '''
 
         '''
@@ -829,20 +829,43 @@ class NetworkABC(object, metaclass=ABCMeta):
 
         return intervals_list
 
+    def make_time_vects(self,
+                        tend: float,
+                        dt: float,
+                        dt_samp: float|None = None,):
+        '''
+
+        '''
+        Nt = int(tend/dt)
+        tvect = np.linspace(0.0, tend, Nt)
+
+        # sampling compression
+        if dt_samp is not None:
+            sampr = int(dt_samp / dt)
+            tvectr = tvect[0::sampr]
+        else:
+            tvectr = tvect
+
+        # make a time-step update vector so we can update any sensors as
+        # an absolute reading (dt = 1.0) while treating the kinetics of the
+        # other node types:
+        # dtv = dt * np.ones(self._N_nodes)
+        # dtv[self.sensor_node_inds] = 1.0
+
+        return tvect, tvectr
+
     @abstractmethod
     def run_time_sim(self,
-                     tend: float,
-                     dt: float,
+                     tvect: ndarray|list,
+                     tvectr: ndarray|list,
                      cvecti: ndarray|list,
                      sig_inds: ndarray|list|None = None,
-                     sig_times: ndarray | list | None = None,
-                     sig_mag: ndarray | list | None = None,
-                     dt_samp: float|None = None,
+                     sig_vals: list | ndarray | None = None,
                      constrained_inds: list | None = None,
                      constrained_vals: list | None = None,
                      d_base: float = 1.0,
-                     n_base: float = 3.0,
-                     beta_base: float = 4.0
+                     n_base: float = 15.0,
+                     beta_base: float = 0.25
                      ):
         '''
 

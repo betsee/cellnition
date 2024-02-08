@@ -24,12 +24,12 @@ def test_state_machine(tmp_path) -> None:
     state transition network inference module with a library network.
     '''
     import os
-    from cellnition.science.network_models.network_library import BasicBinodeNet
+    from cellnition.science.network_models.network_library import BinodeNet
     from cellnition.science.network_workflow import NetworkWorkflow
     from cellnition.science.networks_toolbox.state_machine import StateMachine
     from cellnition.science.network_models.network_enums import InterFuncType, CouplingType
 
-    libg = BasicBinodeNet() # generate the library-derived network
+    libg = BinodeNet() # generate the library-derived network
 
     save_path = str(tmp_path) # temporary directory to write to
     netflow = NetworkWorkflow(save_path) # instantiate network work flow object
@@ -81,6 +81,23 @@ def test_state_machine(tmp_path) -> None:
                                 )
 
     dist_M = smach.get_state_distance_matrix(smach.solsM_all)
+
+    input_list = ['I0', 'I1', 'I2', 'I0', 'I3']
+    starting_state = 0
+    tvectr, ctime, matched_states = smach.sim_time_trajectory(starting_state,
+                                                              smach.solsM_all,
+                                                              input_list,
+                                                              smach.sig_test_set,
+                                                              dt=1.0e-3,
+                                                              dt_samp=0.1,
+                                                              input_hold_duration=30.0,
+                                                              t_wait=10.0,
+                                                              verbose=True,
+                                                              match_tol=0.05,
+                                                              d_base=d_base,
+                                                              n_base=n_base,
+                                                              beta_base=beta_base,
+                                                              )
 
 def test_osmo_model() -> None:
     '''
@@ -423,6 +440,7 @@ def test_time_sim(tmp_path) -> None:
                                                                       i=0)
 
     dt = 1.0e-3
+    dt_samp = 0.15
 
     sig_inds = pnet.input_node_inds
     N_sigs = len(sig_inds)
@@ -440,14 +458,19 @@ def test_time_sim(tmp_path) -> None:
 
     cvecti = np.zeros(pnet.N_nodes) + pnet.p_min
 
-    ctime, tvect = pnet.run_time_sim(tend, dt, cvecti,
-                                     sig_inds=sig_inds,
-                                     sig_times=sig_times,
-                                     sig_mag=sig_mags,
-                                     dt_samp=150.0 * dt,
-                                     constrained_inds=None,
-                                     constrained_vals=None,
-                                     d_base=d_base,
-                                     n_base=n_base,
-                                     beta_base=beta_base
-                                     )
+    # Get the full time vector and the sampled time vector (tvectr)
+    tvect, tvectr = pnet.make_time_vects(tend, dt, dt_samp)
+
+    c_signals = pnet.make_pulsed_signals_matrix(tvect, sig_inds, sig_times, sig_mags)
+
+    ctime = pnet.run_time_sim(tvect,
+                              tvectr,
+                              cvecti,
+                              sig_inds=sig_inds,
+                              sig_vals=c_signals,
+                              constrained_inds=None,
+                              constrained_vals=None,
+                              d_base=d_base,
+                              n_base=n_base,
+                              beta_base=beta_base
+                             )
