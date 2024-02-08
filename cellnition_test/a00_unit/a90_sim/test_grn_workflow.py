@@ -84,7 +84,7 @@ def test_state_machine(tmp_path) -> None:
 
     input_list = ['I0', 'I1', 'I2', 'I0', 'I3']
     starting_state = 0
-    tvectr, ctime, matched_states = smach.sim_time_trajectory(starting_state,
+    tvectr, c_time, matched_states, phase_inds = smach.sim_time_trajectory(starting_state,
                                                               smach.solsM_all,
                                                               input_list,
                                                               smach.sig_test_set,
@@ -98,6 +98,17 @@ def test_state_machine(tmp_path) -> None:
                                                               n_base=n_base,
                                                               beta_base=beta_base,
                                                               )
+
+    savefig = os.path.join(save_path, 'time_traj.png')
+    fig, ax = smach.plot_time_trajectory(c_time, tvectr, phase_inds,
+                                         matched_states,
+                                         smach.charM_all,
+                                         figsize=(10, 4),
+                                         state_label_offset=0.01,
+                                         glyph_zoom=0.1,
+                                         glyph_alignment=(-0.3, -0.4),
+                                         fontsize='medium',
+                                         save_file=savefig)
 
 def test_osmo_model() -> None:
     '''

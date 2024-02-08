@@ -20,8 +20,11 @@ from cellnition._util.path.utilpathmake import FileRelative
 from cellnition._util.path.utilpathself import get_data_png_glyph_stability_dir
 from collections import OrderedDict
 from numpy import ndarray
+import matplotlib.pyplot as plt
 from matplotlib import colors
 from matplotlib import colormaps
+import matplotlib.image as image
+from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 from networkx import MultiDiGraph
 from pygraphviz import AGraph
 
@@ -612,7 +615,7 @@ class StateMachine(object):
                 if verbose:
                     print(f'Warning! Phase {i} state matched not found (match error: {match_error})!')
 
-        return tvectr, ctime, matched_states
+        return tvectr, ctime, matched_states, c_ave_phase_inds
 
     def plot_state_transition_network(self,
                                       nodes_listo: list,
@@ -784,6 +787,55 @@ class StateMachine(object):
             G.draw(save_file)
 
         return G
+
+
+    def plot_time_trajectory(self,
+                             c_time: ndarray,
+                             tvectr: ndarray|list,
+                             phase_inds: ndarray|list,
+                             matched_states: ndarray|list,
+                             charM_all: ndarray|list,
+                             figsize: tuple = (10, 4),
+                             state_label_offset: float = 0.01,
+                             glyph_zoom: float=0.1,
+                             glyph_alignment: tuple[float, float]=(-0.3, -0.4),
+                             fontsize: str='medium',
+                             save_file: str|None = None):
+        '''
+
+        '''
+
+        main_c = c_time[:, self._pnet.noninput_node_inds]
+
+        fig, ax = plt.subplots(1, 1, figsize=figsize)
+        for cc in main_c.T:
+            ax.plot(tvectr, cc, linewidth=2.0)  # plot the time series
+            # annotate the plot with the matched state:
+            for (pi, pj), statei in zip(phase_inds, matched_states):
+                char_i = charM_all[statei]
+                char_i_fname = self._node_image_dict[char_i]
+                logo = image.imread(char_i_fname)
+                imagebox = OffsetImage(logo, zoom=glyph_zoom)
+                pmid = pi
+                tmid = tvectr[pmid]
+                cmid = cc[pmid] + state_label_offset
+                ax.text(tmid, cmid, f'State {statei}', fontsize=fontsize)
+
+                ab = AnnotationBbox(imagebox,
+                                    (tmid, cmid),
+                                    frameon=False,
+                                    box_alignment=glyph_alignment)
+                ax.add_artist(ab)
+
+        ax.set_xlabel('Time')
+        ax.set_ylabel('Expression Probability')
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+
+        if save_file is not None:
+            plt.savefig(save_file, dpi=300, transparent=True, format='png')
+
+        return fig, ax
 
 
     def _order_states_by_distance(self, solsM_all, charM_all):
