@@ -724,6 +724,41 @@ class NetworkABC(object, metaclass=ABCMeta):
 
         return pulse_sig
 
+    def get_interval_inds(self,
+                           tvect: ndarray,
+                           t_on: float,
+                           t_off: float,
+                           t_wait: float = 0.0
+                           ):
+        '''
+        Returns indices specifying an interval from the
+        supplied vector tvect spanning between vector
+        values t_on and t_off.
+
+        Parameters
+        ----------
+        t_vect : ndarray
+            The vector to pull the interval from.
+
+        t_on : float
+            The first value in the vector defining the interval start.
+
+        t_off : float
+            The value in the vector defining the interval end.
+
+        t_wait: float
+            The amount of time to push up the start of the interval from
+            t_on (which is useful if you're waiting for the system to get
+            back to steady-state).
+
+        '''
+        itop = (tvect >= t_on + t_wait).nonzero()[0]
+        ibot = (tvect <= t_off).nonzero()[0]
+
+        ipulse_inds = np.intersect1d(ibot, itop)
+
+        return ipulse_inds
+
     def make_signals_matrix(self,
                             tvect: list|ndarray,
                             sig_inds: list|ndarray,
@@ -745,6 +780,54 @@ class NetworkABC(object, metaclass=ABCMeta):
                                             )
 
         return c_signals
+
+    def get_all_intervals(self,
+                          tvect: ndarray,
+                          sig_times: list | ndarray,
+                          t_wait: float = 0.0,
+                          add_end_intervals: bool = True
+                          ):
+        '''
+
+        '''
+        intervals_set = set()  # Initialize set to hold the interval indices
+
+        # sig_times = sorted(sig_times) # sort the time tuples by their start time
+        sig_times.sort(key=lambda x: x[0])  # sort the time tuples by their start time
+
+        for ts, te in sig_times:
+            inti = self.get_interval_inds(tvect,
+                                          ts,
+                                          te,
+                                          t_wait=t_wait
+                                          )
+
+            if len(inti):
+                intervals_set.add((inti[0], inti[-1]))
+
+        if add_end_intervals:
+            # Add a start interval
+            intis = self.get_interval_inds(tvect,
+                                           tvect[0],
+                                           sig_times[0][0],
+                                           t_wait=t_wait
+                                           )
+            if len(intis):
+                intervals_set.add((intis[0], intis[-1]))
+
+            # Add an end interval:
+            intie = self.get_interval_inds(tvect,
+                                           sig_times[-1][1],
+                                           tvect[-1],
+                                           t_wait=t_wait
+                                           )
+            if len(intie):
+                intervals_set.add((intie[0], intie[-1]))
+
+        intervals_list = list(intervals_set)
+        intervals_list.sort(key=lambda x: x[0])  # sort the time tuples by their start time
+
+        return intervals_list
 
     @abstractmethod
     def run_time_sim(self,

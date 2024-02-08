@@ -25,8 +25,6 @@ from matplotlib import colormaps
 from networkx import MultiDiGraph
 from pygraphviz import AGraph
 
-# FIXME: allow this to save the transition network to gml files as well as to load them
-
 class StateMachine(object):
     '''
     Build and plots a state transition diagram from a solution set and
@@ -110,6 +108,7 @@ class StateMachine(object):
                           t_relax: float = 15.0,
                           dt_samp: float = 0.15,
                           match_tol: float = 0.05,
+                          save_graph_file: str|None =None,
                           save_transition_net_image: str | None = None,
                           save_perturbation_net_image: str|None = None,
                           graph_layout: str = 'dot',
@@ -156,7 +155,8 @@ class StateMachine(object):
                                                                      d_base=d_base,
                                                                      n_base=n_base,
                                                                      beta_base=beta_base,
-                                                                     remove_inaccessible_states=remove_inaccessible_states
+                                                                     remove_inaccessible_states=remove_inaccessible_states,
+                                                                     save_graph_file=save_graph_file
                                                                      )
 
         self.transition_edges_set = transition_edges_set
@@ -168,7 +168,7 @@ class StateMachine(object):
             # Generate a perturbation network plot
             G_pert = self.plot_state_perturbation_network(self.pert_edges_set,
                                                            self.states_dict,
-                                                           nodes_list=nodes_list,
+                                                           nodes_listo=nodes_list,
                                                            save_file=save_perturbation_net_image,
                                                           graph_layout=graph_layout)
 
@@ -298,6 +298,20 @@ class StateMachine(object):
 
         return solsM_all, charM_all, sols_list, states_dict, sig_test_set
 
+    def get_input_signals_from_label_dict(self, sig_test_set: ndarray|list):
+        '''
+
+        '''
+        # Would be very useful to have a lookup dictionary between the integer input
+        # state label and the original signals tuple:
+        input_int_to_signals = {}
+
+        for input_sigs in sig_test_set:
+            int_label = self._get_integer_label(input_sigs)
+            input_int_to_signals[f'I{int_label}'] = tuple(input_sigs)
+
+        return input_int_to_signals
+
     def create_transition_network(self,
                                   states_dict: dict,
                                   sig_test_set: list|ndarray,
@@ -313,7 +327,8 @@ class StateMachine(object):
                                   d_base: float = 1.0,
                                   n_base: float = 15.0,
                                   beta_base: float = 0.25,
-                                  remove_inaccessible_states: bool=True
+                                  remove_inaccessible_states: bool=True,
+                                  save_graph_file: str|None = None
                                   ) -> tuple[set, set, MultiDiGraph]:
         '''
         Build a state transition matrix/diagram by starting the system
@@ -495,7 +510,10 @@ class StateMachine(object):
         GG = nx.MultiDiGraph()
 
         for ndei, ndej, trans_label_ij in list(transition_edges_set):
-            GG.add_edge(ndei, ndej, key=f'I{trans_label_ij}')
+            # GG.add_edge(ndei, ndej, key=f'I{trans_label_ij}')
+            # GG.add_edge(ndei, ndej, key=trans_label_ij)
+            # Annoyingly, nodes must be strings in order to save properly...
+            GG.add_edge(str(ndei), str(ndej), key=f'I{trans_label_ij}')
 
         if remove_inaccessible_states:
             # Remove nodes that have no input degree other than their own self-loop:
@@ -504,10 +522,13 @@ class StateMachine(object):
                 if (node_in_deg == 1 and node_lab in nodes_with_selfloops) or node_in_deg == 0:
                     GG.remove_node(node_lab)
 
+        if save_graph_file:
+            nx.write_gml(GG, save_graph_file)
+
         return transition_edges_set, perturbation_edges_set, GG
 
     def plot_state_transition_network(self,
-                                      nodes_list: list,
+                                      nodes_listo: list,
                                       edges_list: list,
                                       charM_all: list|ndarray,
                                       save_file: str|None = None,
@@ -519,6 +540,9 @@ class StateMachine(object):
         '''
         # FIXME: we probably also want the option to just plot a subset of the state dict?
         # FIXME: Should these be options in the method?
+
+        # Convert nodes from string to int
+        nodes_list = [int(ni) for ni in nodes_listo]
         img_pos = 'bc'  # position of the glyph in the node
         subcluster_font = 'DejaVu Sans Bold'
         node_shape = 'ellipse'
@@ -569,7 +593,7 @@ class StateMachine(object):
     def plot_state_perturbation_network(self,
                                        pert_edges_set: set,
                                        states_dict: dict,
-                                       nodes_list: list|None=None,
+                                       nodes_listo: list|None=None,
                                        save_file: str|None = None,
                                        graph_layout: str = 'dot'):
         '''
@@ -604,6 +628,9 @@ class StateMachine(object):
             Layout for the graph when saving to image.
 
         '''
+
+        if nodes_listo is not None: # convert nodes from string to int
+            nodes_list = [int(ni) for ni in nodes_listo]
         img_pos = 'bc'  # position of the glyph in the node
         subcluster_font = 'DejaVu Sans Bold'
         node_shape = 'ellipse'

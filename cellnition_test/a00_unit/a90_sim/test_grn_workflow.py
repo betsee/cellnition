@@ -52,6 +52,7 @@ def test_state_machine(tmp_path) -> None:
         n_base = 3.0
         beta_base = 5.0
 
+    save_graph_file = os.path.join(save_path, f'graph_{fname_base}.gml')
     save_file = os.path.join(save_path, f'transnet_{fname_base}.png')
     save_file_pert = os.path.join(save_path, f'pertnet_{fname_base}.png')
 
@@ -73,6 +74,7 @@ def test_state_machine(tmp_path) -> None:
                                 t_relax=10.0,
                                 dt_samp=0.15,
                                 match_tol=0.05,
+                                save_graph_file=save_graph_file,
                                 save_transition_net_image=save_file,
                                 save_perturbation_net_image=save_file_pert,
                                 graph_layout='dot'
