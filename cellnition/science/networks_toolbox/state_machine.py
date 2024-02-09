@@ -840,10 +840,11 @@ class StateMachine(object):
                              matched_states: ndarray|list,
                              solsM_all: ndarray|list,
                              charM_all: ndarray|list,
+                             gene_plot_inds: list|None=None,
                              figsize: tuple = (10, 4),
-                             state_label_offset: float = 0.01,
-                             glyph_zoom: float=0.1,
-                             glyph_alignment: tuple[float, float]=(-0.3, -0.4),
+                             state_label_offset: float = 0.02,
+                             glyph_zoom: float=0.15,
+                             glyph_alignment: tuple[float, float]=(-0.0, -0.15),
                              fontsize: str='medium',
                              save_file: str|None = None,
                              matched_to_unique_states: bool = True,
@@ -853,52 +854,77 @@ class StateMachine(object):
 
         '''
 
-        main_c = c_time[:, self._pnet.noninput_node_inds]
+        if matched_to_unique_states:
+            # in order to get the correct assignment to the unique inds, we need to re-match the states:
+            matched_states = []
+            for i, (si, ei) in enumerate(phase_inds):
+                c_ave = np.mean(c_time[si:ei, :], axis=0)
+                state_matcho, match_error = self._find_state_match(solsM_all, c_ave)
+                if match_error < match_tol:
+                    matched_states.append(state_matcho)
+                else:
+                    matched_states.append(np.nan)
+
+        if gene_plot_inds is None:
+            main_c = c_time[:, self._pnet.noninput_node_inds]
+        else:
+            main_c = c_time[:, gene_plot_inds]
+
+        N_plot_genes = main_c.shape[1]
+
+        # Resize the figure to fit the panel of plotted genes:
+        fig_width = figsize[0]
+        fig_height = figsize[1]
+        figsize = (fig_width, fig_height*N_plot_genes)
 
         # Get the sols dict for mapping
         unique_sols_dict, inv_unique_sols_dict, N_unique_sols = self._get_unique_sol_dict(solsM_all,
                                                                                           match_tol=match_tol)
+        cmap = plt.get_cmap("tab10")
 
-        fig, ax = plt.subplots(1, 1, figsize=figsize)
+        fig, axes = plt.subplots(N_plot_genes, 1, figsize=figsize, sharex=True, sharey=True)
         for ii, cc in enumerate(main_c.T):
             gene_lab = f'Gene {ii}'
-            ax.plot(tvectr, cc, linewidth=2.0, label=gene_lab)  # plot the time series
+            lineplt = axes[ii].plot(tvectr, cc, linewidth=2.0, label=gene_lab, color=cmap(ii))  # plot the time series
             # annotate the plot with the matched state:
             for (pi, pj), stateio in zip(phase_inds, matched_states):
 
                 if matched_to_unique_states:
-                    statei = inv_unique_sols_dict[stateio]
+                    statei = unique_sols_dict[stateio]
                 else:
                     statei = stateio
 
-                char_i = charM_all[statei] # We want the state characterization to go to the full state system
+                char_i = charM_all[stateio] # We want the state characterization to go to the full state system
                 char_i_fname = self._node_image_dict[char_i]
                 logo = image.imread(char_i_fname)
                 imagebox = OffsetImage(logo, zoom=glyph_zoom)
                 pmid = pi
                 tmid = tvectr[pmid]
-                cmid = cc[pmid] + state_label_offset
+                cc_max = np.max(cc[pi:pj])
+                cmid = cc_max + state_label_offset
 
-                ax.text(tmid, cmid, f'State {stateio}', fontsize=fontsize)
+                axes[ii].text(tmid, cmid, f'State {statei}', fontsize=fontsize)
 
                 ab = AnnotationBbox(imagebox,
                                     (tmid, cmid),
                                     frameon=False,
                                     box_alignment=glyph_alignment)
-                ax.add_artist(ab)
+                axes[ii].add_artist(ab)
 
-        ax.set_xlabel('Time')
-        ax.set_ylabel('Expression Probability')
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
+                axes[ii].spines['top'].set_visible(False)
+                axes[ii].spines['right'].set_visible(False)
 
-        if legend:
-            fig.legend(frameon=False)
+                axes[ii].set_ylabel('Expression Probability')
+
+                if legend:
+                    axes[ii].legend(frameon=False)
+
+        axes[-1].set_xlabel('Time')
 
         if save_file is not None:
             plt.savefig(save_file, dpi=300, transparent=True, format='png')
 
-        return fig, ax
+        return fig, axes
 
     def get_state_distance_matrix(self, solsM_all):
         '''
