@@ -77,7 +77,8 @@ def test_state_machine(tmp_path) -> None:
                                 save_graph_file=save_graph_file,
                                 save_transition_net_image=save_file,
                                 save_perturbation_net_image=save_file_pert,
-                                graph_layout='dot'
+                                graph_layout='dot',
+                                unique_sol_index=True
                                 )
 
     dist_M = smach.get_state_distance_matrix(smach.solsM_all)
@@ -97,18 +98,22 @@ def test_state_machine(tmp_path) -> None:
                                                               d_base=d_base,
                                                               n_base=n_base,
                                                               beta_base=beta_base,
+                                                              match_to_unique_states=True
                                                               )
 
     savefig = os.path.join(save_path, 'time_traj.png')
     fig, ax = smach.plot_time_trajectory(c_time, tvectr, phase_inds,
                                          matched_states,
+                                         smach.solsM_all,
                                          smach.charM_all,
                                          figsize=(10, 4),
                                          state_label_offset=0.01,
                                          glyph_zoom=0.1,
                                          glyph_alignment=(-0.3, -0.4),
                                          fontsize='medium',
-                                         save_file=savefig)
+                                         save_file=savefig,
+                                         matched_to_unique_states=True,
+                                         match_tol=0.05)
 
 def test_osmo_model() -> None:
     '''
@@ -269,7 +274,7 @@ def test_grn_workflow_bingraph(tmp_path) -> None:
     netflow = NetworkWorkflow(save_path)
 
     N_nodes = 5
-    p_edge = 0.2
+    p_edge = 0.5
     iframe = 0
 
     # randomly generate a scale-free graph:
@@ -406,7 +411,6 @@ def test_network_library(tmp_path) -> None:
                                                                           coupling_type=CouplingType.mixed,
                                                                           network_name=libn.name,
                                                                           i=0)
-
 
 def test_time_sim(tmp_path) -> None:
     '''
