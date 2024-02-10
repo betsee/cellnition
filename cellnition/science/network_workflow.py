@@ -264,7 +264,8 @@ class NetworkWorkflow(object):
                    update_string: str|None = None,
                    node_type_dict: dict|None = None,
                    extra_verbose: bool=False,
-                   coupling_type: CouplingType=CouplingType.mixed
+                   coupling_type: CouplingType=CouplingType.mixed,
+                   label_edges: bool = False
                    ):
         '''
         A single frame of the workflow
@@ -341,7 +342,8 @@ class NetworkWorkflow(object):
                         val_cmap = 'Greys_r',
                         save_path=save_graph_net,
                         layout='dot',
-                        rev_font_color=True
+                        rev_font_color=True,
+                        label_edges=label_edges
                         )
 
         # Highlight the existance of a "core" graph:
@@ -357,7 +359,8 @@ class NetworkWorkflow(object):
                         save_path=save_graph_net_circo,
                         layout='circo',
                         rev_font_color=False,
-                        vminmax = (0.0, 1.0)
+                        vminmax = (0.0, 1.0),
+                        label_edges=label_edges
                         )
 
         # Plot and save the degree distribution for this graph:

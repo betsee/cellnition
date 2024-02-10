@@ -16,7 +16,8 @@ def plot_network(nodes_list: list|ndarray,
                  save_path: str|None=None,
                  layout: str='dot',
                  vminmax: tuple|None = None,
-                 rev_font_color: bool=False):
+                 rev_font_color: bool=False,
+                 label_edges: bool=False):
     '''
 
     layout options:
@@ -158,16 +159,34 @@ def plot_network(nodes_list: list|ndarray,
                    fontsize=node_font_size,
                    )
 
-    for (ei, ej), et in zip(edge_list, edges_type):
+    for ei, ((ndei, ndej), et) in enumerate(zip(edge_list, edges_type)):
+
+        if label_edges:
+            edge_lab = f'e{ei}'
+
+        else:
+            edge_lab = ''
 
         if et is EdgeType.A or et is EdgeType.As:
-            G.add_edge(ei, ej, arrowhead='dot', color='blue', penwidth=edge_width)
+            G.add_edge(ndei, ndej,
+                       label=edge_lab,
+                       arrowhead='dot',
+                       color='blue',
+                       penwidth=edge_width)
 
         elif et is EdgeType.I or et is EdgeType.Is:
-            G.add_edge(ei, ej, arrowhead='tee', color='red', penwidth=edge_width)
+            G.add_edge(ndei, ndej,
+                       label=edge_lab,
+                       arrowhead='tee',
+                       color='red',
+                       penwidth=edge_width)
 
         elif et is EdgeType.N:
-            G.add_edge(ei, ej, arrowhead='normal', color='black', penwidth=edge_width)
+            G.add_edge(ndei, ndej,
+                       label=edge_lab,
+                       arrowhead='normal',
+                       color='black',
+                       penwidth=edge_width)
 
         else:
             raise Exception('Edge type not found.')

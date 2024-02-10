@@ -314,6 +314,34 @@ class ProbabilityNet(NetworkABC):
         # get the "regular" nodes:
         self.noninput_node_inds = np.setdiff1d(self.nodes_index, self.input_node_inds)
 
+        # As we scale-down all concentrations for additive interactions so that the
+        # concentration ranges between 0.0 and 1.0, we need to scale the out edge
+        # beta parameter for these scaled-down nodes so that they signal as they would in
+        # a fully dimensionalized model:
+        subs_list = []
+        for ei, (ndei, ndej) in enumerate(self.edges_index):
+            if self._n_add_edges[ndei] != 1:
+                if self._inter_fun_type is InterFuncType.logistic:
+                    subs_list.append((self._beta_vect_s[ei],
+                                      self._beta_vect_s[ei] * self._n_add_edges[ndei]))
+                else:
+                    subs_list.append((self._beta_vect_s[ei],
+                                      self._beta_vect_s[ei]/self._n_add_edges[ndei]))
+
+        self._dcdt_vect_s = list(sp.Matrix(self._dcdt_vect_s).subs(subs_list))
+
+        # Finally, we wish to create equations for inspection and visualization, that have the
+        # Node names substituted in:
+        subs_list = []
+        for pi, nde_lab in zip(self._c_vect_s, self.nodes_list):
+            subs_list.append((pi, nde_lab))
+
+        for ei, (nij, bij) in enumerate(zip(self._n_vect_s, self._beta_vect_s)):
+            subs_list.append((bij, f'beta_{ei}'))
+            subs_list.append((nij, f'n_{ei}'))
+
+        self.dcdt_vect_s_viz = sp.Matrix(self._dcdt_vect_s).subs(subs_list)
+
     def make_numerical_params(self,
                        d_base: float|list[float]=1.0,
                        n_base: float|list[float]=15.0,
@@ -662,7 +690,7 @@ class ProbabilityNet(NetworkABC):
         len_constr = len(self.input_node_inds)
 
         if signal_constr_vals is None: # default to zero
-            sig_vals = self.p_min*np.ones(len_constr).tolist()
+            sig_vals = (self.p_min*np.ones(len_constr)).tolist()
         else:
             sig_vals = signal_constr_vals
 

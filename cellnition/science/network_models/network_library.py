@@ -205,7 +205,7 @@ class BasicQuadnodeControlNet(LibNet):
                  ]
 
         if activator_signals:
-            self.edge_types = [EdgeType.A, EdgeType.A, EdgeType.I, EdgeType.A,
+            self.edge_types = [EdgeType.A, EdgeType.A, EdgeType.A, EdgeType.I,
                           EdgeType.A
                           ]
         else:
@@ -241,7 +241,7 @@ class QuadnodeControlNet1(LibNet):
                  ]
 
         if activator_signals:
-            self.edge_types = [EdgeType.A, EdgeType.A, EdgeType.I, EdgeType.A,
+            self.edge_types = [EdgeType.A, EdgeType.A, EdgeType.A, EdgeType.I,
                                EdgeType.A,
                           EdgeType.A
                           ]

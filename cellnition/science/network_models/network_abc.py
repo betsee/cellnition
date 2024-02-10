@@ -989,7 +989,8 @@ class NetworkABC(object, metaclass=ABCMeta):
     def save_model_equations(self,
                              save_eqn_image: str,
                              save_reduced_eqn_image: str|None = None,
-                             save_eqn_csv: str|None = None
+                             save_eqn_csv: str|None = None,
+                             substitute_node_labels: bool = True
                              ):
         '''
         Save images of the model equations, as well as a csv file that has
@@ -1007,9 +1008,35 @@ class NetworkABC(object, metaclass=ABCMeta):
             The path and filename to save the main and reduced model equations as LaTex in a csv file.
 
         '''
+
+        if substitute_node_labels:
+            subs_list = []
+            for pi, nde_lab in zip(self._c_vect_s, self.nodes_list):
+                subs_list.append((pi, nde_lab))
+
+            for ei, (nij, bij) in enumerate(zip(self._n_vect_s, self._beta_vect_s)):
+                subs_list.append((bij, f'beta_{ei}'))
+                subs_list.append((nij, f'n_{ei}'))
+
+            _dcdt_vect_s = list(sp.Matrix(self._dcdt_vect_s).subs(subs_list))
+            _c_vect_s = list(sp.Matrix(self._c_vect_s).subs(subs_list))
+
+            if self._dcdt_vect_reduced_s is not None:
+                _dcdt_vect_reduced_s = list(sp.Matrix(self._dcdt_vect_reduced_s).subs(subs_list))
+                _c_vect_reduced_s = list(sp.Matrix(self._c_vect_reduced_s).subs(subs_list))
+
+        else:
+            _dcdt_vect_s = self._dcdt_vect_s
+            _c_vect_s = self._c_vect_s
+
+            if self._dcdt_vect_reduced_s is not None:
+                _dcdt_vect_reduced_s = self._dcdt_vect_reduced_s
+                _c_vect_reduced_s = self._c_vect_reduced_s
+
+
         t_s = sp.symbols('t')
-        c_change = sp.Matrix([sp.Derivative(ci, t_s) for ci in self._c_vect_s])
-        eqn_net = sp.Eq(c_change, sp.Matrix(self._dcdt_vect_s))
+        c_change = sp.Matrix([sp.Derivative(ci, t_s) for ci in _c_vect_s])
+        eqn_net = sp.Eq(c_change, sp.Matrix(_dcdt_vect_s))
 
         sp.preview(eqn_net,
                    viewer='file',
@@ -1019,11 +1046,11 @@ class NetworkABC(object, metaclass=ABCMeta):
 
         # Save the equations for the graph to a file:
         header = ['Concentrations', 'Change Vector']
-        eqns_to_write = [[sp.latex(self._c_vect_s), sp.latex(self._dcdt_vect_s)]]
+        eqns_to_write = [[sp.latex(_c_vect_s), sp.latex(_dcdt_vect_s)]]
 
         if self._dcdt_vect_reduced_s is not None and save_reduced_eqn_image is not None:
-            c_change_reduced = sp.Matrix([sp.Derivative(ci, t_s) for ci in self._c_vect_reduced_s])
-            eqn_net_reduced = sp.Eq(c_change_reduced, self._dcdt_vect_reduced_s)
+            c_change_reduced = sp.Matrix([sp.Derivative(ci, t_s) for ci in _c_vect_reduced_s])
+            eqn_net_reduced = sp.Eq(c_change_reduced, _dcdt_vect_reduced_s)
 
             sp.preview(eqn_net_reduced,
                        viewer='file',
@@ -1031,8 +1058,8 @@ class NetworkABC(object, metaclass=ABCMeta):
                        euler=False,
                        dvioptions=["-T", "tight", "-z", "0", "--truecolor", "-D 600", "-bg", "Transparent"])
 
-            eqns_to_write.append(sp.latex(self._c_vect_reduced_s))
-            eqns_to_write.append(sp.latex(self._dcdt_vect_reduced_s))
+            eqns_to_write.append(sp.latex(_c_vect_reduced_s))
+            eqns_to_write.append(sp.latex(_dcdt_vect_reduced_s))
             header.extend(['Reduced Concentations', 'Reduced Change Vector'])
 
         if save_eqn_csv is not None:
