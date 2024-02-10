@@ -128,6 +128,7 @@ class NetworkWorkflow(object):
     def make_network_from_edges(self,
                                   edges: list[tuple],
                                   edge_types: list[EdgeType]|None = None,
+                                  node_type_dict: dict | None = None,
                                   interaction_function_type: InterFuncType=InterFuncType.logistic,
                                   coupling_type: CouplingType=CouplingType.mixed,
                                   network_name: str='network',
@@ -148,7 +149,7 @@ class NetworkWorkflow(object):
 
         # set the edge and node types to the network:
         pnet.set_edge_types(edge_types)
-        pnet.set_node_types()
+        pnet.set_node_types(node_type_dict=node_type_dict)
 
         # Get the adjacency matrices for this model:
         A_add_s, A_mul_s, A_full_s = pnet.build_adjacency_from_edge_type_list(edge_types,

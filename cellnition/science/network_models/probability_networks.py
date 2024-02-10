@@ -434,7 +434,7 @@ class ProbabilityNet(NetworkABC):
 
         cM = np.zeros((N_pts, self.N_nodes))
 
-        for i, cGrid in enumerate(cGrid):
+        for i, cGrid in zip(c_inds, cGrid):
             cM[:, i] = cGrid.ravel()
 
         return cM, c_lins, cGrid
@@ -443,13 +443,13 @@ class ProbabilityNet(NetworkABC):
                                 constraint_inds: list|None = None,
                                 constraint_vals: list|None = None,
                                 signal_constr_vals: list|None = None,
-                                d_base: float = 1.0,
-                                n_base: float = 15.0,
-                                beta_base: float = 0.25,
+                                d_base: float|list[float] = 1.0,
+                                n_base: float|list[float] = 15.0,
+                                beta_base: float|list[float] = 0.25,
                                 N_space: int = 2,
                                 search_tol: float=1.0e-15,
                                 sol_tol: float=1.0e-1,
-                                N_round_sol: int = 2,
+                                N_round_sol: int = 1,
                                 verbose: bool=True,
                                 save_file: str|None = None,
                                 return_saddles: bool = False
@@ -485,8 +485,8 @@ class ProbabilityNet(NetworkABC):
                                                beta_base=beta_base)
 
         for cvecto in M_pstates: # for each test vector:
-            c_vect_sol = cvecto[unconstrained_inds] # get values for the genes we're solving for...
 
+            c_vect_sol = cvecto[unconstrained_inds] # get values for the genes we're solving for...
             sol_roots = fsolve(dcdt_vect_f,
                                c_vect_sol,
                                args=function_args,
@@ -496,7 +496,7 @@ class ProbabilityNet(NetworkABC):
                                )
 
             # Find any roots below zero and constrain them to 0.0:
-            sol_roots[(sol_roots < 0.0).nonzero()] = 0.0
+            sol_roots[(sol_roots <= 0.0).nonzero()] = self.p_min
 
             c_eqms = np.zeros(self.N_nodes)
             c_eqms[unconstrained_inds] = sol_roots
@@ -662,7 +662,7 @@ class ProbabilityNet(NetworkABC):
         len_constr = len(self.input_node_inds)
 
         if signal_constr_vals is None: # default to zero
-            sig_vals = np.zeros(len_constr).tolist()
+            sig_vals = self.p_min*np.ones(len_constr).tolist()
         else:
             sig_vals = signal_constr_vals
 
@@ -688,9 +688,9 @@ class ProbabilityNet(NetworkABC):
                      sig_vals: list | ndarray | None = None,
                      constrained_inds: list | None = None,
                      constrained_vals: list | None = None,
-                     d_base: float = 1.0,
-                     n_base: float = 15.0,
-                     beta_base: float = 0.25
+                     d_base: float|list[float] = 1.0,
+                     n_base: float|list[float] = 15.0,
+                     beta_base: float|list[float] = 0.25
                      ):
         '''
 

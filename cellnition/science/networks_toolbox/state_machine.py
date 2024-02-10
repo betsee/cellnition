@@ -28,7 +28,6 @@ from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 from networkx import MultiDiGraph
 from pygraphviz import AGraph
 
-# FIXME: Time traj plot needs to make a separate plot for each gene
 class StateMachine(object):
     '''
     Build and plots a state transition diagram from a solution set and
@@ -319,9 +318,9 @@ class StateMachine(object):
                                   dt_samp: float=0.1,
                                   verbose: bool = True,
                                   match_tol: float = 0.05,
-                                  d_base: float = 1.0,
-                                  n_base: float = 15.0,
-                                  beta_base: float = 0.25,
+                                  d_base: float|list[float] = 1.0,
+                                  n_base: float|list[float] = 15.0,
+                                  beta_base: float|list[float] = 0.25,
                                   remove_inaccessible_states: bool=True,
                                   save_graph_file: str|None = None
                                   ) -> tuple[set, set, MultiDiGraph]:
@@ -536,9 +535,9 @@ class StateMachine(object):
                             t_wait: float = 10.0,
                             verbose: bool = True,
                             match_tol: float = 0.05,
-                            d_base: float = 1.0,
-                            n_base: float = 15.0,
-                            beta_base: float = 0.25,
+                            d_base: float|list[float] = 1.0,
+                            n_base: float|list[float] = 15.0,
+                            beta_base: float|list[float] = 0.25,
                             match_to_unique_states: bool = True
                             ):
         '''
@@ -714,7 +713,8 @@ class StateMachine(object):
                                        save_file: str|None = None,
                                        graph_layout: str = 'dot',
                                        unique_sol_index: bool=True,
-                                       match_tol: float=0.05):
+                                       match_tol: float=0.05,
+                                       mono_edge: bool=False):
         '''
         This network plotting and generation function is based on the concept
         that an input node state can be associated with several gene network
@@ -760,7 +760,6 @@ class StateMachine(object):
         clr_map = 'rainbow_r'
         nde_font_color = 'Black'
         hex_transparency = '80'
-        mono_edge = False
 
         # Try to make a nested graph:
         G = pgv.AGraph(strict=mono_edge,
@@ -849,7 +848,8 @@ class StateMachine(object):
                              save_file: str|None = None,
                              matched_to_unique_states: bool = True,
                              match_tol: float=0.05,
-                             legend: bool=True):
+                             legend: bool=True,
+                             ):
         '''
 
         '''
@@ -1102,6 +1102,3 @@ class StateMachine(object):
                 raise Exception("State not found!")
 
         return unique_sol_dict, inv_unique_sols_dict, N_unique_sols
-
-
-

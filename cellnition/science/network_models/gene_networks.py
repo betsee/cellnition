@@ -12,7 +12,7 @@
 # For a general regulatory network, one can say the rate of change of agent a_i is:
 # d a_i/dt = r_max*sum(f(a_j)) - a_i*d_max
 # Where d_max is maximum rate of decay, r_max is maximum rate of growth, and f(a_j) is
-# an interaction function detailing how ajent a_j influences the growth of a_i.
+# an interaction function detailing how agent a_j influences the growth of a_i.
 #
 # Here we use normalized agent variables: c_i = a_i/alpha with alpha = (r_i/d_i).
 # We use the substitution, a_i = c_i*alpha for all entities in the network rate equations.
