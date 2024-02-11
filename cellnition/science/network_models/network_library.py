@@ -485,7 +485,7 @@ class FullQuadStateNet(LibNet):
 
         self.add_interactions = True
 
-class MonoControlNet(LibNet):
+class BiLoopControlNet(LibNet):
 
     def __init__(self, activator_signals: bool=True):
         '''
@@ -494,20 +494,20 @@ class MonoControlNet(LibNet):
         # Initialize the superclass:
         super().__init__()
 
-        self.name = 'MonoControlNet'
+        self.name = 'BiLoopControlNet'
 
-        self.N_nodes = 5
-        self.edges = [('S0', 'H0'), ('H0', 'E0'), ('E0', 'P0'), ('P0', 'S0'), ('F0', 'P0')]
+        self.N_nodes = 8
+        self.edges = [('S0', 'H0'), ('H0', 'E0'), ('E0', 'P0'), ('P0', 'S0'),
+                      ('S1', 'H1'), ('H1', 'E1'), ('E1', 'P0'), ('P0', 'S1'),
+                      ('F0', 'P0')]
 
-        self.edge_types = [EdgeType.I, EdgeType.A, EdgeType.N, EdgeType.N, EdgeType.N]
-
-        # non-homogeneous K-vects to see more effect in satelite nodes:
-        self.B_vect = 2.0
+        self.edge_types = [EdgeType.A, EdgeType.A, EdgeType.I, EdgeType.A,
+                           EdgeType.A, EdgeType.A, EdgeType.A, EdgeType.I,
+                           EdgeType.A
+                           ]
 
         self.node_type_dict = {'S': NodeType.sensor,
                                'E': NodeType.effector,
                                'P': NodeType.process,
                                'F': NodeType.factor
                                }
-
-        self.add_interactions = True

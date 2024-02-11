@@ -27,6 +27,7 @@ from cellnition.science.network_models.network_enums import (EdgeType,
 # FIXME: This class should have a network-building start method so we get the external parameters needed
 # for use in different downstream tools (e.g. state_machine, network_workflow, etc)
 # FIXME: This needs to be able to solve steady-states only on a reduced node set (e.g. cycle nodes)
+# FIXME: make a equation viz method and use it in export equations
 
 class ProbabilityNet(NetworkABC):
     '''
@@ -330,15 +331,25 @@ class ProbabilityNet(NetworkABC):
 
         self._dcdt_vect_s = list(sp.Matrix(self._dcdt_vect_s).subs(subs_list))
 
-        # Finally, we wish to create equations for inspection and visualization, that have the
-        # Node names substituted in:
         subs_list = []
+        self._subs_syms_list = []
         for pi, nde_lab in zip(self._c_vect_s, self.nodes_list):
-            subs_list.append((pi, nde_lab))
+            nde_sym = sp.symbols(nde_lab)
+            subs_list.append((pi, nde_sym))
+            self._subs_syms_list.append(nde_sym)
 
         for ei, (nij, bij) in enumerate(zip(self._n_vect_s, self._beta_vect_s)):
-            subs_list.append((bij, f'beta_{ei}'))
-            subs_list.append((nij, f'n_{ei}'))
+            b_sym = sp.symbols(f'beta_{ei}')
+            n_sym = sp.symbols(f'n_{ei}')
+            subs_list.append((bij, b_sym))
+            subs_list.append((nij, n_sym))
+            self._subs_syms_list.append(b_sym)
+            self._subs_syms_list.append(n_sym)
+
+        for ndei, di in enumerate(self._d_vect_s):
+            d_sym = sp.symbols(f'd_{ndei}')
+            subs_list.append((di, d_sym))
+            self._subs_syms_list.append(d_sym)
 
         self.dcdt_vect_s_viz = sp.Matrix(self._dcdt_vect_s).subs(subs_list)
 
@@ -566,7 +577,7 @@ class ProbabilityNet(NetworkABC):
 
         '''
 
-        eps = 1.0e-25 # Small value to avoid divide-by-zero in the jacobian
+        eps = self.p_min # Small value to avoid divide-by-zero in the jacobian
 
         sol_dicts_list = []
 
@@ -587,7 +598,6 @@ class ProbabilityNet(NetworkABC):
             solution_dict['Change at Minima'] = dcdt_vect_f(pmins[unconstrained_inds], *func_args)
 
             jac = jac_f(pmins[unconstrained_inds], *func_args)
-
             # get the eigenvalues of the jacobian at this equillibrium point:
             eig_valso, eig_vects = np.linalg.eig(jac)
 
