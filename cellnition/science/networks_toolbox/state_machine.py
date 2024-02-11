@@ -279,7 +279,7 @@ class StateMachine(object):
             charM_all[0] = EquilibriumType.saddle.name  # update the state to a saddle node
 
         # if order_states: # order states as distance from the zero vector:
-        #     solsM_all, charM_all = self._order_states_by_distance(solsM_all, charM_all)
+        # solsM_all, charM_all = self._order_states_by_distance(solsM_all, charM_all)
 
         # # set of all states referencing only the hub nodes; rounded to one decimal:
         # state_set = np.round(solsM_all[self._pnet.noninput_node_inds, :].T, 1).tolist()
