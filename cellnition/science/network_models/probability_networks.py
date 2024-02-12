@@ -524,8 +524,10 @@ class ProbabilityNet(NetworkABC):
                                                beta_base=beta_base)
 
         for cvecto in M_pstates: # for each test vector:
-
-            c_vect_sol = cvecto[unconstrained_inds] # get values for the genes we're solving for...
+            # get values for the genes we're solving for...
+            # Note: fsolve doesn't allow us to impose constraints so we need to push this initial guess
+            # quite far away from zero with the added constant:
+            c_vect_sol = cvecto[unconstrained_inds] + self._push_away_from_zero
             sol_roots = fsolve(dcdt_vect_f,
                                c_vect_sol,
                                args=function_args,
@@ -562,7 +564,7 @@ class ProbabilityNet(NetworkABC):
 
         return stable_sol_M, sol_M_char, sol_M
     def find_attractor_sols(self,
-                             sols_0: list|ndarray,
+                             sols_0: ndarray,
                              dcdt_vect_f: Callable,
                              jac_f: Callable,
                              func_args: tuple|list,
@@ -577,7 +579,7 @@ class ProbabilityNet(NetworkABC):
 
         '''
 
-        eps = self.p_min # Small value to avoid divide-by-zero in the jacobian
+        eps = 1.0e-20 # Small value to avoid divide-by-zero in the jacobian
 
         sol_dicts_list = []
 
@@ -593,7 +595,7 @@ class ProbabilityNet(NetworkABC):
 
             solution_dict['Minima Values'] = pminso
 
-            pmins = np.asarray(pminso) + eps # add the small amount here, before calculating the jacobian
+            pmins = pminso + eps # add the small amount here, before calculating the jacobian
 
             solution_dict['Change at Minima'] = dcdt_vect_f(pmins[unconstrained_inds], *func_args)
 
@@ -649,6 +651,7 @@ class ProbabilityNet(NetworkABC):
         sol_char_error = []
         i = 0
         for sol_dic in sol_dicts_list:
+            # print("Computing the reporting stuff")
             error = np.sum(np.asarray(sol_dic['Change at Minima'])**2)
             char = sol_dic['Stability Characteristic']
             sols = sol_dic['Minima Values']

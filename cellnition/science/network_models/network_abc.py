@@ -97,7 +97,8 @@ class NetworkABC(object, metaclass=ABCMeta):
         self.edge_types = None
         self.edges_index = None
 
-        self.p_min = 1.0e-3 # small nonzero element for working with Hill versions
+        self.p_min = 1.0e-6 # small nonzero element for working with Hill versions
+        self._push_away_from_zero = 0.1 # smallish constant to push initial guess of fsolve away from zero
 
     def build_network_from_edges(self, edges: list[tuple]):
         '''

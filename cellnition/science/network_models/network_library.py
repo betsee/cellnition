@@ -185,79 +185,6 @@ class BasicQuadnodeNet(LibNet):
 
         self.add_interactions = True
 
-class BasicQuadnodeControlNet(LibNet):
-
-    def __init__(self, activator_signals: bool=True):
-        '''
-        This is indicated to be a tri-stable network. It is used for
-        parameter space searches to look for further states with changes
-        to parameters.
-
-        '''
-        # Initialize the superclass:
-        super().__init__()
-
-        self.name = 'BasicQuadnodeControlNet'
-
-        self.N_nodes = 5
-        self.edges = [('S0', 'H0'), ('H0', 'E0'), ('E0', 'P0'), ('P0', 'S0'),
-                 ('F0', 'P0')
-                 ]
-
-        if activator_signals:
-            self.edge_types = [EdgeType.A, EdgeType.A, EdgeType.A, EdgeType.I,
-                          EdgeType.A
-                          ]
-        else:
-            self.edge_types = [EdgeType.I, EdgeType.I, EdgeType.A, EdgeType.A,
-                          EdgeType.A
-                          ]
-
-        self.node_type_dict = {'S': NodeType.sensor,
-                               'P': NodeType.process,
-                               'E': NodeType.effector,
-                               'F': NodeType.factor}
-
-        self.add_interactions = True
-
-class QuadnodeControlNet1(LibNet):
-
-    def __init__(self, activator_signals: bool=True):
-        '''
-        This is indicated to be a tri-stable network. It is used for
-        parameter space searches to look for further states with changes
-        to parameters.
-
-        '''
-        # Initialize the superclass:
-        super().__init__()
-
-        self.name = 'QuadnodeControlNet1'
-
-        self.N_nodes = 5
-        self.edges = [('S0', 'H0'), ('H0', 'E0'), ('E0', 'P0'), ('P0', 'S0'),
-                      ('H0', 'H0'),
-                 ('F0', 'P0')
-                 ]
-
-        if activator_signals:
-            self.edge_types = [EdgeType.A, EdgeType.A, EdgeType.A, EdgeType.I,
-                               EdgeType.A,
-                          EdgeType.A
-                          ]
-        else:
-            self.edge_types = [EdgeType.I, EdgeType.I, EdgeType.A, EdgeType.A,
-                               EdgeType.A,
-                          EdgeType.A
-                          ]
-
-        self.node_type_dict = {'S': NodeType.sensor,
-                               'P': NodeType.process,
-                               'E': NodeType.effector,
-                               'F': NodeType.factor}
-
-        self.add_interactions = True
-
 class QuadnodeNet(LibNet):
 
     def __init__(self, activator_signals: bool=True):
@@ -496,13 +423,71 @@ class BiLoopControlNet(LibNet):
 
         self.name = 'BiLoopControlNet'
 
-        self.N_nodes = 8
+        self.N_nodes = 7
         self.edges = [('S0', 'H0'), ('H0', 'E0'), ('E0', 'P0'), ('P0', 'S0'),
-                      ('S1', 'H1'), ('H1', 'E1'), ('E1', 'P0'), ('P0', 'S1'),
+                      ('S0', 'H1'), ('H1', 'E1'), ('E1', 'P0'),
                       ('F0', 'P0')]
 
         self.edge_types = [EdgeType.A, EdgeType.A, EdgeType.I, EdgeType.A,
-                           EdgeType.A, EdgeType.A, EdgeType.A, EdgeType.I,
+                           EdgeType.I, EdgeType.A, EdgeType.A,
+                           EdgeType.A
+                           ]
+
+        self.node_type_dict = {'S': NodeType.sensor,
+                               'E': NodeType.effector,
+                               'P': NodeType.process,
+                               'F': NodeType.factor
+                               }
+
+class BiLoopControlNet2(LibNet):
+
+    def __init__(self, activator_signals: bool=True):
+        '''
+
+        '''
+        # Initialize the superclass:
+        super().__init__()
+
+        self.name = 'BiLoopControlNet2'
+
+        self.N_nodes = 7
+        self.edges = [('S0', 'H0'), ('H0', 'E0'), ('E0', 'P0'), ('P0', 'S0'),
+                      ('S0', 'H1'), ('H1', 'E1'), ('E1', 'P0'),
+                      ('H0', 'H1'), ('H1', 'H0'),
+                      ('F0', 'P0')]
+
+        self.edge_types = [EdgeType.A, EdgeType.A, EdgeType.I, EdgeType.A,
+                           EdgeType.I, EdgeType.A, EdgeType.A,
+                           EdgeType.I, EdgeType.I,
+                           EdgeType.A
+                           ]
+
+        self.node_type_dict = {'S': NodeType.sensor,
+                               'E': NodeType.effector,
+                               'P': NodeType.process,
+                               'F': NodeType.factor
+                               }
+
+class BiLoopControlNet3(LibNet):
+
+    def __init__(self, activator_signals: bool=True):
+        '''
+
+        '''
+        # Initialize the superclass:
+        super().__init__()
+
+        self.name = 'BiLoopControlNet3'
+
+        self.N_nodes = 7
+        self.edges = [('S0', 'H0'), ('H0', 'E0'), ('E0', 'P0'), ('P0', 'S0'),
+                      ('S0', 'H1'), ('H1', 'E1'), ('E1', 'P0'),
+                      # ('H0', 'H1'), ('H1', 'H0'),
+                      ('F0', 'P0')]
+
+        self.edge_types = [EdgeType.I, EdgeType.A, EdgeType.I, EdgeType.I,
+                           EdgeType.I, EdgeType.I, EdgeType.A,
+                           # EdgeType.I, EdgeType.I,
                            EdgeType.A
                            ]
 
