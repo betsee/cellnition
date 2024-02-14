@@ -491,13 +491,13 @@ class ProbabilityNet(NetworkABC):
                                 N_round_sol: int = 1,
                                 verbose: bool=True,
                                 save_file: str|None = None,
-                                return_saddles: bool = False
+                                return_saddles: bool = False,
+                                search_cycle_nodes_only: bool=False
                                 ):
         '''
         Solve for the equilibrium points of gene product probabilities in
         terms of a given set of numerical parameters.
         '''
-
 
         # For any network, there may be nodes without regulation that require constraints
         # (these are in self._constrained_nodes). Therefore, add these to any user-supplied
@@ -509,12 +509,22 @@ class ProbabilityNet(NetworkABC):
         dcdt_vect_f, dcdt_jac_f = self.create_numerical_dcdt(constrained_inds=constrained_inds,
                                                              constrained_vals=constrained_vals)
 
+
         if constrained_inds is None or constrained_vals is None:
             unconstrained_inds = self._nodes_index
         else:
             unconstrained_inds = np.setdiff1d(self._nodes_index, constrained_inds).tolist()
 
-        M_pstates, _, _ = self.generate_state_space(unconstrained_inds, N_space)
+        if search_cycle_nodes_only is False:
+            M_pstates, _, _ = self.generate_state_space(unconstrained_inds, N_space)
+
+        else:
+            if len(self.nodes_in_cycles):
+                M_pstates, _, _ = self.generate_state_space(self.nodes_in_cycles, N_space)
+
+            else:
+                raise Exception("No nodes exist in cycles; cannot perform state search with "
+                                "search_cycle_nodes_only=True.")
 
         sol_Mo = []
 

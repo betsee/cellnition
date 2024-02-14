@@ -289,40 +289,6 @@ class TrinodeNetLoaded(LibNet):
 
         self.add_interactions = True
 
-class QuadStateNet(LibNet):
-
-    def __init__(self, activator_signals: bool=True):
-        '''
-
-        '''
-        # Initialize the superclass:
-        super().__init__()
-
-        self.name = 'QuadStateNet'
-
-        self.N_nodes = 6
-        self.edges = [('H0', 'H1'), ('H1', 'H2'), ('H2', 'H0'),
-                 ('H0', 'H0'), ('H2', 'H2'), ('H1', 'H1'),
-                 ('S0', 'H0'), ('S1', 'H1'), ('S2', 'H2')
-                 ]
-
-        if activator_signals:
-            self.edge_types = [EdgeType.I, EdgeType.A, EdgeType.I,
-                          EdgeType.A, EdgeType.A, EdgeType.A,
-                          EdgeType.A, EdgeType.A, EdgeType.A,
-                          ]
-
-        else:
-            self.edge_types = [EdgeType.I, EdgeType.A, EdgeType.I,
-                          EdgeType.A, EdgeType.A, EdgeType.A,
-                          EdgeType.Is, EdgeType.Is, EdgeType.Is,
-                          ]
-
-        self.node_type_dict = {'S': NodeType.signal}
-        # self.node_type_dict = None
-
-        self.add_interactions = True
-
 class TrinodeChain(LibNet):
 
     def __init__(self, activator_signals: bool=True):
@@ -368,7 +334,7 @@ class TrinodeChain(LibNet):
 
         self.add_interactions = True
 
-class FullQuadStateNet(LibNet):
+class FullTrinodeNet(LibNet):
 
     def __init__(self, activator_signals: bool=True):
         '''
@@ -377,7 +343,7 @@ class FullQuadStateNet(LibNet):
         # Initialize the superclass:
         super().__init__()
 
-        self.name = 'FullQuadStateNet'
+        self.name = 'FullTrinodeNet'
 
         # CASE TYPE QUADSTABLE with sensors and auxillary nodes in scale-free configuration:
         # Core is triangle loop with all auto-nodes edges:
@@ -391,7 +357,7 @@ class FullQuadStateNet(LibNet):
                  ]
 
         if activator_signals:
-            self.edge_types = [EdgeType.I, EdgeType.A, EdgeType.I,
+            self.edge_types = [EdgeType.I, EdgeType.I, EdgeType.I,
                           EdgeType.A, EdgeType.A, EdgeType.A,
                           EdgeType.A, EdgeType.A, EdgeType.A,
                           EdgeType.A, EdgeType.I, EdgeType.A, EdgeType.A, EdgeType.I,
@@ -400,7 +366,7 @@ class FullQuadStateNet(LibNet):
                           ]
 
         else:
-            self.edge_types = [EdgeType.I, EdgeType.A, EdgeType.I,
+            self.edge_types = [EdgeType.I, EdgeType.I, EdgeType.I,
                           EdgeType.A, EdgeType.A, EdgeType.A,
                           EdgeType.Is, EdgeType.Is, EdgeType.Is,
                           EdgeType.A, EdgeType.I, EdgeType.A, EdgeType.A, EdgeType.I,
@@ -408,7 +374,9 @@ class FullQuadStateNet(LibNet):
                           EdgeType.A
                           ]
 
-        self.node_type_dict = {'S': NodeType.signal}
+        self.node_type_dict = {'S': NodeType.sensor,
+                               'G': NodeType.effector,
+                               'H': NodeType.core}
 
         self.add_interactions = True
 
@@ -496,3 +464,46 @@ class BiLoopControlNet3(LibNet):
                                'P': NodeType.process,
                                'F': NodeType.factor
                                }
+
+class FullQuadnodeNet(LibNet):
+
+    def __init__(self, activator_signals: bool=True):
+        '''
+        This is indicated to be a tri-stable network. It is used for
+        parameter space searches to look for further states with changes
+        to parameters.
+
+        '''
+        # Initialize the superclass:
+        super().__init__()
+
+        self.name = 'FullQuadnodeNet'
+
+        self.N_nodes = 16
+        self.edges = [('H0', 'H1'), ('H1', 'H2'), ('H2', 'H3'), ('H3', 'H0'),
+                      ('H0', 'H0'), ('H1', 'H1'), ('H2', 'H2'), ('H3', 'H3'),
+                      ('S0', 'H0'), ('S1', 'H1'), ('S2', 'H2'), ('S3', 'H3'),
+                      ('H0', 'G0'), ('H0', 'G1'), ('H0', 'G2'), ('H1', 'G3'),
+                      ('H1', 'G4'), ('H2', 'G5'), ('H2', 'G6'), ('H3', 'G7'),
+                     ]
+
+        if activator_signals:
+            self.edge_types = [EdgeType.I, EdgeType.I, EdgeType.I, EdgeType.I,
+                               EdgeType.A, EdgeType.A, EdgeType.A, EdgeType.A,
+                               EdgeType.A, EdgeType.A, EdgeType.A, EdgeType.A,
+                               EdgeType.A, EdgeType.A, EdgeType.I, EdgeType.A,
+                               EdgeType.I, EdgeType.A, EdgeType.I, EdgeType.A,
+                              ]
+        else:
+            self.edge_types = [EdgeType.I, EdgeType.I, EdgeType.I, EdgeType.I,
+                               EdgeType.A, EdgeType.A, EdgeType.A, EdgeType.A,
+                               EdgeType.Is, EdgeType.Is, EdgeType.Is, EdgeType.Is,
+                               EdgeType.A, EdgeType.A, EdgeType.I, EdgeType.A,
+                               EdgeType.I, EdgeType.A, EdgeType.I, EdgeType.A,
+                              ]
+
+        self.node_type_dict = {'S': NodeType.sensor,
+                               'G': NodeType.effector,
+                               'H': NodeType.core}
+
+        self.add_interactions = True

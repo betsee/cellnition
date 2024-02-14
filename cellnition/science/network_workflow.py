@@ -265,7 +265,8 @@ class NetworkWorkflow(object):
                    node_type_dict: dict|None = None,
                    extra_verbose: bool=False,
                    coupling_type: CouplingType=CouplingType.mixed,
-                   label_edges: bool = False
+                   label_edges: bool = False,
+                   search_cycle_nodes_only: bool = False
                    ):
         '''
         A single frame of the workflow
@@ -410,7 +411,8 @@ class NetworkWorkflow(object):
                                                                   sol_tol=sol_unique_tol,
                                                                   N_round_sol=N_round_unique_sol,
                                                                   save_file=save_solns,
-                                                                  verbose=extra_verbose
+                                                                  verbose=extra_verbose,
+                                                                  search_cycle_nodes_only=search_cycle_nodes_only
                                                                   )
 
 

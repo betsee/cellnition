@@ -492,10 +492,13 @@ class NetworkABC(object, metaclass=ABCMeta):
         # aliases for convenience:
         # combine signals with factors as they have a similar 'setability' condition
         # from the outside
-        self.input_node_inds = self.node_type_inds[NodeType.signal.name] + self.node_type_inds[NodeType.factor.name]
+        # self.input_node_inds = self.node_type_inds[NodeType.signal.name] + self.node_type_inds[NodeType.factor.name]
+        self.input_node_inds = ((np.asarray(self.in_degree_sequence) == 0).nonzero()[0]).tolist()
         self.sensor_node_inds = self.node_type_inds[NodeType.sensor.name]
         self.process_node_inds = self.node_type_inds[NodeType.process.name]
+        self.effector_node_inds = ((np.asarray(self.out_degree_sequence) == 0).nonzero()[0]).tolist()
         self.noninput_node_inds = np.setdiff1d(self.nodes_index, self.input_node_inds).tolist()
+        self.factor_node_inds = self.node_type_inds[NodeType.factor.name]
 
     def edges_from_path(self, path_nodes: list|ndarray) -> list:
         '''
@@ -566,7 +569,7 @@ class NetworkABC(object, metaclass=ABCMeta):
             elif nde_t == 'Effector':
                 self.node_types.append(NodeType.effector)
             elif nde_t == 'Root Hub':
-                self.node_types.append(NodeType.root)
+                self.node_types.append(NodeType.core)
             elif nde_t == 'Path':
                 self.node_types.append(NodeType.path)
             else:

@@ -105,7 +105,6 @@ class StateMachine(object):
                           sol_tol: float=1.0e-2,
                           N_round_sol: int=1,
                           dt: float = 1.0e-3,
-                          tend: float = 100.0,
                           space_sig: float = 30.0,
                           delta_sig: float = 30.0,
                           t_relax: float = 15.0,
@@ -116,7 +115,8 @@ class StateMachine(object):
                           save_perturbation_net_image: str|None = None,
                           graph_layout: str = 'dot',
                           remove_inaccessible_states: bool = True,
-                          unique_sol_index: bool=True
+                          unique_sol_index: bool=True,
+                          search_cycle_nodes_only: bool = False
                           ) -> MultiDiGraph:
         '''
         Run all steps to generate a state transition network and associated
@@ -136,7 +136,8 @@ class StateMachine(object):
                                                             N_space=N_space,
                                                             search_tol=search_tol,
                                                             sol_tol=sol_tol,
-                                                            N_round_sol=N_round_sol
+                                                            N_round_sol=N_round_sol,
+                                                            search_cycle_nodes_only=search_cycle_nodes_only
                                                             )
 
         # save entities to the object:
@@ -149,7 +150,6 @@ class StateMachine(object):
         # Create the edges of the transition network:
         transition_edges_set, pert_edges_set, G_nx = self.create_transition_network(states_dict, sig_test_set, solsM_all,
                                                                      dt=dt,
-                                                                     tend=tend,
                                                                      space_sig=space_sig,
                                                                      delta_sig=delta_sig,
                                                                      t_relax=t_relax,
@@ -160,7 +160,7 @@ class StateMachine(object):
                                                                      n_base=n_base,
                                                                      beta_base=beta_base,
                                                                      remove_inaccessible_states=remove_inaccessible_states,
-                                                                     save_graph_file=save_graph_file
+                                                                     save_graph_file=save_graph_file,
                                                                      )
 
         self.transition_edges_set = transition_edges_set
@@ -176,7 +176,8 @@ class StateMachine(object):
                                                            nodes_listo=nodes_list,
                                                            save_file=save_perturbation_net_image,
                                                           graph_layout=graph_layout,
-                                                          unique_sol_index=unique_sol_index)
+                                                          unique_sol_index=unique_sol_index,
+                                                          N_round_sol=N_round_sol)
 
         if save_transition_net_image is not None: # save an image of the network to file:
             # get nodes and edges list:
@@ -189,7 +190,8 @@ class StateMachine(object):
                                                       charM_all,
                                                       save_file=save_transition_net_image,
                                                       graph_layout=graph_layout,
-                                                      use_unique_sol_index=unique_sol_index
+                                                      use_unique_sol_index=unique_sol_index,
+                                                      N_round_sol=N_round_sol
                                                       )
 
         return G_nx
@@ -205,6 +207,7 @@ class StateMachine(object):
                                       search_tol: float=1.0e-15,
                                       sol_tol: float=1.0e-2,
                                       N_round_sol: int=1,
+                                      search_cycle_nodes_only: bool = False
                                       ):
         '''
         Search through all possible combinations of signal node values
@@ -242,7 +245,8 @@ class StateMachine(object):
                                                                     sol_tol=sol_tol,
                                                                     N_round_sol=N_round_sol,
                                                                     verbose=verbose,
-                                                                    return_saddles=return_saddles
+                                                                    return_saddles=return_saddles,
+                                                                    search_cycle_nodes_only=search_cycle_nodes_only
                                                                     )
 
 
@@ -279,7 +283,7 @@ class StateMachine(object):
             charM_all[0] = EquilibriumType.saddle.name  # update the state to a saddle node
 
         # if order_states: # order states as distance from the zero vector:
-        # solsM_all, charM_all = self._order_states_by_distance(solsM_all, charM_all)
+        solsM_all, charM_all = self._order_states_by_distance(solsM_all, charM_all)
 
         # # set of all states referencing only the hub nodes; rounded to one decimal:
         # state_set = np.round(solsM_all[self._pnet.noninput_node_inds, :].T, 1).tolist()
@@ -311,7 +315,7 @@ class StateMachine(object):
                                   sig_test_set: list|ndarray,
                                   solsM_all: ndarray|list,
                                   dt: float = 5.0e-3,
-                                  tend: float = 80.0,
+                                  # tend: float = 80.0,
                                   space_sig: float = 25.0,
                                   delta_sig: float = 25.0,
                                   t_relax: float = 10.0,
@@ -378,6 +382,8 @@ class StateMachine(object):
         # We want all signals on at the same time (we want the sim to end before
         # the signal changes again:
         sig_times = [(space_sig, delta_sig + space_sig) for i in range(N_sigs)]
+
+        tend = sig_times[-1][1] + delta_sig + space_sig
 
         transition_edges_set = set()
         perturbation_edges_set = set()
@@ -538,7 +544,8 @@ class StateMachine(object):
                             d_base: float|list[float] = 1.0,
                             n_base: float|list[float] = 15.0,
                             beta_base: float|list[float] = 0.25,
-                            match_to_unique_states: bool = True
+                            match_to_unique_states: bool = True,
+                            N_round_sol: int = 1
                             ):
         '''
         Use a provided starting state and a list of input signals to hold for
@@ -552,7 +559,8 @@ class StateMachine(object):
         '''
         # Get the sols dict for mapping
         unique_sols_dict, inv_unique_sols_dict, N_unique_sols = self._get_unique_sol_dict(solsM_all,
-                                                                                          match_tol=match_tol)
+                                                                                          match_tol=match_tol,
+                                                                                          N_round_sol=N_round_sol)
         # If we're matching to unique states, assume the starting state index is wrt to the unique starting
         # state index and obtain the index in the full state matrix:
         if match_to_unique_states:
@@ -634,7 +642,8 @@ class StateMachine(object):
                                       graph_layout: str='dot',
                                       mono_edge: bool = False,
                                       use_unique_sol_index: bool=True,
-                                      match_tol: float=0.05
+                                      match_tol: float=0.05,
+                                      N_round_sol: int = 1
                                       ):
         '''
 
@@ -662,7 +671,8 @@ class StateMachine(object):
 
         # Get the sols dict for mapping:
         unique_sols_dict, inv_unique_sols_dict, N_unique_sols = self._get_unique_sol_dict(solsM_all,
-                                                                                          match_tol=match_tol)
+                                                                                          match_tol=match_tol,
+                                                                                          N_round_sol=N_round_sol)
 
         cmap = colormaps[clr_map]
 
@@ -714,7 +724,8 @@ class StateMachine(object):
                                        graph_layout: str = 'dot',
                                        unique_sol_index: bool=True,
                                        match_tol: float=0.05,
-                                       mono_edge: bool=False):
+                                       mono_edge: bool=False,
+                                       N_round_sol: int=1):
         '''
         This network plotting and generation function is based on the concept
         that an input node state can be associated with several gene network
@@ -753,7 +764,8 @@ class StateMachine(object):
 
         # Get the sols dict for mapping:
         unique_sols_dict, inv_unique_sols_dict, N_unique_sols = self._get_unique_sol_dict(solsM_all,
-                                                                                          match_tol=match_tol)
+                                                                                          match_tol=match_tol,
+                                                                                          N_round_sol=N_round_sol)
         img_pos = 'bc'  # position of the glyph in the node
         subcluster_font = 'DejaVu Sans Bold'
         node_shape = 'ellipse'
@@ -849,6 +861,7 @@ class StateMachine(object):
                              matched_to_unique_states: bool = True,
                              match_tol: float=0.05,
                              legend: bool=True,
+                             N_round_sol: int = 1
                              ):
         '''
 
@@ -879,7 +892,8 @@ class StateMachine(object):
 
         # Get the sols dict for mapping
         unique_sols_dict, inv_unique_sols_dict, N_unique_sols = self._get_unique_sol_dict(solsM_all,
-                                                                                          match_tol=match_tol)
+                                                                                          match_tol=match_tol,
+                                                                                          N_round_sol=N_round_sol)
         cmap = plt.get_cmap("tab10")
 
         fig, axes = plt.subplots(N_plot_genes, 1, figsize=figsize, sharex=True, sharey=True)
@@ -1068,7 +1082,7 @@ class StateMachine(object):
 
         return state_best_match, errM[state_best_match]
 
-    def _get_unique_sol_dict(self, solsM_all: ndarray, match_tol: float=0.05):
+    def _get_unique_sol_dict(self, solsM_all: ndarray, match_tol: float=0.05, N_round_sol: int=1):
         '''
         Returns a dictionary that maps an index in solsM_all to an index to the unique
         sols in solsM_all with respect to the noninput node indes.
@@ -1084,7 +1098,7 @@ class StateMachine(object):
         '''
         # The sols that are unique with respect to the non-input nodes:
         solsM_all_unique, unique_inds = np.unique(np.round(solsM_all[self._pnet.noninput_node_inds],
-                                                           1), axis=1, return_index=True)
+                                                           N_round_sol), axis=1, return_index=True)
 
         N_unique_sols = len(unique_inds)
 

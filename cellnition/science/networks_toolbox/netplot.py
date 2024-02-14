@@ -59,60 +59,69 @@ def plot_network(nodes_list: list|ndarray,
         cmap = None
         norm = None
 
+    transp = 'c0'
+    hub_clr = '#151F30'
+    sig_clr = '#FF7A48' + transp
+    out_clr = '#0593A2' + transp
+    low_clr = '#1F2024'
+    nde_font_clr1 = 'White'
+    nde_font_clr2 = 'Black'
+    node_shape_gen = 'circle'
+
     node_dict_gene = {
-    'node_font_color': 'Black',
-    'node_color': 'GhostWhite',
-    'node_shape': 'ellipse',
-    'outline_color': 'Black'
+        'node_font_color': 'Black',
+        'node_color': 'GhostWhite',
+        'node_shape': node_shape_gen,
+        'outline_color': 'Black'
     }
 
     node_dict_signal = {
-    'node_font_color': 'Black',
-    'node_color': 'LemonChiffon',
-    'node_shape': 'ellipse',
-    'outline_color': 'Black'
+        'node_font_color': 'White',
+        'node_color': sig_clr,
+        'node_shape': node_shape_gen,
+        'outline_color': sig_clr
     }
 
     node_dict_cycle = {
-    'node_font_color': 'Black',
-    'node_color': 'PaleTurquoise',
-    'node_shape': 'ellipse',
-    'outline_color': 'Black'
+        'node_font_color': 'White',
+        'node_color': hub_clr,
+        'node_shape': node_shape_gen,
+        'outline_color': hub_clr
     }
 
     node_dict_sensor = {
-    'node_font_color' : 'Black',
-    'node_color' : 'LemonChiffon',
-    'node_shape' : 'ellipse',
-    'outline_color': 'Black'
+        'node_font_color': 'White',
+        'node_color': sig_clr,
+        'node_shape': node_shape_gen,
+        'outline_color': sig_clr
     }
 
-    node_dict_root = {
-    'node_font_color' : 'Black',
-    'node_color' : 'Pink',
-    'node_shape' : 'ellipse',
-    'outline_color': 'Black'
+    node_dict_core = {
+        'node_font_color': 'White',
+        'node_color': hub_clr,
+        'node_shape': node_shape_gen,
+        'outline_color': hub_clr
     }
 
     node_dict_effector = {
-    'node_font_color' : 'Black',
-    'node_color' : 'Turquoise',
-    'node_shape' : 'ellipse',
-    'outline_color': 'Black'
+        'node_font_color': 'White',
+        'node_color': out_clr,
+        'node_shape': node_shape_gen,
+        'outline_color': out_clr
     }
 
     node_dict_process = {
-    'node_font_color' : 'White',
-    'node_color' : 'DarkSlateGrey',
-    'node_shape' : 'rect',
-    'outline_color': 'None'
+        'node_font_color': 'White',
+        'node_color': low_clr,
+        'node_shape': 'rect',
+        'outline_color': low_clr
     }
 
     node_dict_factor = {
-    'node_font_color' : 'Black',
-    'node_color' : 'GhostWhite',
-    'node_shape' : 'diamond',
-    'outline_color': 'Black'
+        'node_font_color': 'White',
+        'node_color': sig_clr,
+        'node_shape': 'diamond',
+        'outline_color': sig_clr
     }
 
     node_plot_dict = {NodeType.gene.value: node_dict_gene,
@@ -120,7 +129,7 @@ def plot_network(nodes_list: list|ndarray,
                       NodeType.sensor.value: node_dict_sensor,
                       NodeType.process.value: node_dict_process,
                       NodeType.effector.value: node_dict_effector,
-                      NodeType.root.value: node_dict_root,
+                      NodeType.core.value: node_dict_core,
                       NodeType.cycle.value: node_dict_cycle,
                       NodeType.factor.value: node_dict_factor}
 
@@ -132,6 +141,8 @@ def plot_network(nodes_list: list|ndarray,
             nde_color = nde_dict['node_color']
             nde_outline = nde_dict['outline_color']
             nde_font_color = nde_dict['node_font_color']
+
+            # print(nt.name, nde_color)
 
         else:
             nde_color = colors.rgb2hex(cmap(norm(node_vals[ni])))

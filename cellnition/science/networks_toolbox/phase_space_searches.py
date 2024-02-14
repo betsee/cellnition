@@ -29,6 +29,7 @@ def multistability_search(pnet: ProbabilityNet,
                           constraint_inds: list[int]|None = None,
                           signal_constr_vals: list|None = None,
                           coupling_type: CouplingType = CouplingType.mixed,
+                          search_cycle_nodes_only: bool=False
                           ) -> tuple[list, list]:
     '''
     By randomly generating sets of different edge interaction types (i.e. activator or inhibitor), find
@@ -126,7 +127,8 @@ def multistability_search(pnet: ProbabilityNet,
                                                                  sol_tol=sol_tol,
                                                                  N_round_sol=N_round_unique_sol,
                                                                  save_file=None,
-                                                                 verbose=verbose
+                                                                 verbose=verbose,
+                                                                 search_cycle_nodes_only=search_cycle_nodes_only
                                                                  )
 
         if len(solsM):
@@ -158,7 +160,8 @@ def param_space_search(pnet: ProbabilityNet,
                        verbose: bool=True,
                        constraint_vals: list[float] | None = None,
                        constraint_inds: list[int] | None = None,
-                       signal_constr_vals: list|None = None
+                       signal_constr_vals: list|None = None,
+                       search_cycle_nodes_only: bool=False
                        ) -> tuple[ndarray, list]:
     '''
     Search parameter space of a model to find parameter combinations that give different multistable
@@ -271,7 +274,8 @@ def param_space_search(pnet: ProbabilityNet,
                                                                  sol_tol=sol_tol,
                                                                  N_round_sol=N_unique_sol_round,
                                                                  save_file=None,
-                                                                 verbose=verbose
+                                                                 verbose=verbose,
+                                                                 search_cycle_nodes_only=search_cycle_nodes_only
                                                                  )
 
 

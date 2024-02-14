@@ -47,7 +47,8 @@ class GeneKnockout(object):
                                save_file_basename: str | None = None,
                                constraint_vals: list[float]|None = None,
                                constraint_inds: list[int]|None = None,
-                               signal_constr_vals: list | None = None
+                               signal_constr_vals: list | None = None,
+                               search_cycle_nodes_only: bool = False
                                ):
         '''
         Performs a sequential knockout of all genes in the network, computing all possible steady-state
@@ -83,7 +84,8 @@ class GeneKnockout(object):
                                                                         N_space=Ns,
                                                                         search_tol=tol,
                                                                         sol_tol=sol_tol,
-                                                                        N_round_sol=round_unique_sol
+                                                                        N_round_sol=round_unique_sol,
+                                                                        search_cycle_nodes_only=search_cycle_nodes_only
                                                                         )
 
         if verbose:
@@ -114,7 +116,8 @@ class GeneKnockout(object):
                                                                         search_tol=tol,
                                                                         sol_tol=sol_tol,
                                                                         N_round_sol=round_unique_sol,
-                                                                        verbose=verbose
+                                                                        verbose=verbose,
+                                                                        search_cycle_nodes_only=search_cycle_nodes_only
                                                                             )
 
             if verbose:

@@ -24,7 +24,7 @@ class NodeType(Enum):
     process = 'Process'
     sensor = 'Sensor'
     effector = 'Effector'
-    root = 'Root Hub'
+    core = 'Hub Core'
     factor = 'Factor'
     cycle = 'Cycle'
 
