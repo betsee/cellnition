@@ -380,7 +380,7 @@ class FullTrinodeNet(LibNet):
 
         self.add_interactions = True
 
-class BiLoopControlNet(LibNet):
+class BiLoopControlNet3(LibNet):
 
     def __init__(self, activator_signals: bool=True):
         '''
@@ -389,7 +389,7 @@ class BiLoopControlNet(LibNet):
         # Initialize the superclass:
         super().__init__()
 
-        self.name = 'BiLoopControlNet'
+        self.name = 'BiLoopControlNet3'
 
         self.N_nodes = 7
         self.edges = [('S0', 'H0'), ('H0', 'E0'), ('E0', 'P0'), ('P0', 'S0'),
@@ -436,7 +436,7 @@ class BiLoopControlNet2(LibNet):
                                'F': NodeType.factor
                                }
 
-class BiLoopControlNet3(LibNet):
+class BiLoopControlNet(LibNet):
 
     def __init__(self, activator_signals: bool=True):
         '''
@@ -445,7 +445,7 @@ class BiLoopControlNet3(LibNet):
         # Initialize the superclass:
         super().__init__()
 
-        self.name = 'BiLoopControlNet3'
+        self.name = 'BiLoopControlNet'
 
         self.N_nodes = 7
         self.edges = [('S0', 'H0'), ('H0', 'E0'), ('E0', 'P0'), ('P0', 'S0'),
@@ -462,7 +462,8 @@ class BiLoopControlNet3(LibNet):
         self.node_type_dict = {'S': NodeType.sensor,
                                'E': NodeType.effector,
                                'P': NodeType.process,
-                               'F': NodeType.factor
+                               'F': NodeType.factor,
+                               'H': NodeType.core
                                }
 
 class FullQuadnodeNet(LibNet):

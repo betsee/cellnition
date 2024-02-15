@@ -496,8 +496,14 @@ class NetworkABC(object, metaclass=ABCMeta):
         self.input_node_inds = ((np.asarray(self.in_degree_sequence) == 0).nonzero()[0]).tolist()
         self.sensor_node_inds = self.node_type_inds[NodeType.sensor.name]
         self.process_node_inds = self.node_type_inds[NodeType.process.name]
-        self.effector_node_inds = ((np.asarray(self.out_degree_sequence) == 0).nonzero()[0]).tolist()
+
+        if len(self.node_type_inds[NodeType.effector.name]) == 0:
+            self.effector_node_inds = ((np.asarray(self.out_degree_sequence) == 0).nonzero()[0]).tolist()
+        else:
+            self.effector_node_inds = self.node_type_inds[NodeType.effector.name]
+
         self.noninput_node_inds = np.setdiff1d(self.nodes_index, self.input_node_inds).tolist()
+
         self.factor_node_inds = self.node_type_inds[NodeType.factor.name]
 
     def edges_from_path(self, path_nodes: list|ndarray) -> list:

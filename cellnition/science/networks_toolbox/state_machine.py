@@ -545,7 +545,8 @@ class StateMachine(object):
                             n_base: float|list[float] = 15.0,
                             beta_base: float|list[float] = 0.25,
                             match_to_unique_states: bool = True,
-                            N_round_sol: int = 1
+                            N_round_sol: int = 1,
+                            time_wobble: float = 0.0,
                             ):
         '''
         Use a provided starting state and a list of input signals to hold for
@@ -575,7 +576,9 @@ class StateMachine(object):
         N_phases = len(input_list)
         end_t = N_phases * input_hold_duration
 
-        phase_time_tuples = [(i * input_hold_duration, (i + 1) * input_hold_duration) for i in range(N_phases)]
+        time_noise = np.random.uniform(0.0, time_wobble)
+
+        phase_time_tuples = [(i * input_hold_duration, (i + 1) * input_hold_duration + time_noise) for i in range(N_phases)]
 
         # Get the full time vector and the sampled time vector (tvectr)
         tvect, tvectr = self._pnet.make_time_vects(end_t, dt, dt_samp)
