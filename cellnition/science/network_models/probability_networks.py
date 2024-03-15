@@ -331,27 +331,7 @@ class ProbabilityNet(NetworkABC):
 
         self._dcdt_vect_s = list(sp.Matrix(self._dcdt_vect_s).subs(subs_list))
 
-        subs_list = []
-        self._subs_syms_list = []
-        for pi, nde_lab in zip(self._c_vect_s, self.nodes_list):
-            nde_sym = sp.symbols(nde_lab)
-            subs_list.append((pi, nde_sym))
-            self._subs_syms_list.append(nde_sym)
-
-        for ei, (nij, bij) in enumerate(zip(self._n_vect_s, self._beta_vect_s)):
-            b_sym = sp.symbols(f'beta_{ei}')
-            n_sym = sp.symbols(f'n_{ei}')
-            subs_list.append((bij, b_sym))
-            subs_list.append((nij, n_sym))
-            self._subs_syms_list.append(b_sym)
-            self._subs_syms_list.append(n_sym)
-
-        for ndei, di in enumerate(self._d_vect_s):
-            d_sym = sp.symbols(f'd_{ndei}')
-            subs_list.append((di, d_sym))
-            self._subs_syms_list.append(d_sym)
-
-        self.dcdt_vect_s_viz = sp.Matrix(self._dcdt_vect_s).subs(subs_list)
+        self._dcdt_vect_s_viz = self._get_visual_equations()
 
     def make_numerical_params(self,
                        d_base: float|list[float]=1.0,

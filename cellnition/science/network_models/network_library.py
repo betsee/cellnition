@@ -380,6 +380,56 @@ class FullTrinodeNet(LibNet):
 
         self.add_interactions = True
 
+class FullTrinodeNetFeedback(LibNet):
+
+    def __init__(self, activator_signals: bool=True):
+        '''
+
+        '''
+        # Initialize the superclass:
+        super().__init__()
+
+        self.name = 'FullTrinodeNetFeedback'
+
+        # CASE TYPE QUADSTABLE with sensors and auxillary nodes in scale-free configuration:
+        # Core is triangle loop with all auto-nodes edges:
+        self.N_nodes = 9
+        self.edges = [('H0', 'H1'), ('H1', 'H2'), ('H2', 'H0'),
+                 ('H0', 'H0'), ('H2', 'H2'), ('H1', 'H1'),
+                 ('S0', 'H0'), ('S1', 'H1'), ('S2', 'H2'),
+                 ('F0', 'H0'), ('F1', 'H1'), ('F2', 'H2'),
+                 # ('H2', 'G0'), ('H2', 'G1'), ('H2', 'G2'), ('H2', 'G3'), ('H2', 'G4'),
+                 # ('H0', 'G5'), ('H0', 'G6'), ('H0', 'G7'),
+                 # ('H1', 'G8')
+                 ]
+
+        if activator_signals:
+            self.edge_types = [EdgeType.I, EdgeType.I, EdgeType.I,
+                          EdgeType.A, EdgeType.A, EdgeType.A,
+                          EdgeType.A, EdgeType.A, EdgeType.A,
+                          EdgeType.A, EdgeType.A, EdgeType.A,
+                          # EdgeType.A, EdgeType.I, EdgeType.A, EdgeType.A, EdgeType.I,
+                          # EdgeType.A, EdgeType.I, EdgeType.A,
+                          # EdgeType.A
+                          ]
+
+        else:
+            self.edge_types = [EdgeType.I, EdgeType.I, EdgeType.I,
+                          EdgeType.A, EdgeType.A, EdgeType.A,
+                          EdgeType.Is, EdgeType.Is, EdgeType.Is,
+                          EdgeType.Is, EdgeType.Is, EdgeType.Is,
+                          # EdgeType.A, EdgeType.I, EdgeType.A, EdgeType.A, EdgeType.I,
+                          # EdgeType.A, EdgeType.I, EdgeType.A,
+                          # EdgeType.A
+                          ]
+
+        self.node_type_dict = {'S': NodeType.sensor,
+                               'F': NodeType.factor,
+                               'G': NodeType.effector,
+                               'H': NodeType.core}
+
+        self.add_interactions = True
+
 class BiLoopControlNet3(LibNet):
 
     def __init__(self, activator_signals: bool=True):

@@ -995,6 +995,34 @@ class NetworkABC(object, metaclass=ABCMeta):
 
         return fig, ax
 
+    def _get_visual_equations(self):
+        '''
+
+        '''
+        subs_list = []
+        self._subs_syms_list = []
+        for pi, nde_lab in zip(self._c_vect_s, self.nodes_list):
+            nde_sym = sp.symbols(str(nde_lab))
+            subs_list.append((pi, nde_sym))
+            self._subs_syms_list.append(nde_sym)
+
+        for ei, (nij, bij) in enumerate(zip(self._n_vect_s, self._beta_vect_s)):
+            b_sym = sp.symbols(f'beta_{ei}')
+            n_sym = sp.symbols(f'n_{ei}')
+            subs_list.append((bij, b_sym))
+            subs_list.append((nij, n_sym))
+            self._subs_syms_list.append(b_sym)
+            self._subs_syms_list.append(n_sym)
+
+        for ndei, di in enumerate(self._d_vect_s):
+            d_sym = sp.symbols(f'd_{ndei}')
+            subs_list.append((di, d_sym))
+            self._subs_syms_list.append(d_sym)
+
+        dcdt_vect_s_viz = sp.Matrix(self._dcdt_vect_s).subs(subs_list)
+
+        return dcdt_vect_s_viz
+
 
     def save_model_equations(self,
                              save_eqn_image: str,
@@ -1022,11 +1050,18 @@ class NetworkABC(object, metaclass=ABCMeta):
         if substitute_node_labels:
             subs_list = []
             for pi, nde_lab in zip(self._c_vect_s, self.nodes_list):
-                subs_list.append((pi, nde_lab))
+                nde_sym = sp.symbols(nde_lab)
+                subs_list.append((pi, nde_sym))
 
             for ei, (nij, bij) in enumerate(zip(self._n_vect_s, self._beta_vect_s)):
-                subs_list.append((bij, f'beta_{ei}'))
-                subs_list.append((nij, f'n_{ei}'))
+                b_sym = sp.symbols(f'beta_{ei}')
+                n_sym = sp.symbols(f'n_{ei}')
+                subs_list.append((bij, b_sym))
+                subs_list.append((nij, n_sym))
+
+            for ndei, di in enumerate(self._d_vect_s):
+                d_sym = sp.symbols(f'd_{ndei}')
+                subs_list.append((di, d_sym))
 
             _dcdt_vect_s = list(sp.Matrix(self._dcdt_vect_s).subs(subs_list))
             _c_vect_s = list(sp.Matrix(self._c_vect_s).subs(subs_list))

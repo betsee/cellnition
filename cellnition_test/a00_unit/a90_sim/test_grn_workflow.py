@@ -68,7 +68,6 @@ def test_state_machine(tmp_path) -> None:
                                 sol_tol=1.0e-2,
                                 N_round_sol=1,
                                 dt=5.0e-3,
-                                tend=80.0,
                                 space_sig=25.0,
                                 delta_sig=25.0,
                                 t_relax=10.0,
