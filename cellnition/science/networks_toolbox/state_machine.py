@@ -567,7 +567,7 @@ class StateMachine(object):
         return transition_edges_set, perturbation_edges_set, GG
 
     def sim_time_trajectory(self,
-                            starting_state: int,
+                            starting_state_i: int,
                             solsM_all: ndarray,
                             input_list: list[str],
                             sig_test_set: list|ndarray,
@@ -580,7 +580,7 @@ class StateMachine(object):
                             d_base: float|list[float] = 1.0,
                             n_base: float|list[float] = 15.0,
                             beta_base: float|list[float] = 0.25,
-                            match_to_unique_states: bool = True,
+                            # match_to_unique_states: bool = True,
                             N_round_sol: int = 1,
                             time_wobble: float = 0.0,
                             ):
@@ -594,16 +594,16 @@ class StateMachine(object):
         Returns
         -------
         '''
-        # Get the sols dict for mapping
-        unique_sols_dict, inv_unique_sols_dict, N_unique_sols = self._get_unique_sol_dict(solsM_all,
-                                                                                          match_tol=match_tol,
-                                                                                          N_round_sol=N_round_sol)
+        # # Get the sols dict for mapping
+        # unique_sols_dict, inv_unique_sols_dict, N_unique_sols = self._get_unique_sol_dict(solsM_all,
+        #                                                                                   match_tol=match_tol,
+        #                                                                                   N_round_sol=N_round_sol)
         # If we're matching to unique states, assume the starting state index is wrt to the unique starting
         # state index and obtain the index in the full state matrix:
-        if match_to_unique_states:
-            starting_state_i = inv_unique_sols_dict[starting_state]
-        else:
-            starting_state_i = starting_state
+        # if match_to_unique_states:
+        #     starting_state_i = inv_unique_sols_dict[starting_state]
+        # else:
+        #     starting_state_i = starting_state
 
         c_vecti = solsM_all[:, starting_state_i]  # get the starting state concentrations
 
@@ -657,10 +657,10 @@ class StateMachine(object):
             c_ave = np.mean(ctime[si:ei, :], axis=0)
             state_matcho, match_error = self._find_state_match(solsM_all, c_ave)
             if match_error < match_tol:
-                if match_to_unique_states: # If matching to unique hub states only...
-                    state_match = unique_sols_dict[state_matcho] # Then get the unique index
-                else:
-                    state_match = state_matcho
+                # if match_to_unique_states: # If matching to unique hub states only...
+                #     state_match = unique_sols_dict[state_matcho] # Then get the unique index
+                # else:
+                state_match = state_matcho
 
                 matched_states.append(state_match)
                 if verbose:
@@ -675,14 +675,14 @@ class StateMachine(object):
     def plot_state_transition_network(self,
                                       nodes_listo: list,
                                       edges_list: list,
-                                      solsM_all: ndarray|list,
+                                      # solsM_all: ndarray|list,
                                       charM_all: list|ndarray,
                                       save_file: str|None = None,
                                       graph_layout: str='dot',
                                       mono_edge: bool = False,
-                                      use_unique_sol_index: bool=True,
-                                      match_tol: float=0.05,
-                                      N_round_sol: int = 1
+                                      # use_unique_sol_index: bool=True,
+                                      # match_tol: float=0.05,
+                                      # N_round_sol: int = 1
                                       ):
         '''
 
@@ -709,26 +709,26 @@ class StateMachine(object):
                        dpi=300)
 
         # Get the sols dict for mapping:
-        unique_sols_dict, inv_unique_sols_dict, N_unique_sols = self._get_unique_sol_dict(solsM_all,
-                                                                                          match_tol=match_tol,
-                                                                                          N_round_sol=N_round_sol)
+        # unique_sols_dict, inv_unique_sols_dict, N_unique_sols = self._get_unique_sol_dict(solsM_all,
+        #                                                                                   match_tol=match_tol,
+        #                                                                                   N_round_sol=N_round_sol)
 
         cmap = colormaps[clr_map]
 
-        if use_unique_sol_index:
-            norm = colors.Normalize(vmin=0, vmax=N_unique_sols)
-        else:
-            norm = colors.Normalize(vmin=0, vmax=len(nodes_list))
+        # if use_unique_sol_index:
+        #     norm = colors.Normalize(vmin=0, vmax=N_unique_sols)
+        # else:
+        norm = colors.Normalize(vmin=0, vmax=len(nodes_list))
 
         # Add all the nodes:
         for nde_i in nodes_list:
-            if use_unique_sol_index:
-                nde_lab = unique_sols_dict[nde_i]
-                nde_color = colors.rgb2hex(cmap(norm(nde_lab)))
-            else:
-                nde_lab = nde_i
-                nde_index = nodes_list.index(nde_i)
-                nde_color = colors.rgb2hex(cmap(norm(nde_index)))
+            # if use_unique_sol_index:
+            #     nde_lab = unique_sols_dict[nde_i]
+            #     nde_color = colors.rgb2hex(cmap(norm(nde_lab)))
+            # else:
+            nde_lab = nde_i
+            nde_index = nodes_list.index(nde_i)
+            nde_color = colors.rgb2hex(cmap(norm(nde_index)))
 
             nde_color += hex_transparency  # add some transparancy to the node
             char_i = charM_all[nde_i] # Get the stability characterization for this state
@@ -757,14 +757,15 @@ class StateMachine(object):
     def plot_state_perturbation_network(self,
                                        pert_edges_set: set,
                                        states_dict: dict,
-                                       solsM_all: ndarray,
+                                       # solsM_all: ndarray,
                                        nodes_listo: list|ndarray,
                                        save_file: str|None = None,
                                        graph_layout: str = 'dot',
-                                       unique_sol_index: bool=True,
-                                       match_tol: float=0.05,
+                                       # unique_sol_index: bool=True,
+                                       # match_tol: float=0.05,
                                        mono_edge: bool=False,
-                                       N_round_sol: int=1):
+                                       # N_round_sol: int=1
+                                        ):
         '''
         This network plotting and generation function is based on the concept
         that an input node state can be associated with several gene network
@@ -802,9 +803,9 @@ class StateMachine(object):
         nodes_list = [int(ni) for ni in nodes_listo] # convert nodes from string to int
 
         # Get the sols dict for mapping:
-        unique_sols_dict, inv_unique_sols_dict, N_unique_sols = self._get_unique_sol_dict(solsM_all,
-                                                                                          match_tol=match_tol,
-                                                                                          N_round_sol=N_round_sol)
+        # unique_sols_dict, inv_unique_sols_dict, N_unique_sols = self._get_unique_sol_dict(solsM_all,
+        #                                                                                   match_tol=match_tol,
+        #                                                                                   N_round_sol=N_round_sol)
         img_pos = 'bc'  # position of the glyph in the node
         subcluster_font = 'DejaVu Sans Bold'
         node_shape = 'ellipse'
@@ -823,10 +824,10 @@ class StateMachine(object):
 
         cmap = colormaps[clr_map]
 
-        if unique_sol_index:
-            norm = colors.Normalize(vmin=0, vmax=N_unique_sols)
-        else:
-            norm = colors.Normalize(vmin=0, vmax=len(nodes_list))
+        # if unique_sol_index:
+        #     norm = colors.Normalize(vmin=0, vmax=N_unique_sols)
+        # else:
+        norm = colors.Normalize(vmin=0, vmax=len(nodes_list))
 
         # First add all solution sets to subgraphs of the network
         for sig_base_set, sc_dict in states_dict.items():
@@ -845,14 +846,14 @@ class StateMachine(object):
                 if st_i in nodes_list:
                     subnode_name = st_i
 
-                    if unique_sol_index:
-                        nde_lab = unique_sols_dict[st_i]
-                        nde_color = colors.rgb2hex(cmap(norm(nde_lab)))
-
-                    else:
-                        nde_lab = st_i
-                        nde_index = nodes_list.index(st_i)
-                        nde_color = colors.rgb2hex(cmap(norm(nde_index)))
+                    # if unique_sol_index:
+                    #     nde_lab = unique_sols_dict[st_i]
+                    #     nde_color = colors.rgb2hex(cmap(norm(nde_lab)))
+                    #
+                    # else:
+                    nde_lab = st_i
+                    nde_index = nodes_list.index(st_i)
+                    nde_color = colors.rgb2hex(cmap(norm(nde_index)))
 
                     nde_color += hex_transparency  # add some transparency to the node
 
