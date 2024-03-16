@@ -953,9 +953,10 @@ class NetworkABC(object, metaclass=ABCMeta):
             cmap = 'magma'
 
         state_labels = [f'State {i +1}' for i in range(solsM.shape[1])]
-        gene_labels = np.asarray(self.nodes_list)[self.regular_node_inds]
+        # gene_labels = np.asarray(self.nodes_list)[self.regular_node_inds]
+        gene_labels = np.asarray(self.nodes_list)
         fig, ax = plt.subplots()
-        im = ax.imshow(solsM[self.regular_node_inds, :], cmap=cmap)
+        im = ax.imshow(solsM, cmap=cmap)
         # plt.colorbar(label='Expression Level')
         ax.set_xticks(np.arange(len(state_labels)), labels=state_labels)
         ax.set_yticks(np.arange(len(gene_labels)), labels=gene_labels)

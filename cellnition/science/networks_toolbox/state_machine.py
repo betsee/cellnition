@@ -257,18 +257,34 @@ class StateMachine(object):
                 print('----')
 
         # Perform a merger of sols into one array and find only the unique solutions
-        solsM_all = np.zeros((self._pnet.N_nodes, 1))  # include the zero state
-        charM_all = [EquilibriumType.undetermined.name]  # set the zero state to undetermined by default
+        # solsM_all = np.zeros((self._pnet.N_nodes, 1))  # include the zero state
+        # charM_all = [EquilibriumType.undetermined.name]  # set the zero state to undetermined by default
+
+        solsM_all = None
+        charM_all = []
 
         for i, (soli, chari) in enumerate(zip(solsM_allo, charM_allo)):
-            solsM_all = np.hstack((solsM_all, soli))
+            if i == 0:
+                solsM_all = soli
+            else:
+                solsM_all = np.hstack((solsM_all, soli))
             charM_all.extend(chari)
 
-        # _, inds_solsM_all_unique = np.unique(np.round(solsM_all, N_round_sol)[self._pnet.noninput_node_inds, :], axis=1,
-        #                                      return_index=True)
+        # Round the solsM_all array so that it's all integers:
+        solsM_all_round = np.round(solsM_all)
 
-        _, inds_solsM_all_unique = np.unique(np.round(solsM_all, N_round_sol), axis=1,
-                                             return_index=True)
+        # Next, determine the value array of equ'm types:
+        char_num_list = []
+        for ctag in charM_all:
+            char_num_list.append(EquilibriumType[ctag].value)
+
+        # stack the char numerical index onto the rounded solsM matrix:
+        solsM_all_round_cnum = np.vstack((solsM_all_round, char_num_list))
+
+        solsM_check = np.delete(solsM_all_round_cnum, self._pnet.input_node_inds, axis=0)
+
+        #  Access the solsM_all array only for the hub nodes:
+        _, inds_solsM_all_unique = np.unique(solsM_check, axis=1, return_index=True)
 
         solsM_all = solsM_all[:, inds_solsM_all_unique]
         charM_all = np.asarray(charM_all)[inds_solsM_all_unique]
@@ -289,24 +305,39 @@ class StateMachine(object):
         # state_set = np.round(solsM_all[self._pnet.noninput_node_inds, :].T, 1).tolist()
 
         # set of all states referencing all nodes; rounded to one decimal:
-        state_set = np.round(solsM_all.T, 1).tolist()
+        # state_set = np.round(solsM_all.T).tolist()
+        #
+        # states_dict = OrderedDict()
+        # for sigi in sig_test_set:
+        #     states_dict[tuple(sigi)] = {'States': [], 'Stability': []}
+        #
+        # for sigi, state_subseto in zip(sig_test_set, sols_list):
+        #     # state_subset = state_subseto[self._pnet.noninput_node_inds, :]
+        #     state_subset = state_subseto
+        #     for target_state in np.round(state_subset).T.tolist():
+        #         if target_state in state_set:
+        #             state_match_index = state_set.index(target_state)
+        #             states_dict[tuple(sigi)]['States'].append(state_match_index)
+        #             states_dict[tuple(sigi)]['Stability'].append(charM_all[state_match_index])
+        #         else:
+        #             print('match not found!')
+        #             states_dict[tuple(sigi)]['States'].append(np.nan)
+        #             states_dict[tuple(sigi)]['Stability'].append(np.nan)
+
+        state_set = solsM_all.T.tolist()
 
         states_dict = OrderedDict()
         for sigi in sig_test_set:
             states_dict[tuple(sigi)] = {'States': [], 'Stability': []}
 
         for sigi, state_subseto in zip(sig_test_set, sols_list):
-            # state_subset = state_subseto[self._pnet.noninput_node_inds, :]
-            state_subset = state_subseto
-            for target_state in np.round(state_subset, 1).T.tolist():
-                if target_state in state_set:
-                    state_match_index = state_set.index(target_state)
+            state_subset = state_subseto[self._pnet.noninput_node_inds, :]
+            for target_state in state_subset.T.tolist():
+                state_match_index, err_match = self._find_state_match(solsM_all[self._pnet.noninput_node_inds, :],
+                                                                       target_state)
+                if state_match_index not in states_dict[tuple(sigi)]['States']:
                     states_dict[tuple(sigi)]['States'].append(state_match_index)
                     states_dict[tuple(sigi)]['Stability'].append(charM_all[state_match_index])
-                else:
-                    print('match not found!')
-                    states_dict[tuple(sigi)]['States'].append(np.nan)
-                    states_dict[tuple(sigi)]['Stability'].append(np.nan)
 
         return solsM_all, charM_all, sols_list, states_dict, sig_test_set
 
@@ -444,27 +475,30 @@ class StateMachine(object):
 
                     c_initial = np.mean(ctime[inds_win1[0]:inds_win1[1], :], axis=0)
                     # var_c_initial = np.sum(np.std(ctime[inds_win1[0]:inds_win1[1], :], axis=0))
-                    # initial_state, match_error_initial = self._find_state_match(solsM_all[self._pnet.noninput_node_inds, :],
-                    #                                                       c_initial[self._pnet.noninput_node_inds])
-                    initial_state, match_error_initial = self._find_state_match(solsM_all, c_initial)
+
+                    # match the network state to one that only involves the hub nodes:
+                    initial_state, match_error_initial = self._find_state_match(solsM_all[self._pnet.noninput_node_inds, :],
+                                                                          c_initial[self._pnet.noninput_node_inds])
+                    # initial_state, match_error_initial = self._find_state_match(solsM_all, c_initial)
 
                     if match_error_initial > match_tol: # if state is unmatched, flag it with a nan
                         initial_state = np.nan
 
                     c_held = np.mean(ctime[inds_win2[0]:inds_win2[1], :], axis=0)
                     # var_c_held = np.sum(np.std(ctime[inds_win2[0]:inds_win2[1], :], axis=0))
-                    # held_state, match_error_held = self._find_state_match(solsM_all[self._pnet.noninput_node_inds, :],
-                    #                                                 c_held[self._pnet.noninput_node_inds])
-                    held_state, match_error_held = self._find_state_match(solsM_all, c_held)
+
+                    held_state, match_error_held = self._find_state_match(solsM_all[self._pnet.noninput_node_inds, :],
+                                                                    c_held[self._pnet.noninput_node_inds])
+                    # held_state, match_error_held = self._find_state_match(solsM_all, c_held)
 
                     if match_error_held > match_tol: # if state is unmatched, flag it
                         held_state = np.nan
 
                     c_final = np.mean(ctime[inds_win3[0]:inds_win3[1], :], axis=0)
                     # var_c_final = np.sum(np.std(ctime[inds_win3[0]:inds_win3[1], :], axis=0))
-                    # final_state, match_error_final = self._find_state_match(solsM_all[self._pnet.noninput_node_inds, :],
-                    #                                                   c_final[self._pnet.noninput_node_inds])
-                    final_state, match_error_final = self._find_state_match(solsM_all, c_final)
+                    final_state, match_error_final = self._find_state_match(solsM_all[self._pnet.noninput_node_inds, :],
+                                                                      c_final[self._pnet.noninput_node_inds])
+                    # final_state, match_error_final = self._find_state_match(solsM_all, c_final)
 
                     if match_error_final > match_tol: # if state is unmatched, flag it
                         final_state = np.nan
@@ -501,7 +535,9 @@ class StateMachine(object):
                                   f'Match errors {match_error_initial, match_error_held, match_error_final}')
 
                     num_step += 1
+
                     if verbose:
+                        # print(f'Match errors {match_error_initial, match_error_held, match_error_final}')
                         print('------')
 
         # The first thing we do after the construction of the
