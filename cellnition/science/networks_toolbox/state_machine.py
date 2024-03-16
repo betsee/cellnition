@@ -11,6 +11,7 @@ set and corresponding GeneNetworkModel.
 import os
 import itertools
 import numpy as np
+from scipy.cluster.hierarchy import fclusterdata
 import networkx as nx
 import pygraphviz as pgv
 from cellnition.science.network_models.probability_networks import (
@@ -198,23 +199,24 @@ class StateMachine(object):
 
 
     def steady_state_solutions_search(self,
-                                      beta_base: float | list = 0.25,
-                                      n_base: float | list = 15.0,
-                                      d_base: float | list = 1.0,
+                                      beta_base: float | list,
+                                      n_base: float | list,
+                                      d_base: float | list,
                                       verbose: bool=True,
                                       return_saddles: bool=True,
                                       N_space: int=3,
                                       search_tol: float=1.0e-15,
                                       sol_tol: float=1.0e-2,
                                       N_round_sol: int=1,
-                                      search_cycle_nodes_only: bool = False
+                                      search_cycle_nodes_only: bool = False,
+                                      cluster_threshhold: float=0.1,
+                                      cluster_method: str = 'inconsistent'
                                       ):
         '''
         Search through all possible combinations of signal node values
         and collect and identify all equilibrium points of the system.
 
         '''
-        # FIXME: do we want this to have additional node constraints?
 
         sig_lin = [1.0e-6, 1.0]
         sig_lin_set = [sig_lin for i in self._pnet.input_node_inds]
@@ -270,61 +272,34 @@ class StateMachine(object):
                 solsM_all = np.hstack((solsM_all, soli))
             charM_all.extend(chari)
 
-        # Round the solsM_all array so that it's all integers:
-        solsM_all_round = np.round(solsM_all)
+        # Use a clustering algorithm to disregard solutions that are very close to one another in terms of
+        # an Euclidian vector distance:
+        unique_sol_clusters = fclusterdata(solsM_all[self._pnet.noninput_node_inds, :].T,
+                                           t=cluster_threshhold,
+                                           criterion=cluster_method)
+        cluster_index = np.unique(unique_sol_clusters)
 
-        # Next, determine the value array of equ'm types:
-        char_num_list = []
-        for ctag in charM_all:
-            char_num_list.append(EquilibriumType[ctag].value)
+        cluster_pool = [[] for i in cluster_index]
+        for i, clst_i in enumerate(unique_sol_clusters):
+            cluster_pool[int(clst_i) - 1].append(i)
 
-        # stack the char numerical index onto the rounded solsM matrix:
-        solsM_all_round_cnum = np.vstack((solsM_all_round, char_num_list))
+        # now that we've clustered similar sols together,
+        # we ensure that their stability characteristics are the same,
+        # and go ahead and take the first entry as the stable sol:
+        inds_solsM_all_unique = []
 
-        solsM_check = np.delete(solsM_all_round_cnum, self._pnet.input_node_inds, axis=0)
+        for clst_inds in cluster_pool:
+            # get the cluster indices of all unique attractors (in case the clustered states have different dynamic characteristics):
+            _, uni_inds = np.unique(np.asarray(charM_all)[clst_inds], return_index=True)
+            inds_solsM_all_unique.extend(np.asarray(clst_inds)[uni_inds])
 
-        #  Access the solsM_all array only for the hub nodes:
-        _, inds_solsM_all_unique = np.unique(solsM_check, axis=1, return_index=True)
+        # _, inds_solsM_all_unique = np.unique(np.round(solsM_all, N_round_sol), return_index=True, axis=1)
 
         solsM_all = solsM_all[:, inds_solsM_all_unique]
         charM_all = np.asarray(charM_all)[inds_solsM_all_unique]
 
-        if np.zeros(self._pnet.N_nodes).T in np.round(solsM_all, 1).T:
-            zer_index = np.round(solsM_all, 1).T.tolist().index(np.zeros(self._pnet.N_nodes).T.tolist())
-            if charM_all[
-                zer_index] == EquilibriumType.undetermined.name:  # if it hasn't been alogrithmically set already...
-                charM_all.T[zer_index] = EquilibriumType.attractor.name  # update the state to an attractor
-
-        else:
-            charM_all[0] = EquilibriumType.saddle.name  # update the state to a saddle node
-
         # if order_states: # order states as distance from the zero vector:
-        solsM_all, charM_all = self._order_states_by_distance(solsM_all, charM_all)
-
-        # # set of all states referencing only the hub nodes; rounded to one decimal:
-        # state_set = np.round(solsM_all[self._pnet.noninput_node_inds, :].T, 1).tolist()
-
-        # set of all states referencing all nodes; rounded to one decimal:
-        # state_set = np.round(solsM_all.T).tolist()
-        #
-        # states_dict = OrderedDict()
-        # for sigi in sig_test_set:
-        #     states_dict[tuple(sigi)] = {'States': [], 'Stability': []}
-        #
-        # for sigi, state_subseto in zip(sig_test_set, sols_list):
-        #     # state_subset = state_subseto[self._pnet.noninput_node_inds, :]
-        #     state_subset = state_subseto
-        #     for target_state in np.round(state_subset).T.tolist():
-        #         if target_state in state_set:
-        #             state_match_index = state_set.index(target_state)
-        #             states_dict[tuple(sigi)]['States'].append(state_match_index)
-        #             states_dict[tuple(sigi)]['Stability'].append(charM_all[state_match_index])
-        #         else:
-        #             print('match not found!')
-        #             states_dict[tuple(sigi)]['States'].append(np.nan)
-        #             states_dict[tuple(sigi)]['Stability'].append(np.nan)
-
-        state_set = solsM_all.T.tolist()
+        # solsM_all, charM_all = self._order_states_by_distance(solsM_all, charM_all)
 
         states_dict = OrderedDict()
         for sigi in sig_test_set:
@@ -346,7 +321,6 @@ class StateMachine(object):
                                   sig_test_set: list|ndarray,
                                   solsM_all: ndarray|list,
                                   dt: float = 5.0e-3,
-                                  # tend: float = 80.0,
                                   space_sig: float = 25.0,
                                   delta_sig: float = 25.0,
                                   t_relax: float = 10.0,
@@ -356,9 +330,9 @@ class StateMachine(object):
                                   d_base: float|list[float] = 1.0,
                                   n_base: float|list[float] = 15.0,
                                   beta_base: float|list[float] = 0.25,
-                                  remove_inaccessible_states: bool=True,
+                                  remove_inaccessible_states: bool=False,
                                   save_graph_file: str|None = None
-                                  ) -> tuple[set, set, MultiDiGraph]:
+                                  ) -> tuple[set, set, MultiDiGraph, list]:
         '''
         Build a state transition matrix/diagram by starting the system
         in different states and seeing which state it ends up in after
@@ -439,6 +413,8 @@ class StateMachine(object):
             self._get_index_from_val(tvectr, window3[0], dt_samp),
             self._get_index_from_val(tvectr, window3[1], dt_samp))
 
+        _all_time_runs = []
+
         # We first want to step through all 'held' signals and potentially multistable states:
         for sig_base_set, sc_dict in states_dict.items():
 
@@ -503,30 +479,22 @@ class StateMachine(object):
                     if match_error_final > match_tol: # if state is unmatched, flag it
                         final_state = np.nan
 
-                    if initial_state != final_state: # add this to the perturbed transitions
-                        if initial_state is not np.nan and final_state is not np.nan:
-                            perturbation_edges_set.add((initial_state, final_state, pert_input_label, base_input_label))
-
-                            if verbose:
-                                print(num_step)
-                                print(f'Perturbed Transition from State {initial_state} to {final_state} via '
-                                      f'{pert_input_label}')
-
-                        else:
-                            if verbose:
-                                print(f'Warning: {initial_state} to {final_state} via {pert_input_label} not added \n '
-                                      f'as state match not found! \n'
-                                      f'Match errors {match_error_initial, match_error_final}')
+                    print(num_step)
 
                     if initial_state is not np.nan and held_state is not np.nan and final_state is not np.nan:
                         transition_edges_set.add((initial_state, held_state, pert_input_label))
                         transition_edges_set.add((held_state, final_state, base_input_label))
 
                         if verbose:
-                            print(num_step)
                             print(f'Transition State {initial_state} to {held_state} via {pert_input_label}')
                             print(f'Transition State {held_state} to {final_state} via {base_input_label}')
 
+                        if initial_state != final_state:  # add this to the perturbed transitions:
+                            perturbation_edges_set.add((initial_state, final_state, pert_input_label, base_input_label))
+
+                            if verbose:
+                                print(f'Perturbed Transition from State {initial_state} to {final_state} via '
+                                      f'{pert_input_label}')
 
                     else:
                         if verbose:
@@ -534,10 +502,11 @@ class StateMachine(object):
                                   f'as state match not found! \n'
                                   f'Match errors {match_error_initial, match_error_held, match_error_final}')
 
+                    _all_time_runs.append(ctime.copy())
                     num_step += 1
 
                     if verbose:
-                        # print(f'Match errors {match_error_initial, match_error_held, match_error_final}')
+                        print(f'Match errors {match_error_initial, match_error_held, match_error_final}')
                         print('------')
 
         # The first thing we do after the construction of the
@@ -549,8 +518,6 @@ class StateMachine(object):
         GG = nx.MultiDiGraph()
 
         for ndei, ndej, trans_label_ij in list(transition_edges_set):
-            # GG.add_edge(ndei, ndej, key=f'I{trans_label_ij}')
-            # GG.add_edge(ndei, ndej, key=trans_label_ij)
             # Annoyingly, nodes must be strings in order to save properly...
             GG.add_edge(str(ndei), str(ndej), key=f'I{trans_label_ij}')
 
@@ -564,7 +531,7 @@ class StateMachine(object):
         if save_graph_file:
             nx.write_gml(GG, save_graph_file)
 
-        return transition_edges_set, perturbation_edges_set, GG
+        return transition_edges_set, perturbation_edges_set, GG, _all_time_runs
 
     def sim_time_trajectory(self,
                             starting_state_i: int,
@@ -594,17 +561,6 @@ class StateMachine(object):
         Returns
         -------
         '''
-        # # Get the sols dict for mapping
-        # unique_sols_dict, inv_unique_sols_dict, N_unique_sols = self._get_unique_sol_dict(solsM_all,
-        #                                                                                   match_tol=match_tol,
-        #                                                                                   N_round_sol=N_round_sol)
-        # If we're matching to unique states, assume the starting state index is wrt to the unique starting
-        # state index and obtain the index in the full state matrix:
-        # if match_to_unique_states:
-        #     starting_state_i = inv_unique_sols_dict[starting_state]
-        # else:
-        #     starting_state_i = starting_state
-
         c_vecti = solsM_all[:, starting_state_i]  # get the starting state concentrations
 
         sig_inds = self._pnet.input_node_inds
@@ -619,7 +575,7 @@ class StateMachine(object):
         # Get the full time vector and the sampled time vector (tvectr)
         tvect, tvectr = self._pnet.make_time_vects(end_t, dt, dt_samp)
 
-        # list of tuples with indices defining start and stop of phase averaging region (for state maching solutions)
+        # list of tuples with indices defining start and stop of phase averaging region (for state matching solutions)
         c_ave_phase_inds = []
         for ts, te in phase_time_tuples:
             rtinds = self._pnet.get_interval_inds(tvectr, ts, te, t_wait=t_wait)
@@ -657,9 +613,6 @@ class StateMachine(object):
             c_ave = np.mean(ctime[si:ei, :], axis=0)
             state_matcho, match_error = self._find_state_match(solsM_all, c_ave)
             if match_error < match_tol:
-                # if match_to_unique_states: # If matching to unique hub states only...
-                #     state_match = unique_sols_dict[state_matcho] # Then get the unique index
-                # else:
                 state_match = state_matcho
 
                 matched_states.append(state_match)
@@ -675,14 +628,10 @@ class StateMachine(object):
     def plot_state_transition_network(self,
                                       nodes_listo: list,
                                       edges_list: list,
-                                      # solsM_all: ndarray|list,
                                       charM_all: list|ndarray,
                                       save_file: str|None = None,
                                       graph_layout: str='dot',
                                       mono_edge: bool = False,
-                                      # use_unique_sol_index: bool=True,
-                                      # match_tol: float=0.05,
-                                      # N_round_sol: int = 1
                                       ):
         '''
 
@@ -705,27 +654,14 @@ class StateMachine(object):
                        splines=True,
                        directed=True,
                        concentrate=False,
-                       # compound=True,
                        dpi=300)
-
-        # Get the sols dict for mapping:
-        # unique_sols_dict, inv_unique_sols_dict, N_unique_sols = self._get_unique_sol_dict(solsM_all,
-        #                                                                                   match_tol=match_tol,
-        #                                                                                   N_round_sol=N_round_sol)
 
         cmap = colormaps[clr_map]
 
-        # if use_unique_sol_index:
-        #     norm = colors.Normalize(vmin=0, vmax=N_unique_sols)
-        # else:
         norm = colors.Normalize(vmin=0, vmax=len(nodes_list))
 
         # Add all the nodes:
         for nde_i in nodes_list:
-            # if use_unique_sol_index:
-            #     nde_lab = unique_sols_dict[nde_i]
-            #     nde_color = colors.rgb2hex(cmap(norm(nde_lab)))
-            # else:
             nde_lab = nde_i
             nde_index = nodes_list.index(nde_i)
             nde_color = colors.rgb2hex(cmap(norm(nde_index)))
@@ -756,15 +692,11 @@ class StateMachine(object):
 
     def plot_state_perturbation_network(self,
                                        pert_edges_set: set,
-                                       states_dict: dict,
-                                       # solsM_all: ndarray,
+                                       charM_all: list | ndarray,
                                        nodes_listo: list|ndarray,
                                        save_file: str|None = None,
                                        graph_layout: str = 'dot',
-                                       # unique_sol_index: bool=True,
-                                       # match_tol: float=0.05,
                                        mono_edge: bool=False,
-                                       # N_round_sol: int=1
                                         ):
         '''
         This network plotting and generation function is based on the concept
@@ -802,10 +734,6 @@ class StateMachine(object):
 
         nodes_list = [int(ni) for ni in nodes_listo] # convert nodes from string to int
 
-        # Get the sols dict for mapping:
-        # unique_sols_dict, inv_unique_sols_dict, N_unique_sols = self._get_unique_sol_dict(solsM_all,
-        #                                                                                   match_tol=match_tol,
-        #                                                                                   N_round_sol=N_round_sol)
         img_pos = 'bc'  # position of the glyph in the node
         subcluster_font = 'DejaVu Sans Bold'
         node_shape = 'ellipse'
@@ -813,7 +741,7 @@ class StateMachine(object):
         nde_font_color = 'Black'
         hex_transparency = '80'
 
-        # Try to make a nested graph:
+        # Make a nested graph with compound=True keyword:
         G = pgv.AGraph(strict=mono_edge,
                        fontname=subcluster_font,
                        splines=True,
@@ -824,58 +752,49 @@ class StateMachine(object):
 
         cmap = colormaps[clr_map]
 
-        # if unique_sol_index:
-        #     norm = colors.Normalize(vmin=0, vmax=N_unique_sols)
-        # else:
         norm = colors.Normalize(vmin=0, vmax=len(nodes_list))
 
-        # First add all solution sets to subgraphs of the network
-        for sig_base_set, sc_dict in states_dict.items():
+        for st_i, st_f, i_pert, i_base in pert_edges_set:
+            # Add in a subgraph box for the "held" input node state:
+            Gsub = G.add_subgraph(name=f'cluster_{i_base}', label=f'Held at I{i_base}')
 
-            states_set = sc_dict['States']
-            states_char = sc_dict['Stability']
+            # next add-in nodes for the initial state:
+            nde_i_name = f'{st_i}.{i_base}' # node name is in terms of the subgraph box index
+            nde_i_lab = f'State {st_i}'
+            nde_i_color = colors.rgb2hex(cmap(norm(st_i)))
+            nde_i_color += hex_transparency  # add some transparency to the node
+            chr_i = charM_all[st_i]
 
-            # Get an integer label for the 'bitstring' of signal node inds defining the base:
-            base_input_label = self._get_integer_label(sig_base_set)
+            Gsub.add_node(nde_i_name,
+                          label=nde_i_lab,
+                          labelloc='t',
+                          image=self._node_image_dict[chr_i],
+                          imagepos=img_pos,
+                          shape=node_shape,
+                          fontcolor=nde_font_color,
+                          style='filled',
+                          fillcolor=nde_i_color
+                          )
 
-            Gsub = G.add_subgraph(name=f'cluster_{base_input_label}', label=f'Held at I{base_input_label}')
+            # ...and for the final state:
+            nde_f_name = f'{st_f}.{i_base}' # node name is in terms of the subgraph box index
+            nde_f_lab = f'State {st_f}'
+            nde_f_color = colors.rgb2hex(cmap(norm(st_f)))
+            nde_f_color += hex_transparency  # add some transparency to the node
+            chr_f = charM_all[st_f]
 
-            # print(f'Held at I{base_input_label}:')
+            Gsub.add_node(nde_f_name,
+                          label=nde_f_lab,
+                          labelloc='t',
+                          image=self._node_image_dict[chr_f],
+                          imagepos=img_pos,
+                          shape=node_shape,
+                          fontcolor=nde_font_color,
+                          style='filled',
+                          fillcolor=nde_f_color
+                          )
 
-            for st_i, chr_i in zip(states_set, states_char):
-                if st_i in nodes_list:
-                    subnode_name = st_i
-
-                    # if unique_sol_index:
-                    #     nde_lab = unique_sols_dict[st_i]
-                    #     nde_color = colors.rgb2hex(cmap(norm(nde_lab)))
-                    #
-                    # else:
-                    nde_lab = st_i
-                    nde_index = nodes_list.index(st_i)
-                    nde_color = colors.rgb2hex(cmap(norm(nde_index)))
-
-                    nde_color += hex_transparency  # add some transparency to the node
-
-                    Gsub.add_node(subnode_name,
-                                  label=f'State {nde_lab}',
-                                  labelloc='t',
-                                  image=self._node_image_dict[chr_i],
-                                  imagepos=img_pos,
-                                  shape=node_shape,
-                                  fontcolor=nde_font_color,
-                                  style='filled',
-                                  fillcolor=nde_color
-                                  )
-                    # print(f'State {st_i}, Stability: {chr_i}')
-            # print('----')
-
-        for ndi, ndj, transI, baseI in pert_edges_set:
-
-            if ndi in nodes_list and ndj in nodes_list:
-                subnode_i = ndi
-                subnode_j = ndj
-                G.add_edge(subnode_i, subnode_j, label=f'I{transI}')
+            Gsub.add_edge(nde_i_name, nde_f_name, label=f'I{i_pert}')
 
         if save_file is not None:
             G.layout(prog=graph_layout)
@@ -1116,7 +1035,7 @@ class StateMachine(object):
         errM = []
         for soli in solsM.T:
             sdiff = soli - cvecti
-            errM.append(np.sum(sdiff ** 2))
+            errM.append(np.sqrt(np.sum(sdiff ** 2)))
         errM = np.asarray(errM)
         state_best_match = (errM == errM.min()).nonzero()[0][0]
 
