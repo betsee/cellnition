@@ -944,7 +944,12 @@ class NetworkABC(object, metaclass=ABCMeta):
 
         return fig, ax
 
-    def plot_sols_array(self, solsM: ndarray, figsave: str | None = None, cmap: str | None =None):
+    def plot_sols_array(self,
+                        solsM: ndarray,
+                        gene_inds: list|ndarray|None=None,
+                        figsave: str | None = None,
+                        cmap: str | None =None,
+                        save_format: str='png'):
         '''
 
         '''
@@ -952,12 +957,21 @@ class NetworkABC(object, metaclass=ABCMeta):
         if cmap is None:
             cmap = 'magma'
 
-        state_labels = [f'State {i +1}' for i in range(solsM.shape[1])]
-        # gene_labels = np.asarray(self.nodes_list)[self.regular_node_inds]
-        gene_labels = np.asarray(self.nodes_list)
+        state_labels = [f'State {i}' for i in range(solsM.shape[1])]
+
+        if gene_inds is None:
+            gene_labels = np.asarray(self.nodes_list)
+
+        else:
+            gene_labels = np.asarray(self.nodes_list)[gene_inds]
+
         fig, ax = plt.subplots()
-        im = ax.imshow(solsM, cmap=cmap)
-        # plt.colorbar(label='Expression Level')
+
+        if gene_inds is None:
+            im = ax.imshow(solsM, cmap=cmap)
+        else:
+            im = ax.imshow(solsM[gene_inds, :], cmap=cmap)
+
         ax.set_xticks(np.arange(len(state_labels)), labels=state_labels)
         ax.set_yticks(np.arange(len(gene_labels)), labels=gene_labels)
         plt.setp(ax.get_xticklabels(), rotation=45, ha="right",
@@ -965,7 +979,7 @@ class NetworkABC(object, metaclass=ABCMeta):
         fig.colorbar(im, label='Expression Level')
 
         if figsave is not None:
-            plt.savefig(figsave, dpi=300, transparent=True, format='png')
+            plt.savefig(figsave, dpi=300, transparent=True, format=save_format)
 
         return fig, ax
 

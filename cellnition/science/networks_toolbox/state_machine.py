@@ -436,6 +436,9 @@ class StateMachine(object):
                     # Initial state vector: add the small non-zero amount to prevent 0/0 in Hill functions:
                     cvecti = 1 * solsM_all[:, si] + self._pnet.p_min
 
+                    # if verbose:
+                    #     print(f'Start state {si}...')
+
                     c_signals = self._pnet.make_pulsed_signals_matrix(tvect, sig_inds, sig_times, sig_mags)
 
                     ctime = self._pnet.run_time_sim(tvect, tvectr, cvecti.copy(),
@@ -547,8 +550,6 @@ class StateMachine(object):
                             d_base: float|list[float] = 1.0,
                             n_base: float|list[float] = 15.0,
                             beta_base: float|list[float] = 0.25,
-                            # match_to_unique_states: bool = True,
-                            N_round_sol: int = 1,
                             time_wobble: float = 0.0,
                             ):
         '''
@@ -632,6 +633,9 @@ class StateMachine(object):
                                       save_file: str|None = None,
                                       graph_layout: str='dot',
                                       mono_edge: bool = False,
+                                      rank: str='same',
+                                      constraint: bool = False,
+                                      concentrate: bool = True
                                       ):
         '''
 
@@ -653,7 +657,9 @@ class StateMachine(object):
                        fontname=subcluster_font,
                        splines=True,
                        directed=True,
-                       concentrate=False,
+                       concentrate=concentrate,
+                       constraint=constraint,
+                       rank=rank,
                        dpi=300)
 
         cmap = colormaps[clr_map]
@@ -697,6 +703,9 @@ class StateMachine(object):
                                        save_file: str|None = None,
                                        graph_layout: str = 'dot',
                                        mono_edge: bool=False,
+                                       rank: str = 'same',
+                                       constraint: bool=False,
+                                       concentrate: bool=True
                                         ):
         '''
         This network plotting and generation function is based on the concept
@@ -746,8 +755,10 @@ class StateMachine(object):
                        fontname=subcluster_font,
                        splines=True,
                        directed=True,
-                       concentrate=False,
+                       concentrate=concentrate,
+                       constraint=constraint,
                        compound=True,
+                       rank=rank,
                        dpi=300)
 
         cmap = colormaps[clr_map]
@@ -808,7 +819,6 @@ class StateMachine(object):
                              tvectr: ndarray|list,
                              phase_inds: ndarray|list,
                              matched_states: ndarray|list,
-                             solsM_all: ndarray|list,
                              charM_all: ndarray|list,
                              gene_plot_inds: list|None=None,
                              figsize: tuple = (10, 4),
@@ -817,25 +827,11 @@ class StateMachine(object):
                              glyph_alignment: tuple[float, float]=(-0.0, -0.15),
                              fontsize: str='medium',
                              save_file: str|None = None,
-                             matched_to_unique_states: bool = True,
-                             match_tol: float=0.05,
                              legend: bool=True,
-                             N_round_sol: int = 1
                              ):
         '''
 
         '''
-
-        if matched_to_unique_states:
-            # in order to get the correct assignment to the unique inds, we need to re-match the states:
-            matched_states = []
-            for i, (si, ei) in enumerate(phase_inds):
-                c_ave = np.mean(c_time[si:ei, :], axis=0)
-                state_matcho, match_error = self._find_state_match(solsM_all, c_ave)
-                if match_error < match_tol:
-                    matched_states.append(state_matcho)
-                else:
-                    matched_states.append(np.nan)
 
         if gene_plot_inds is None:
             main_c = c_time[:, self._pnet.noninput_node_inds]
@@ -849,10 +845,6 @@ class StateMachine(object):
         fig_height = figsize[1]
         figsize = (fig_width, fig_height*N_plot_genes)
 
-        # Get the sols dict for mapping
-        unique_sols_dict, inv_unique_sols_dict, N_unique_sols = self._get_unique_sol_dict(solsM_all,
-                                                                                          match_tol=match_tol,
-                                                                                          N_round_sol=N_round_sol)
         cmap = plt.get_cmap("tab10")
 
         fig, axes = plt.subplots(N_plot_genes, 1, figsize=figsize, sharex=True, sharey=True)
@@ -861,11 +853,7 @@ class StateMachine(object):
             lineplt = axes[ii].plot(tvectr, cc, linewidth=2.0, label=gene_lab, color=cmap(ii))  # plot the time series
             # annotate the plot with the matched state:
             for (pi, pj), stateio in zip(phase_inds, matched_states):
-
-                if matched_to_unique_states:
-                    statei = unique_sols_dict[stateio]
-                else:
-                    statei = stateio
+                statei = stateio
 
                 char_i = charM_all[stateio] # We want the state characterization to go to the full state system
                 char_i_fname = self._node_image_dict[char_i]
@@ -1041,37 +1029,37 @@ class StateMachine(object):
 
         return state_best_match, errM[state_best_match]
 
-    def _get_unique_sol_dict(self, solsM_all: ndarray, match_tol: float=0.05, N_round_sol: int=1):
-        '''
-        Returns a dictionary that maps an index in solsM_all to an index to the unique
-        sols in solsM_all with respect to the noninput node indes.
-
-        Parameters
-        ----------
-        solsM_all : ndarray
-            An array of concentrations in rows and unique equilibrium states in columns.
-
-        match_tol : float=0.05
-            The tolerance, above which a state is taken to not be a match.
-
-        '''
-        # The sols that are unique with respect to the non-input nodes:
-        solsM_all_unique, unique_inds = np.unique(np.round(solsM_all[self._pnet.noninput_node_inds],
-                                                           N_round_sol), axis=1, return_index=True)
-
-        N_unique_sols = len(unique_inds)
-
-        unique_sol_dict = {}
-        inv_unique_sols_dict = {}
-        for si, soli in enumerate(solsM_all.T):
-            # Find a match between soli and a solution in solsM_all_unique:
-            state_match, match_error = self._find_state_match(solsM_all_unique,
-                                                               soli[self._pnet.noninput_node_inds])
-            if match_error < match_tol:
-                unique_sol_dict[si] = state_match
-                inv_unique_sols_dict[state_match] = si # record the inverse mapping as well
-
-            else:
-                raise Exception("State not found!")
-
-        return unique_sol_dict, inv_unique_sols_dict, N_unique_sols
+    # def _get_unique_sol_dict(self, solsM_all: ndarray, match_tol: float=0.05, N_round_sol: int=1):
+    #     '''
+    #     Returns a dictionary that maps an index in solsM_all to an index to the unique
+    #     sols in solsM_all with respect to the noninput node indes.
+    #
+    #     Parameters
+    #     ----------
+    #     solsM_all : ndarray
+    #         An array of concentrations in rows and unique equilibrium states in columns.
+    #
+    #     match_tol : float=0.05
+    #         The tolerance, above which a state is taken to not be a match.
+    #
+    #     '''
+    #     # The sols that are unique with respect to the non-input nodes:
+    #     solsM_all_unique, unique_inds = np.unique(np.round(solsM_all[self._pnet.noninput_node_inds],
+    #                                                        N_round_sol), axis=1, return_index=True)
+    #
+    #     N_unique_sols = len(unique_inds)
+    #
+    #     unique_sol_dict = {}
+    #     inv_unique_sols_dict = {}
+    #     for si, soli in enumerate(solsM_all.T):
+    #         # Find a match between soli and a solution in solsM_all_unique:
+    #         state_match, match_error = self._find_state_match(solsM_all_unique,
+    #                                                            soli[self._pnet.noninput_node_inds])
+    #         if match_error < match_tol:
+    #             unique_sol_dict[si] = state_match
+    #             inv_unique_sols_dict[state_match] = si # record the inverse mapping as well
+    #
+    #         else:
+    #             raise Exception("State not found!")
+    #
+    #     return unique_sol_dict, inv_unique_sols_dict, N_unique_sols
