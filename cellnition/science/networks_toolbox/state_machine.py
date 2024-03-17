@@ -299,7 +299,7 @@ class StateMachine(object):
         charM_all = np.asarray(charM_all)[inds_solsM_all_unique]
 
         # if order_states: # order states as distance from the zero vector:
-        # solsM_all, charM_all = self._order_states_by_distance(solsM_all, charM_all)
+        solsM_all, charM_all = self._order_states_by_distance(solsM_all, charM_all)
 
         states_dict = OrderedDict()
         for sigi in sig_test_set:
@@ -321,8 +321,7 @@ class StateMachine(object):
                                   sig_test_set: list|ndarray,
                                   solsM_all: ndarray|list,
                                   dt: float = 5.0e-3,
-                                  space_sig: float = 25.0,
-                                  delta_sig: float = 25.0,
+                                  delta_sig: float = 40.0,
                                   t_relax: float = 10.0,
                                   dt_samp: float=0.1,
                                   verbose: bool = True,
@@ -332,7 +331,7 @@ class StateMachine(object):
                                   beta_base: float|list[float] = 0.25,
                                   remove_inaccessible_states: bool=False,
                                   save_graph_file: str|None = None
-                                  ) -> tuple[set, set, MultiDiGraph, list]:
+                                  ) -> tuple[set, set, MultiDiGraph]:
         '''
         Build a state transition matrix/diagram by starting the system
         in different states and seeing which state it ends up in after
@@ -386,9 +385,9 @@ class StateMachine(object):
 
         # We want all signals on at the same time (we want the sim to end before
         # the signal changes again:
-        sig_times = [(space_sig, delta_sig + space_sig) for i in range(N_sigs)]
+        sig_times = [(delta_sig, 2*delta_sig) for i in range(N_sigs)]
 
-        tend = sig_times[-1][1] + delta_sig + space_sig
+        tend = sig_times[-1][1] + delta_sig
 
         transition_edges_set = set()
         perturbation_edges_set = set()
@@ -415,7 +414,7 @@ class StateMachine(object):
 
         _all_time_runs = []
 
-        # We first want to step through all 'held' signals and potentially multistable states:
+        # We want to step through all 'held' signals and potentially multistable states:
         for sig_base_set, sc_dict in states_dict.items():
 
             states_set = sc_dict['States']
@@ -479,7 +478,8 @@ class StateMachine(object):
                     if match_error_final > match_tol: # if state is unmatched, flag it
                         final_state = np.nan
 
-                    print(num_step)
+                    if verbose:
+                        print(num_step)
 
                     if initial_state is not np.nan and held_state is not np.nan and final_state is not np.nan:
                         transition_edges_set.add((initial_state, held_state, pert_input_label))
@@ -506,7 +506,7 @@ class StateMachine(object):
                     num_step += 1
 
                     if verbose:
-                        print(f'Match errors {match_error_initial, match_error_held, match_error_final}')
+                        # print(f'Match errors {match_error_initial, match_error_held, match_error_final}')
                         print('------')
 
         # The first thing we do after the construction of the
@@ -531,7 +531,7 @@ class StateMachine(object):
         if save_graph_file:
             nx.write_gml(GG, save_graph_file)
 
-        return transition_edges_set, perturbation_edges_set, GG, _all_time_runs
+        return transition_edges_set, perturbation_edges_set, GG
 
     def sim_time_trajectory(self,
                             starting_state_i: int,
@@ -937,7 +937,7 @@ class StateMachine(object):
         progressively closer to one another, in order to see a more
         logical transition through the network with perturbation.
         '''
-        zer_sol = solsM_all[:, 0]
+        zer_sol = np.zeros(solsM_all[:, 0].shape)
         dist_list = []
 
         for soli in solsM_all.T:
