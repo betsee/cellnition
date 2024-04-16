@@ -635,7 +635,8 @@ class StateMachine(object):
                                       mono_edge: bool = False,
                                       rank: str='same',
                                       constraint: bool = False,
-                                      concentrate: bool = True
+                                      concentrate: bool = True,
+                                      fontsize: float = 18.0
                                       ):
         '''
 
@@ -688,7 +689,7 @@ class StateMachine(object):
 
         # Add all the edges:
         for nde_i, nde_j, trans_ij in edges_list:
-            G.add_edge(nde_i, nde_j, label=trans_ij)
+            G.add_edge(nde_i, nde_j, label=trans_ij, fontsize=fontsize)
 
         if save_file is not None:
             G.layout(prog=graph_layout)
@@ -705,7 +706,8 @@ class StateMachine(object):
                                        mono_edge: bool=False,
                                        rank: str = 'same',
                                        constraint: bool=False,
-                                       concentrate: bool=True
+                                       concentrate: bool=True,
+                                       fontsize: float = 18.0
                                         ):
         '''
         This network plotting and generation function is based on the concept
@@ -805,7 +807,7 @@ class StateMachine(object):
                           fillcolor=nde_f_color
                           )
 
-            Gsub.add_edge(nde_i_name, nde_f_name, label=f'I{i_pert}')
+            Gsub.add_edge(nde_i_name, nde_f_name, label=f'I{i_pert}', fontsize=fontsize)
 
         if save_file is not None:
             G.layout(prog=graph_layout)
