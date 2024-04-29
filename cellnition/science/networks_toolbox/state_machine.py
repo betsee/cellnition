@@ -517,6 +517,8 @@ class StateMachine(object):
         # use networkx to pre-process & simplify it, removing inaccessible states
         # (states with no non-self input degree)
 
+        self._all_time_runs = _all_time_runs
+
         # Create the multidigraph:
         GG = nx.MultiDiGraph()
 

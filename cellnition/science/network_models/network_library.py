@@ -558,3 +558,99 @@ class FullQuadnodeNet(LibNet):
                                'H': NodeType.core}
 
         self.add_interactions = True
+
+class StemCellNet(LibNet):
+
+    def __init__(self, activator_signals: bool=True):
+        '''
+        This biological network is the Oct4-Sox2-Nanog multistable core
+        network of embryonic stem cells, with extrinsic signalling
+        factors included.
+
+        The network is sourced from the reference:
+        Mossahbi-Mohammadi, M. et al. FGF signalling pathway: A key regulator of stem
+        cell pluripotency. Frontiers in Cell and Developmental Biology. 8:79. 2020.
+
+        '''
+        # Initialize the superclass:
+        super().__init__()
+
+        self.name = 'StemCellNet'
+
+        self.N_nodes = 27
+        self.edges = [('FGF2', 'RAS'),
+                      ('FGF2', 'PLCg'),
+                      ('FGF2', 'PI3k'),
+                      ('RAS', 'RAF'),
+                      ('RAF', 'MEK1/2'),
+                      ('MEK1/2', 'ERK1/2'),
+                      ('ERK1/2', 'TBX3'),
+                      ('TBX3', 'NANOG'),
+                      ('NANOG', 'OCT4'),
+                      ('OCT4', 'SOX2'),
+                      ('SOX2', 'NANOG'),
+                      ('OCT4', 'NANOG'),
+                      ('NANOG', 'SOX2'),
+                      ('SOX2', 'OCT4'),
+                      ('SOX2', 'SOX2'),
+                      ('OCT4', 'OCT4'),
+                      ('PLCg', 'DAG'),
+                      ('PKC', 'GSK3b'),
+                      ('GSK3b', 'cMYC'),
+                      ('cMYC', 'SOX2'),
+                      ('IGF2', 'PIP3'),
+                      ('PIP3', 'PKD1'),
+                      ('PKD1', 'AKT'),
+                      ('AKT', 'GSK3b'),
+                      ('BMP4', 'SMAD1584'),
+                      ('SMAD1584', 'NANOG'),
+                      ('TGF', 'SMAD234'),
+                      ('SMAD234', 'NANOG'),
+                      ('WNT', 'DVL'),
+                      ('DVL', 'bCAT'),
+                      ('bCAT', 'TCF3'),
+                      ('TCF3', 'NANOG'),
+                      ('PI3k', 'PIP3'),
+                      ('DAG', 'PKC')
+                 ]
+
+        self.edge_types = [EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.I,
+                           EdgeType.I,
+                           EdgeType.I,
+                           EdgeType.I,
+                           EdgeType.I,
+                           EdgeType.I,
+                           EdgeType.I,
+                           EdgeType.I,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.I,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.I,
+                           EdgeType.A,
+                           EdgeType.I,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.I,
+                           EdgeType.A,
+                           EdgeType.I,
+                           EdgeType.A,
+                           EdgeType.A
+                      ]
+
+        self.node_type_dict = None
+
+        self.add_interactions = True
+

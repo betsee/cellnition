@@ -221,13 +221,15 @@ class NetworkABC(object, metaclass=ABCMeta):
             self.edges_index.append((nde_i, nde_j))
         # self.nodes_list = np.arange(self.N_nodes)
 
-    def characterize_graph(self):
+    def characterize_graph(self, count_cycles: bool=True, cycle_length_bound: int|None=None):
         '''
         Perform a number of graph-theory style characterizations on the network to determine
         cycle number, analyze in- and out- degree distribution, and analyze hierarchy. Hierarchical
         structure analysis was from the work of Moutsinas, G. et al. Scientific Reports 11 (2021).
 
         '''
+
+        # print('Degree sequences...')
         # Indices of edges with selfloops:
         self.selfloop_edge_inds = [self.edges_list.index(ei) for ei in list(nx.selfloop_edges(self.GG))]
 
@@ -260,21 +262,23 @@ class NetworkABC(object, metaclass=ABCMeta):
         self.root_hub = self.nodes_by_out_degree[0]
         self.leaf_hub = self.nodes_by_out_degree[-1]
 
-        # Number of cycles:
-        self.graph_cycles = sorted(nx.simple_cycles(self.GG))
-        self.N_cycles = len(self.graph_cycles)
+        if count_cycles:
+            # print('Cycle Number...')
+            # Number of cycles:
+            self.graph_cycles = sorted(nx.simple_cycles(self.GG, length_bound=cycle_length_bound))
+            self.N_cycles = len(self.graph_cycles)
 
-        # Determine the nodes in the cycles:
-        nodes_in_cycles = set()
-        for nde_lst in self.graph_cycles:
-            for nde_ni in nde_lst:
-                nde_i = self.nodes_list.index(nde_ni)
-                nodes_in_cycles.add(nde_i)
+            # Determine the nodes in the cycles:
+            nodes_in_cycles = set()
+            for nde_lst in self.graph_cycles:
+                for nde_ni in nde_lst:
+                    nde_i = self.nodes_list.index(nde_ni)
+                    nodes_in_cycles.add(nde_i)
 
-        self.nodes_in_cycles = list(nodes_in_cycles)
-        self.nodes_acyclic = np.setdiff1d(self.nodes_index, nodes_in_cycles)
+            self.nodes_in_cycles = list(nodes_in_cycles)
+            self.nodes_acyclic = np.setdiff1d(self.nodes_index, nodes_in_cycles)
 
-
+        # print('Graph hierarchical structure...')
         # Graph structure characterization (from the amazing paper of Moutsinas, G. et al. Scientific Reports 11 (2021))
         a_out = list(self.GG.adjacency())
 
@@ -864,7 +868,7 @@ class NetworkABC(object, metaclass=ABCMeta):
 
         return tvect, tvectr
 
-    @abstractmethod
+    # @abstractmethod
     def run_time_sim(self,
                      tvect: ndarray|list,
                      tvectr: ndarray|list,

@@ -132,40 +132,67 @@ class NetworkWorkflow(object):
                                   interaction_function_type: InterFuncType=InterFuncType.logistic,
                                   coupling_type: CouplingType=CouplingType.mixed,
                                   network_name: str='network',
-                                  i: int=0):
+                                  i: int=0,
+                                  verbose: bool=False,
+                                  build_analytical_model: bool=True,
+                                  count_cycles: bool=True,
+                                  cycle_length_bound: int|None=None):
         '''
 
         '''
+
+        if verbose:
+            print("Begining network build...")
+
         N_nodes = np.unique(np.ravel(edges)).shape[0]
         pnet = ProbabilityNet(N_nodes, interaction_function_type=interaction_function_type)
+        if verbose:
+            print("Building network...")
         pnet.build_network_from_edges(edges)
 
+        if verbose:
+            print("Characterizing network...")
         # characterize the network:
-        pnet.characterize_graph()
+        pnet.characterize_graph(count_cycles=count_cycles,
+                                cycle_length_bound=cycle_length_bound)
 
         if edge_types is None:
             # randomly generate edge types:
             edge_types = pnet.get_edge_types()
 
+        if verbose:
+            print("Setting edge types network...")
         # set the edge and node types to the network:
         pnet.set_edge_types(edge_types)
         pnet.set_node_types(node_type_dict=node_type_dict)
+
+        if verbose:
+            print("Building adjacency matrix...")
 
         # Get the adjacency matrices for this model:
         A_add_s, A_mul_s, A_full_s = pnet.build_adjacency_from_edge_type_list(edge_types,
                                                                               pnet.edges_index,
                                                           coupling_type=coupling_type)
-        # build the analytical model for this network:
-        pnet.build_analytical_model(A_add_s, A_mul_s)
+        if build_analytical_model:
+            if verbose:
+                print("Building analytical model...")
+            # build the analytical model for this network:
+            pnet.build_analytical_model(A_add_s, A_mul_s)
 
         fname_base = f'{i}_{network_name}'
 
         dem_coeff = np.round(pnet.dem_coeff, 1)
         incoh = np.round(pnet.hier_incoherence, 1)
 
+        if count_cycles is False:
+            pnet.N_cycles = 9999
+
         update_string = (f'{i}: cycles: {pnet.N_cycles}, '
                          f'dem_coeff: {dem_coeff}, '
                          f'incoherence: {incoh}')
+
+        if verbose:
+            print("Completed network build!")
 
         return pnet, update_string, fname_base
 
