@@ -272,6 +272,14 @@ class StateMachine(object):
                 solsM_all = np.hstack((solsM_all, soli))
             charM_all.extend(chari)
 
+
+        # first use numpy unique on rounded set of solutions to exclude similar cases:
+        _, inds_solsM_all_unique = np.unique(np.round(solsM_all[self._pnet.noninput_node_inds, :],
+                                                      N_round_sol), return_index=True, axis=1)
+
+        solsM_all = solsM_all[:, inds_solsM_all_unique]
+        charM_all = np.asarray(charM_all)[inds_solsM_all_unique]
+
         # Use a clustering algorithm to disregard solutions that are very close to one another in terms of
         # an Euclidian vector distance:
         unique_sol_clusters = fclusterdata(solsM_all[self._pnet.noninput_node_inds, :].T,
@@ -319,7 +327,7 @@ class StateMachine(object):
     def create_transition_network(self,
                                   states_dict: dict,
                                   sig_test_set: list|ndarray,
-                                  solsM_all: ndarray|list,
+                                  solsM_allo: ndarray,
                                   dt: float = 5.0e-3,
                                   delta_sig: float = 40.0,
                                   t_relax: float = 10.0,
@@ -330,7 +338,8 @@ class StateMachine(object):
                                   n_base: float|list[float] = 15.0,
                                   beta_base: float|list[float] = 0.25,
                                   remove_inaccessible_states: bool=False,
-                                  save_graph_file: str|None = None
+                                  save_graph_file: str|None = None,
+                                  save_time_runs: bool=False
                                   ) -> tuple[set, set, MultiDiGraph]:
         '''
         Build a state transition matrix/diagram by starting the system
@@ -374,6 +383,9 @@ class StateMachine(object):
             match error is above tol, it is added to the matrix as a new state.
 
         '''
+
+        # make a copy of solsM_all:
+        solsM_all = solsM_allo.copy()
 
         # States for perturbation of the zero state inputs
         # Let's start the system off in the zero vector, then
@@ -460,7 +472,10 @@ class StateMachine(object):
                     # initial_state, match_error_initial = self._find_state_match(solsM_all, c_initial)
 
                     if match_error_initial > match_tol: # if state is unmatched, flag it with a nan
-                        initial_state = np.nan
+                        if verbose:
+                            print(f'Initial state not found; adding new state to the solution set...')
+                        solsM_all = np.column_stack((solsM_all, c_initial))
+                        initial_state = solsM_all.shape[1]
 
                     c_held = np.mean(ctime[inds_win2[0]:inds_win2[1], :], axis=0)
                     # var_c_held = np.sum(np.std(ctime[inds_win2[0]:inds_win2[1], :], axis=0))
@@ -470,7 +485,10 @@ class StateMachine(object):
                     # held_state, match_error_held = self._find_state_match(solsM_all, c_held)
 
                     if match_error_held > match_tol: # if state is unmatched, flag it
-                        held_state = np.nan
+                        if verbose:
+                            print(f'Held state not found; adding new state to the solution set...')
+                        solsM_all = np.column_stack((solsM_all, c_held))
+                        held_state = solsM_all.shape[1]
 
                     c_final = np.mean(ctime[inds_win3[0]:inds_win3[1], :], axis=0)
                     # var_c_final = np.sum(np.std(ctime[inds_win3[0]:inds_win3[1], :], axis=0))
@@ -478,8 +496,11 @@ class StateMachine(object):
                                                                       c_final[self._pnet.noninput_node_inds])
                     # final_state, match_error_final = self._find_state_match(solsM_all, c_final)
 
-                    if match_error_final > match_tol: # if state is unmatched, flag it
-                        final_state = np.nan
+                    if match_error_final > match_tol: # if state is unmatched, add it to the system
+                        if verbose:
+                            print(f'Final state not found; adding new state to the solution set...')
+                        solsM_all = np.column_stack((solsM_all, c_final))
+                        final_state = solsM_all.shape[1]
 
                     if verbose:
                         print(num_step)
@@ -517,7 +538,12 @@ class StateMachine(object):
         # use networkx to pre-process & simplify it, removing inaccessible states
         # (states with no non-self input degree)
 
-        self._all_time_runs = _all_time_runs
+        if save_time_runs:
+            self._all_time_runs = _all_time_runs
+        else:
+            self._all_time_runs = None
+
+        self._solsM_all = solsM_all
 
         # Create the multidigraph:
         GG = nx.MultiDiGraph()
@@ -1032,6 +1058,40 @@ class StateMachine(object):
         state_best_match = (errM == errM.min()).nonzero()[0][0]
 
         return state_best_match, errM[state_best_match]
+
+    def plot_input_words_array(self,
+                        sig_test_set: ndarray,
+                        gene_list: list|ndarray,
+                        figsave: str | None = None,
+                        cmap: str | None =None,
+                        save_format: str='png',
+                        figsize: tuple=(10,10)):
+        '''
+
+        '''
+
+        if cmap is None:
+            cmap = 'magma'
+
+        state_labels = [f'I{i}' for i in range(sig_test_set.shape[0])]
+
+        gene_labels = np.asarray(gene_list)
+
+        fig, ax = plt.subplots(figsize=figsize)
+
+        im = ax.imshow(sig_test_set, cmap=cmap)
+
+        ax.set_xticks(np.arange(len(gene_labels)), labels=gene_labels)
+        ax.set_yticks(np.arange(len(state_labels)), labels=state_labels)
+
+        plt.setp(ax.get_xticklabels(), rotation=45, ha="right",
+                 rotation_mode="anchor")
+        fig.colorbar(im, label='Expression Level')
+
+        if figsave is not None:
+            plt.savefig(figsave, dpi=300, transparent=True, format=save_format)
+
+        return fig, ax
 
     # def _get_unique_sol_dict(self, solsM_all: ndarray, match_tol: float=0.05, N_round_sol: int=1):
     #     '''

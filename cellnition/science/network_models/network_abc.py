@@ -953,7 +953,8 @@ class NetworkABC(object, metaclass=ABCMeta):
                         gene_inds: list|ndarray|None=None,
                         figsave: str | None = None,
                         cmap: str | None =None,
-                        save_format: str='png'):
+                        save_format: str='png',
+                        figsize: tuple=(10,10)):
         '''
 
         '''
@@ -969,7 +970,7 @@ class NetworkABC(object, metaclass=ABCMeta):
         else:
             gene_labels = np.asarray(self.nodes_list)[gene_inds]
 
-        fig, ax = plt.subplots()
+        fig, ax = plt.subplots(figsize=figsize)
 
         if gene_inds is None:
             im = ax.imshow(solsM, cmap=cmap)

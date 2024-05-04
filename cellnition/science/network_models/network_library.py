@@ -559,7 +559,7 @@ class FullQuadnodeNet(LibNet):
 
         self.add_interactions = True
 
-class StemCellNet(LibNet):
+class StemCellNetFull(LibNet):
 
     def __init__(self, activator_signals: bool=True):
         '''
@@ -575,7 +575,7 @@ class StemCellNet(LibNet):
         # Initialize the superclass:
         super().__init__()
 
-        self.name = 'StemCellNet'
+        self.name = 'StemCellNetFull'
 
         self.N_nodes = 27
         self.edges = [('FGF2', 'RAS'),
@@ -611,7 +611,8 @@ class StemCellNet(LibNet):
                       ('bCAT', 'TCF3'),
                       ('TCF3', 'NANOG'),
                       ('PI3k', 'PIP3'),
-                      ('DAG', 'PKC')
+                      ('DAG', 'PKC'),
+                      ('NANOG', 'NANOG')
                  ]
 
         self.edge_types = [EdgeType.A,
@@ -647,6 +648,7 @@ class StemCellNet(LibNet):
                            EdgeType.A,
                            EdgeType.I,
                            EdgeType.A,
+                           EdgeType.A,
                            EdgeType.A
                       ]
 
@@ -654,3 +656,219 @@ class StemCellNet(LibNet):
 
         self.add_interactions = True
 
+class StemCellNet(LibNet):
+    '''
+
+    '''
+
+    def __init__(self, activator_signals: bool=True):
+        '''
+        This biological network is the Oct4-Sox2-Nanog multistable core
+        network of embryonic stem cells, with extrinsic signalling
+        factors included.
+
+        The network is sourced from the reference:
+        Mossahbi-Mohammadi, M. et al. FGF signalling pathway: A key regulator of stem
+        cell pluripotency. Frontiers in Cell and Developmental Biology. 8:79. 2020.
+
+        '''
+        # Initialize the superclass:
+        super().__init__()
+
+        self.name = 'StemCellNet'
+
+        self.N_nodes = 8
+        self.edges = [
+                      ('NANOG', 'OCT4'),
+                      ('OCT4', 'NANOG'),
+                      ('OCT4', 'SOX2'),
+                      ('SOX2', 'OCT4'),
+                      ('SOX2', 'NANOG'),
+                      ('NANOG', 'SOX2'),
+                      ('SOX2', 'SOX2'),
+                      ('OCT4', 'OCT4'),
+                      ('NANOG', 'NANOG'),
+                      ('cMYC', 'SOX2'),
+                      ('TBX3', 'NANOG'),
+                      ('BMP4', 'NANOG'),
+                      ('TFG', 'NANOG'),
+                      ('TCF3', 'NANOG')
+
+                 ]
+
+        self.edge_types = [EdgeType.I,
+                           EdgeType.I,
+                           EdgeType.I,
+                           EdgeType.I,
+                           EdgeType.I,
+                           EdgeType.I,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.I,
+                           EdgeType.I,
+                           EdgeType.A,
+                           EdgeType.I,
+                      ]
+
+        self.node_type_dict = None
+
+        self.add_interactions = True
+
+class StemCellNet2(LibNet):
+    '''
+
+    '''
+
+    def __init__(self, activator_signals: bool=True):
+        '''
+        This biological network is the Oct4-Sox2-Nanog multistable core
+        network of embryonic stem cells, with extrinsic signalling
+        factors included.
+
+        The network is sourced from the reference:
+        Mossahbi-Mohammadi, M. et al. FGF signalling pathway: A key regulator of stem
+        cell pluripotency. Frontiers in Cell and Developmental Biology. 8:79. 2020.
+
+        '''
+        # Initialize the superclass:
+        super().__init__()
+
+        self.name = 'StemCellNet2'
+
+        self.N_nodes = 15
+        self.edges = [
+                      ('NANOG', 'OCT4'),
+                      ('OCT4', 'NANOG'),
+                      ('OCT4', 'SOX2'),
+                      ('SOX2', 'OCT4'),
+                      ('SOX2', 'NANOG'),
+                      ('NANOG', 'SOX2'),
+                      ('SOX2', 'SOX2'),
+                      ('OCT4', 'OCT4'),
+                      ('NANOG', 'NANOG'),
+                      ('cMYC', 'SOX2'),
+                      ('TBX3', 'NANOG'),
+                      ('BMP4', 'NANOG'),
+                      ('TFG', 'NANOG'),
+                      ('TCF3', 'NANOG'),
+                      ('FGF2', 'TBX3'),
+                      ('FGF2', 'GSK3b'),
+                      ('GSK3b', 'cMYC'),
+                      ('FGF2', 'PI3K'),
+                      ('PI3K', 'PIP3'),
+                      ('PIP3', 'AKT'),
+                      ('AKT', 'GSK3b'),
+                      ('IGF2', 'PIP3')
+
+                 ]
+
+        self.edge_types = [EdgeType.I,
+                           EdgeType.I,
+                           EdgeType.I,
+                           EdgeType.I,
+                           EdgeType.I,
+                           EdgeType.I,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.I,
+                           EdgeType.I,
+                           EdgeType.A,
+                           EdgeType.I,
+                           EdgeType.I,
+                           EdgeType.A,
+                           EdgeType.I,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.I,
+                           EdgeType.A,
+                      ]
+
+        self.node_type_dict = None
+
+        self.add_interactions = True
+
+class AKTNet(LibNet):
+    '''
+
+    '''
+
+    def __init__(self, activator_signals: bool=True):
+        '''
+        This biological network is the Oct4-Sox2-Nanog multistable core
+        network of embryonic stem cells, with extrinsic signalling
+        factors included.
+
+        The network is sourced from the reference:
+        Mossahbi-Mohammadi, M. et al. FGF signalling pathway: A key regulator of stem
+        cell pluripotency. Frontiers in Cell and Developmental Biology. 8:79. 2020.
+
+        '''
+        # Initialize the superclass:
+        super().__init__()
+
+        self.name = 'AKTNet'
+
+        self.N_nodes = 18
+        self.edges = [
+                      ('GrowthFactors', 'RAS'),
+                      ('SurvivalFactors', 'PI3K'),
+                      ('WNT', 'Dsh'),
+                      ('RAS', 'RAF'),
+                      ('RAF', 'MEK'),
+                      ('MEK', 'ERK'),
+                      ('Dsh', 'AxinComplex'),
+                      ('ERK', 'eIF4E'),
+                      ('ERK', 'mTORC1'),
+                      ('mTORC1', '4EBP1'),
+                      ('4EBP1', 'eIF4E'),
+                      ('ERK', 'TSCComplex'),
+                      ('AKT', 'TSCComplex'),
+                      ('AKT', 'RAF'),
+                      ('RAS', 'PI3K'),
+                      ('PI3K', 'mTORC2'),
+                      ('mTORC2', 'AKT'),
+                      ('AKT', 'FOXO'),
+                      ('AKT', 'AxinComplex'),
+                      ('AxinComplex', 'bCAT'),
+                      ('AKT', 'bCAT')
+                 ]
+
+        self.edge_types = [EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.I,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.I,
+                           EdgeType.I,
+                           EdgeType.I,
+                           EdgeType.I,
+                           EdgeType.I,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.I,
+                           EdgeType.I,
+                           EdgeType.A,
+                           EdgeType.A,
+                      ]
+
+        # self.effector_edges = [('ERK', 'Cell Survival'),
+        #                        ('mTORC1', 'Cell Survival'),
+        #                        ('mTORC1', 'Cell Cycle'),
+        #                        ('mTORC1', 'Metabolism'),
+        #                        ('FOXO', 'Apoptosis'),
+        #                        ('bCAT', 'Proliferation'),
+        #                        ('bCAT', 'Proteasome')]
+
+        self.node_type_dict = None
+
+        self.add_interactions = True
