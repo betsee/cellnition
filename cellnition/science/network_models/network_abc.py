@@ -15,7 +15,10 @@ import networkx as nx
 import sympy as sp
 from sympy.core.symbol import Symbol
 from sympy.tensor.indexed import Indexed
-from cellnition.science.network_models.network_enums import EdgeType, GraphType, NodeType, InterFuncType
+from cellnition.science.network_models.network_enums import (EdgeType,
+                                                             GraphType,
+                                                             NodeType,
+                                                             InterFuncType)
 from cellnition.science.network_models.interaction_functions import (f_neut_s)
 import pygraphviz as pgv
 
@@ -306,9 +309,9 @@ class NetworkABC(object, metaclass=ABCMeta):
             # Grading of hierarchical level of nodes:
             # fwd hierachical levels grade vertices based on distance from source subgraphs
             self.fwd_hier_node_level = L_in_inv.dot(self.in_degree_sequence)
-            # rev hierachical levels grade vertices based on distance from sink subgraphs
+            # rev hierarchical levels grade vertices based on distance from sink subgraphs
             self.rev_hier_node_level = L_out_inv.dot(self.out_degree_sequence)
-            # overal hierachical levels of the graph (this is akin to a y-coordinate for each node of the network):
+            # overall hierarchical levels of the graph (this is akin to a y-coordinate for each node of the network):
             self.hier_node_level = (1 / 2) * (self.fwd_hier_node_level - self.rev_hier_node_level)
 
             # Next, define a difference matrix for the network -- this calculates the difference between node i and j
@@ -326,6 +329,12 @@ class NetworkABC(object, metaclass=ABCMeta):
             #themselves):
             self.dem_coeff = 1 - np.mean(self.fwd_hier_diff)
             self.dem_coeff_rev = 1 - np.mean(self.rev_hier_diff)
+
+            # I don't think this is calculated correctly...
+            self.influence_centrality = (1 -
+                                         self.D_diff.T.dot(self.fwd_hier_diff)/(1 +
+                                                          np.asarray(self.in_degree_sequence))
+                                         )
 
             # And the hierarchical incoherence parameter (measures how much feedback there is):
             self.hier_incoherence = np.var(self.fwd_hier_diff)
@@ -498,6 +507,7 @@ class NetworkABC(object, metaclass=ABCMeta):
         # from the outside
         # self.input_node_inds = self.node_type_inds[NodeType.signal.name] + self.node_type_inds[NodeType.factor.name]
         self.input_node_inds = ((np.asarray(self.in_degree_sequence) == 0).nonzero()[0]).tolist()
+
         self.sensor_node_inds = self.node_type_inds[NodeType.sensor.name]
         self.process_node_inds = self.node_type_inds[NodeType.process.name]
 

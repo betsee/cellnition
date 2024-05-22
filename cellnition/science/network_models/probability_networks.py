@@ -435,7 +435,7 @@ class ProbabilityNet(NetworkABC):
 
 
     def generate_state_space(self,
-                             c_inds: list[int],
+                             c_inds: list,
                              N_space: int,
                              ) -> tuple[ndarray, list, ndarray]:
         '''
@@ -650,7 +650,7 @@ class ProbabilityNet(NetworkABC):
                 if char is not EquilibriumType.saddle.name and error <= tol:
                     i += 1
                     if verbose:
-                        print(f'Soln {i}, {char}, {np.round(sols, sol_round)}, {np.round(error, sol_round)}')
+                        print(f'Soln {i}, {char}, {np.round(sols, sol_round)}, {np.round(error, 4)}')
                     solsM.append(sols)
                     sol_char_list.append(char)
                     sol_char_error.append(error)
@@ -658,7 +658,7 @@ class ProbabilityNet(NetworkABC):
                 if error <= tol:
                     i += 1
                     if verbose:
-                        print(f'Soln {i}, {char}, {np.round(sols, sol_round)}, {np.round(error, sol_round)}')
+                        print(f'Soln {i}, {char}, {np.round(sols, sol_round)}, {np.round(error, 4)}')
                     solsM.append(sols)
                     sol_char_list.append(char)
                     sol_char_error.append(error)
@@ -680,10 +680,10 @@ class ProbabilityNet(NetworkABC):
         return solsM_return, sol_char_list_return
 
     def _handle_constrained_nodes(self,
-                                  constr_inds: list[int] | None,
+                                  constr_inds: list | None,
                                   constr_vals: list[float] | None,
                                   signal_constr_vals: list[float] | None = None
-                                  ) -> tuple[list[int], list[float]]:
+                                  ) -> tuple[list, list[float]]:
         '''
         Networks will often have nodes without regulation that need to
         be constrained during optimization. This helper-method augments

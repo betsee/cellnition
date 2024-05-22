@@ -272,42 +272,60 @@ class StateMachine(object):
                 solsM_all = np.hstack((solsM_all, soli))
             charM_all.extend(chari)
 
+        # First append all attractor types as an integer value as a way to
+        # further distinguish states by their dynamics:
+        charM_all_vals = []
+        for ci in charM_all:
+            attr_type = getattr(EquilibriumType, ci, None)
+            if attr_type is not None:
+                charM_all_vals.append(attr_type.value)
 
-        # first use numpy unique on rounded set of solutions to exclude similar cases:
-        _, inds_solsM_all_unique = np.unique(np.round(solsM_all[self._pnet.noninput_node_inds, :],
-                                                      N_round_sol), return_index=True, axis=1)
+        solsM_all_char = np.vstack((solsM_all, charM_all_vals))
 
-        solsM_all = solsM_all[:, inds_solsM_all_unique]
-        charM_all = np.asarray(charM_all)[inds_solsM_all_unique]
+        select_inds = []
+        select_inds.extend(self._pnet.noninput_node_inds)
+        select_inds.append(-1)
 
-        # Use a clustering algorithm to disregard solutions that are very close to one another in terms of
-        # an Euclidian vector distance:
-        unique_sol_clusters = fclusterdata(solsM_all[self._pnet.noninput_node_inds, :].T,
+        # # # first use numpy unique on rounded set of solutions to exclude similar cases:
+        # _, inds_solsM_all_unique = np.unique(np.round(solsM_all_char[select_inds, :],
+        #                                               N_round_sol), return_index=True, axis=1)
+        # #
+        # solsM_all_char = solsM_all_char[:, inds_solsM_all_unique]
+        # charM_all = np.asarray(charM_all)[inds_solsM_all_unique]
+
+        # Next use a clustering algorithm to disregard solutions that are very close
+        # to one another in terms of an Euclidian vector distance:
+
+        unique_sol_clusters = fclusterdata(solsM_all_char[select_inds, :].T,
                                            t=cluster_threshhold,
                                            criterion=cluster_method)
+
         cluster_index = np.unique(unique_sol_clusters)
 
         cluster_pool = [[] for i in cluster_index]
         for i, clst_i in enumerate(unique_sol_clusters):
             cluster_pool[int(clst_i) - 1].append(i)
 
-        # now that we've clustered similar sols together,
-        # we ensure that their stability characteristics are the same,
-        # and go ahead and take the first entry as the stable sol:
-        inds_solsM_all_unique = []
+        solsM_all_unique = np.zeros((self._pnet.N_nodes, len(cluster_pool)))
+        charM_all_unique = []
 
-        for clst_inds in cluster_pool:
-            # get the cluster indices of all unique attractors (in case the clustered states have different dynamic characteristics):
-            _, uni_inds = np.unique(np.asarray(charM_all)[clst_inds], return_index=True)
-            inds_solsM_all_unique.extend(np.asarray(clst_inds)[uni_inds])
+        for ii, sol_i in enumerate(cluster_pool):
+            if len(sol_i):
+                solsM_all_unique[self._pnet.noninput_node_inds, ii] = (
+                    np.mean(solsM_all[:, sol_i][self._pnet.noninput_node_inds], 1))
+                # print(np.asarray(charM_all)[sol_i])
+                charM_all_unique.append(charM_all[sol_i[0]])
 
-        # _, inds_solsM_all_unique = np.unique(np.round(solsM_all, N_round_sol), return_index=True, axis=1)
+        # redefine the solsM_all and charM_all data structures:
+        solsM_all = solsM_all_unique
+        charM_all = np.asarray(charM_all_unique)
 
+        # # # first use numpy unique on rounded set of solutions to exclude similar cases:
+        _, inds_solsM_all_unique = np.unique(np.round(solsM_all[self._pnet.noninput_node_inds, :],
+                                                      N_round_sol), return_index=True, axis=1)
+        # #
         solsM_all = solsM_all[:, inds_solsM_all_unique]
-        charM_all = np.asarray(charM_all)[inds_solsM_all_unique]
-
-        # if order_states: # order states as distance from the zero vector:
-        solsM_all, charM_all = self._order_states_by_distance(solsM_all, charM_all)
+        charM_all = charM_all[inds_solsM_all_unique]
 
         states_dict = OrderedDict()
         for sigi in sig_test_set:

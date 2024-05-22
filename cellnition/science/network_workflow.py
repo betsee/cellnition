@@ -15,11 +15,14 @@ from cellnition.science.network_models.network_enums import (EdgeType,
                                                              GraphType,
                                                              NodeType,
                                                              InterFuncType,
-                                                             CouplingType)
+                                                             CouplingType,
+                                                             PType)
 from cellnition.science.network_models.probability_networks import ProbabilityNet
 from cellnition.science.networks_toolbox.netplot import plot_network
 from cellnition.science.networks_toolbox.gene_knockout import GeneKnockout
 from cellnition.science.networks_toolbox.phase_space_searches import multistability_search
+from cellnition.science.networks_toolbox.state_machine import StateMachine
+
 
 # FIXME: document throughout
 
@@ -32,6 +35,79 @@ class NetworkWorkflow(object):
 
         '''
         self._save_path = save_path
+        
+        
+    def bionet_graph_gen(self, 
+                         N_nodes: int,
+                         p_in_type: PType,
+                         p_out_type: PType,
+                         connect_fract: float=0.25,
+                         p_bkg: float=0.002,
+                         p_activator: float=0.5
+                         ):
+        '''
+        
+        '''
+        N_iter = int(connect_fract * (N_nodes * N_nodes))
+
+        nodes_list = [i for i in range(N_nodes)]
+        node_act_list = np.random.choice([True, False], size=N_nodes, p=[p_activator, 1.0 - p_activator])
+        in_degree_list = np.zeros(N_nodes)
+        out_degree_list = np.zeros(N_nodes)
+
+        edges_list = [(0, 1)]  # Initial edges list
+        edge_types_list = [EdgeType.A] # Initial edge type list
+
+        out_degree_list[0] = 1
+        in_degree_list[1] = 1
+
+        p_rand_list = np.asarray([1.0 / N_nodes for i in nodes_list])  # random probability
+
+        for i in range(N_iter):
+
+            ave_degree_list = (np.asarray(in_degree_list) +
+                               np.asarray(out_degree_list)) / 2  # calculate ave of in and out degree
+
+            p_in_list = (np.asarray(in_degree_list) + p_bkg) / np.sum(np.asarray(in_degree_list) + p_bkg)
+            p_out_list = (np.asarray(out_degree_list) + p_bkg) / np.sum(np.asarray(out_degree_list) + p_bkg)
+            p_ave_list = (np.asarray(ave_degree_list) + p_bkg) / np.sum(np.asarray(ave_degree_list) + p_bkg)
+            
+            if p_in_type is PType.in_deg:
+                p_in = p_in_list
+            elif p_in_type is PType.out_deg:
+                p_in = p_out_list
+            elif p_in_type is PType.ave_deg:
+                p_in = p_ave_list
+            else:
+                p_in = p_rand_list
+
+            if p_out_type is PType.in_deg:
+                p_out = p_in_list
+            elif p_out_type is PType.out_deg:
+                p_out = p_out_list
+            elif p_out_type is PType.ave_deg:
+                p_out = p_ave_list
+            else:
+                p_out = p_rand_list
+
+            # print(p_out)
+            # print(p_in)
+
+            # select a node and connector from list of all nodes:
+            node_a = np.random.choice(nodes_list, p=p_out)
+            node_b = np.random.choice(nodes_list, p=p_in)
+
+            if (node_a, node_b) not in edges_list:
+                edges_list.append((node_a, node_b))
+
+                # Determine if node_a is an activator or inhibitor:
+                node_a_type = node_act_list[node_a]
+                if node_a_type:
+                    edge_types_list.append(EdgeType.A)
+                else:
+                    edge_types_list.append(EdgeType.I)
+
+        return edges_list, edge_types_list
 
     def scalefree_graph_gen(self,
                             N_nodes: int,
@@ -263,6 +339,257 @@ class NetworkWorkflow(object):
                          f'incoherence: {incoh}')
 
         return pnet, update_string, fname_base
+
+    def bionet_work_frame(self,
+                          N_nodes: int,
+                         p_in_type: PType,
+                         p_out_type: PType,
+                         connect_fract: float=0.25,
+                         p_bkg: float=0.002,
+                         p_act: float=0.5,
+                          interfunctype: InterFuncType=InterFuncType.logistic,
+                          coupling_type: CouplingType=CouplingType.mixed,
+                          fname_base: str='network',
+                          net_i: int=0,
+                          save_path: str|None = None,
+                          verbose: bool=True,
+                          img_fmt: str='png',
+                          N_input_nodes: int=3):
+        '''
+
+        '''
+
+
+
+        edges_list, edge_types = self.bionet_graph_gen(N_nodes,
+                                                          p_in_type,
+                                                          p_out_type,
+                                                          connect_fract,
+                                                          p_bkg,
+                                                          p_act
+                                                          )
+
+        pnet, update_string, net_name = self.make_network_from_edges(edges_list,
+                                                              edge_types=edge_types,
+                                                              # node_type_dict=node_type_dict,
+                                                              interaction_function_type=interfunctype,
+                                                              coupling_type=coupling_type,
+                                                              network_name=fname_base,
+                                                              i=net_i,
+                                                              build_analytical_model=True,
+                                                              count_cycles=True,
+                                                              cycle_length_bound=10)
+
+        if save_path is None:
+            save_path = os.path.join(self._save_path, net_name)
+        else:
+            save_path = os.path.join(self._save_path, save_path)
+
+        if not os.path.isdir(save_path):
+            os.makedirs(save_path)
+
+
+        # (pnet.N_nodes,
+        #  pnet.N_cycles,
+        #  pnet.N_edges,
+        #  pnet.N_edges / pnet.N_nodes ** 2,
+        #  pnet.hier_incoherence)
+
+        # Save a plot of the graph
+        graph_net_c = f'hier_graph_{net_name}.{img_fmt}'
+        save_graph_net_hier = os.path.join(save_path, graph_net_c)
+
+        cycle_tags = np.zeros(pnet.N_nodes)
+        cycle_tags[pnet.nodes_in_cycles] = 1.0
+
+        gp = plot_network(pnet.nodes_list,
+                          pnet.edges_list,
+                          pnet.node_types,
+                          pnet.edge_types,
+                          node_vals=pnet.hier_node_level,
+                          # val_cmap = 'magma',
+                          save_path=save_graph_net_hier,
+                          layout='dot',
+                          rev_font_color=False,
+                          vminmax=(0.0, 1.0),
+                          label_edges=False
+                          )
+
+        # Save a plot of the graph
+        graph_net_c = f'circ_graph_{net_name}.{img_fmt}'
+        save_graph_net_circo = os.path.join(save_path,
+                                            graph_net_c)
+
+        cycle_tags = np.zeros(pnet.N_nodes)
+        cycle_tags[pnet.nodes_in_cycles] = 1.0
+
+        gp = plot_network(pnet.nodes_list,
+                          pnet.edges_list,
+                          pnet.node_types,
+                          pnet.edge_types,
+                          # node_vals = cycle_tags,
+                          # val_cmap = 'Blues',
+                          save_path=save_graph_net_circo,
+                          layout='circo',
+                          rev_font_color=False,
+                          vminmax=(0.0, 1.0),
+                          label_edges=False
+                          )
+
+        fig, ax = pnet.plot_degree_distributions()
+        deg_dist_fig = os.path.join(save_path, f'degree_dist{net_name}.{img_fmt}')
+        plt.savefig(deg_dist_fig, dpi=300, transparent=True, format=img_fmt)
+        plt.close(fig)
+
+        plt.figure(figsize=(10, 10))
+        deg_cor_fig = os.path.join(save_path, f'degree_correlation{net_name}.{img_fmt}')
+        plt.scatter(pnet.in_degree_sequence, pnet.out_degree_sequence, c='k')
+        for i, nde_nme in enumerate(pnet.nodes_list):
+            xi = pnet.in_degree_sequence[i]
+            yi = pnet.out_degree_sequence[i]
+            plt.text(xi, yi, nde_nme)
+        plt.xlabel('In degree')
+        plt.xlabel('Out degree')
+        plt.savefig(deg_cor_fig, dpi=300, transparent=True, format=img_fmt)
+        plt.close()
+
+        if verbose:
+            print(f'Original input inds: {pnet.input_node_inds}')
+        i_hi_sort = np.argsort(pnet.hier_node_level)
+
+        if len(pnet.input_node_inds) == 0:
+            if verbose:
+                print('No input node inds; choosing top from hierarchical node level....')
+            pnet.input_node_inds = i_hi_sort[0:N_input_nodes].tolist()
+
+        pnet.noninput_node_inds = np.setdiff1d(pnet.nodes_index, pnet.input_node_inds).tolist()
+
+        dd = 1.0
+        d_base = [dd for i in range(pnet.N_nodes)]
+
+        if interfunctype is InterFuncType.logistic:
+            n_base = 15.0
+            bb = 0.5
+            beta_base = [bb for i in range(pnet.N_edges)]
+        else:
+            n_base = 3.0
+            bb = 2.0
+            beta_base = [bb for i in range(pnet.N_edges)]
+
+        smach = StateMachine(pnet)
+        N_round_sol = 1
+        return_saddles = False
+
+        solsM_all, charM_all, sols_list, states_dict, sig_test_set = smach.steady_state_solutions_search(
+            beta_base=beta_base,
+            n_base=n_base,
+            d_base=d_base,
+            verbose=verbose,
+            return_saddles=return_saddles,
+            N_space=2,
+            search_tol=1.0e-15,
+            sol_tol=1.0e-3,
+            N_round_sol=N_round_sol,
+            search_cycle_nodes_only=False,
+            cluster_threshhold=0.1,
+            cluster_method='inconsistent'
+            )
+
+        # Create the edges of the transition network:
+        # Reduce the sig_test_set to have only N_input_nodes key parameter values:
+        if len(pnet.input_node_inds) > N_input_nodes:
+            ifoo = np.all((np.round(sig_test_set)[:, N_input_nodes:] == 0), axis=1).nonzero()[0]
+            sig_test_set = sig_test_set[ifoo, :]
+
+        dt = 5.0e-3
+        dt_samp = 0.1
+        delta_sig = 60.0
+        t_relax = 20.0
+        verbose = True
+        match_tol = 0.2
+        remove_inaccessible_states = False
+        graph_layout = 'dot'
+
+        save_graph_file = os.path.join(save_path, f'network_{net_name}.gml')
+
+        transition_edges_set, pert_edges_set, G_nx = smach.create_transition_network(states_dict,
+                                                                                     sig_test_set,
+                                                                                     solsM_all,
+                                                                                     dt=dt,
+                                                                                     delta_sig=delta_sig,
+                                                                                     t_relax=t_relax,
+                                                                                     dt_samp=dt_samp,
+                                                                                     verbose=verbose,
+                                                                                     match_tol=match_tol,
+                                                                                     d_base=d_base,
+                                                                                     n_base=n_base,
+                                                                                     beta_base=beta_base,
+                                                                                     remove_inaccessible_states=remove_inaccessible_states,
+                                                                                     save_graph_file=save_graph_file,
+
+                                                                                     )
+
+        if smach._solsM_all.shape[1] != solsM_all.shape[1]:
+            charM_xtra = ['undetermined' for i in range(smach._solsM_all.shape[1] - solsM_all.shape[1] + 1)]
+
+        charM_all = np.hstack((charM_all, charM_xtra))
+
+        nodes_list = list(G_nx.nodes())
+        edges_list = list(G_nx.edges)
+        mono_edge = False
+
+        if mono_edge is True:
+            mono_lab = 'monoedge'
+        else:
+            mono_lab = 'multiedge'
+
+        # fimg = '.svg'
+        fimg = f'.{img_fmt}'
+
+        graph_layout = 'dot'
+        # graph_layout = 'neato'
+
+        save_perturbation_net_image = os.path.join(save_path, f'Pert_Net_{net_name}_' + mono_lab + fimg)
+        G_pert = smach.plot_state_perturbation_network(pert_edges_set,
+                                                       charM_all,
+                                                       nodes_listo=nodes_list,
+                                                       save_file=save_perturbation_net_image,
+                                                       graph_layout=graph_layout,
+                                                       mono_edge=mono_edge,
+                                                       constraint=True,
+                                                       concentrate=False,
+                                                       rank='same'
+                                                       )
+
+        save_transition_net_image = os.path.join(save_path, f'Trans_Net_{net_name}_' + mono_lab + fimg)
+        G_gv = smach.plot_state_transition_network(nodes_list,
+                                                   edges_list,
+                                                   charM_all,
+                                                   save_file=save_transition_net_image,
+                                                   graph_layout=graph_layout,
+                                                   mono_edge=mono_edge,
+                                                   constraint=True,
+                                                   concentrate=False,
+                                                   rank='same'
+                                                   )
+
+        save_microarray_image = os.path.join(save_path, f'Microarray_{net_name}_smach.{img_fmt}')
+        fig, ax = pnet.plot_sols_array(smach._solsM_all,
+                             gene_inds=pnet.noninput_node_inds,
+                             figsave=save_microarray_image,
+                             cmap=None,
+                             save_format=img_fmt
+                             )
+        plt.close(fig)
+
+        save_inputs_image = os.path.join(save_path, f'Inputs_{net_name}_smach.{img_fmt}')
+        fig, ax = pnet.plot_sols_array(smach._solsM_all,
+                             gene_inds=pnet.input_node_inds,
+                             figsave=save_inputs_image,
+                             cmap=None,
+                             save_format=img_fmt
+                             )
+        plt.close(fig)
 
 
     def work_frame(self,

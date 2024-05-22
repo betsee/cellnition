@@ -33,6 +33,12 @@ class GraphType(Enum):
     random = 'Random'
     user = 'User Defined'
 
+class PType(Enum):
+    in_deg = 'in degree'
+    out_deg = 'out degree'
+    ave_deg = 'ave degree'
+    rand = 'random'
+
 class EquilibriumType(Enum):
     attractor = 0
     attractor_limit_cycle = 1
