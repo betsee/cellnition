@@ -682,7 +682,8 @@ class StateMachine(object):
                                       rank: str='same',
                                       constraint: bool = False,
                                       concentrate: bool = True,
-                                      fontsize: float = 18.0
+                                      fontsize: float = 18.0,
+                                      node_colors: list|None = None
                                       ):
         '''
 
@@ -711,15 +712,24 @@ class StateMachine(object):
 
         cmap = colormaps[clr_map]
 
-        norm = colors.Normalize(vmin=0, vmax=len(nodes_list))
+        if node_colors is None:
+            norm = colors.Normalize(vmin=0, vmax=len(nodes_list))
+        else:
+            norm = colors.Normalize(vmin=np.min(node_colors),
+                                    vmax=np.max(node_colors))
 
         # Add all the nodes:
         for nde_i in nodes_list:
             nde_lab = nde_i
             nde_index = nodes_list.index(nde_i)
-            nde_color = colors.rgb2hex(cmap(norm(nde_index)))
+
+            if node_colors is None:
+                nde_color = colors.rgb2hex(cmap(norm(nde_index)))
+            else:
+                nde_color = colors.rgb2hex(cmap(norm(node_colors[nde_index])))
 
             nde_color += hex_transparency  # add some transparancy to the node
+
             char_i = charM_all[nde_i] # Get the stability characterization for this state
 
             G.add_node(nde_i,
@@ -753,7 +763,8 @@ class StateMachine(object):
                                        rank: str = 'same',
                                        constraint: bool=False,
                                        concentrate: bool=True,
-                                       fontsize: float = 18.0
+                                       fontsize: float = 18.0,
+                                       node_colors: list | None = None
                                         ):
         '''
         This network plotting and generation function is based on the concept
@@ -811,7 +822,10 @@ class StateMachine(object):
 
         cmap = colormaps[clr_map]
 
-        norm = colors.Normalize(vmin=0, vmax=len(nodes_list))
+        if node_colors is None:
+            norm = colors.Normalize(vmin=0, vmax=len(nodes_list))
+        else:
+            norm = colors.Normalize(vmin=np.min(node_colors), vmax=np.max(node_colors))
 
         for st_i, st_f, i_pert, i_base in pert_edges_set:
             # Add in a subgraph box for the "held" input node state:
@@ -820,8 +834,14 @@ class StateMachine(object):
             # next add-in nodes for the initial state:
             nde_i_name = f'{st_i}.{i_base}' # node name is in terms of the subgraph box index
             nde_i_lab = f'State {st_i}'
-            nde_i_color = colors.rgb2hex(cmap(norm(st_i)))
+
+            if node_colors is None:
+                nde_i_color = colors.rgb2hex(cmap(norm(st_i)))
+            else:
+                nde_i_color = colors.rgb2hex(cmap(norm(node_colors[st_i])))
+
             nde_i_color += hex_transparency  # add some transparency to the node
+
             chr_i = charM_all[st_i]
 
             Gsub.add_node(nde_i_name,

@@ -8,6 +8,7 @@ This module defines a top-level handler that can perform various workflows perta
 analytis, model generation, solution finding, searching, knockout experiments, and other functions.
 '''
 import os
+import copy
 import numpy as np
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -22,6 +23,8 @@ from cellnition.science.networks_toolbox.netplot import plot_network
 from cellnition.science.networks_toolbox.gene_knockout import GeneKnockout
 from cellnition.science.networks_toolbox.phase_space_searches import multistability_search
 from cellnition.science.networks_toolbox.state_machine import StateMachine
+from cellnition.science.network_models.basic_network import BasicNet
+import pandas as pd
 
 
 # FIXME: document throughout
@@ -342,15 +345,15 @@ class NetworkWorkflow(object):
 
     def bionet_work_frame(self,
                           N_nodes: int,
-                         p_in_type: PType,
-                         p_out_type: PType,
-                         connect_fract: float=0.25,
-                         p_bkg: float=0.002,
-                         p_act: float=0.5,
+                          p_in_type: PType,
+                          p_out_type: PType,
+                          connect_fract: float=0.25,
+                          p_bkg: float=0.002,
+                          p_act: float=0.5,
                           interfunctype: InterFuncType=InterFuncType.logistic,
                           coupling_type: CouplingType=CouplingType.mixed,
                           fname_base: str='network',
-                          net_i: int=0,
+                          frame_i: int=0,
                           save_path: str|None = None,
                           verbose: bool=True,
                           img_fmt: str='png',
@@ -370,15 +373,15 @@ class NetworkWorkflow(object):
                                                           )
 
         pnet, update_string, net_name = self.make_network_from_edges(edges_list,
-                                                              edge_types=edge_types,
-                                                              # node_type_dict=node_type_dict,
-                                                              interaction_function_type=interfunctype,
-                                                              coupling_type=coupling_type,
-                                                              network_name=fname_base,
-                                                              i=net_i,
-                                                              build_analytical_model=True,
-                                                              count_cycles=True,
-                                                              cycle_length_bound=10)
+                                                                     edge_types=edge_types,
+                                                                     # node_type_dict=node_type_dict,
+                                                                     interaction_function_type=interfunctype,
+                                                                     coupling_type=coupling_type,
+                                                                     network_name=fname_base,
+                                                                     i=frame_i,
+                                                                     build_analytical_model=True,
+                                                                     count_cycles=True,
+                                                                     cycle_length_bound=10)
 
         if save_path is None:
             save_path = os.path.join(self._save_path, net_name)
@@ -388,12 +391,14 @@ class NetworkWorkflow(object):
         if not os.path.isdir(save_path):
             os.makedirs(save_path)
 
-
-        # (pnet.N_nodes,
-        #  pnet.N_cycles,
-        #  pnet.N_edges,
-        #  pnet.N_edges / pnet.N_nodes ** 2,
-        #  pnet.hier_incoherence)
+        # print key data:
+        if verbose:
+            print(f'N_nodes: {pnet.N_nodes} \n '
+                  f'N_cycles: {pnet.N_cycles} \n'
+                  f'N_edges: {pnet.N_edges} \n'
+                  f'Connectivity: {np.round(pnet.N_edges / pnet.N_nodes ** 2, 4)} \n'
+                  f'Hierarchical incoherence: {np.round(pnet.hier_incoherence, 4)} \n'
+                  )
 
         # Save a plot of the graph
         graph_net_c = f'hier_graph_{net_name}.{img_fmt}'
@@ -464,6 +469,12 @@ class NetworkWorkflow(object):
 
         pnet.noninput_node_inds = np.setdiff1d(pnet.nodes_index, pnet.input_node_inds).tolist()
 
+
+        # # save the randomly generated network as a text file:
+        # gfile = f'network_{net_name}.gml'
+        # save_gfile = os.path.join(save_path, gfile)
+        # pnet.save_network(save_gfile)
+
         dd = 1.0
         d_base = [dd for i in range(pnet.N_nodes)]
 
@@ -480,6 +491,9 @@ class NetworkWorkflow(object):
         N_round_sol = 1
         return_saddles = False
 
+        if verbose:
+            print('Obtaining steady-state solutions...')
+
         solsM_all, charM_all, sols_list, states_dict, sig_test_set = smach.steady_state_solutions_search(
             beta_base=beta_base,
             n_base=n_base,
@@ -495,6 +509,8 @@ class NetworkWorkflow(object):
             cluster_method='inconsistent'
             )
 
+        if verbose:
+            print(f'Number of unique states found: {solsM_all.shape[1]}')
         # Create the edges of the transition network:
         # Reduce the sig_test_set to have only N_input_nodes key parameter values:
         if len(pnet.input_node_inds) > N_input_nodes:
@@ -510,7 +526,10 @@ class NetworkWorkflow(object):
         remove_inaccessible_states = False
         graph_layout = 'dot'
 
-        save_graph_file = os.path.join(save_path, f'network_{net_name}.gml')
+        save_graph_file = os.path.join(save_path, f'nfsm_{net_name}.gml')
+
+        if verbose:
+            print('Creating NFSM...')
 
         transition_edges_set, pert_edges_set, G_nx = smach.create_transition_network(states_dict,
                                                                                      sig_test_set,
@@ -531,11 +550,10 @@ class NetworkWorkflow(object):
 
         if smach._solsM_all.shape[1] != solsM_all.shape[1]:
             charM_xtra = ['undetermined' for i in range(smach._solsM_all.shape[1] - solsM_all.shape[1] + 1)]
+            charM_all = np.hstack((charM_all, charM_xtra))
 
-        charM_all = np.hstack((charM_all, charM_xtra))
-
-        nodes_list = list(G_nx.nodes())
-        edges_list = list(G_nx.edges)
+        nodes_list_fsm = list(G_nx.nodes())
+        edges_list_fsm = list(G_nx.edges)
         mono_edge = False
 
         if mono_edge is True:
@@ -549,28 +567,87 @@ class NetworkWorkflow(object):
         graph_layout = 'dot'
         # graph_layout = 'neato'
 
-        save_perturbation_net_image = os.path.join(save_path, f'Pert_Net_{net_name}_' + mono_lab + fimg)
-        G_pert = smach.plot_state_perturbation_network(pert_edges_set,
-                                                       charM_all,
-                                                       nodes_listo=nodes_list,
-                                                       save_file=save_perturbation_net_image,
-                                                       graph_layout=graph_layout,
-                                                       mono_edge=mono_edge,
-                                                       constraint=True,
-                                                       concentrate=False,
-                                                       rank='same'
-                                                       )
+        # Next we'd like to analyze the NFSM to identify cycles and hierarchical level (flow tendancy):
+        edges_fsm_di = sorted(nx.DiGraph(G_nx).edges)
+
+        N_fsm_nodes = len(np.unique(edges_fsm_di))
+        fnet = BasicNet(N_fsm_nodes)
+        fnet.build_network_from_edges(edges_fsm_di)
+        fnet.characterize_graph(count_cycles=True,
+                                cycle_length_bound=10)
+
+        if verbose:
+            print("Hierarchical node level of NFSM:")
+            print(fnet.hier_node_level)
+            print("----")
+
+        fsm_net_dict = {'N Cycles': fnet.N_cycles,
+                        'N Nodes': fnet.N_nodes,
+                        'N Edges': fnet.N_edges,
+                        'Connectivity fraction': fnet.N_edges / fnet.N_nodes ** 2,
+                        'Out-Degree Max': fnet.out_dmax,
+                        'In-Degree Max': fnet.in_dmax,
+                        'Democracy Coefficient': fnet.dem_coeff,
+                        'Hierarchical Incoherence': fnet.hier_incoherence,
+                        }
+
+        pert_edges_di = []
+        for ei, ej, _, _ in pert_edges_set:
+            if (ei, ej) not in pert_edges_di:
+                pert_edges_di.append((ei, ej))
+
+        N_pfsm_nodes = len(np.unique(pert_edges_di))
+        if N_pfsm_nodes != 0:
+            pfnet = BasicNet(N_pfsm_nodes)
+            pfnet.build_network_from_edges(pert_edges_di)
+            pfnet.characterize_graph(count_cycles=True,
+                                     cycle_length_bound=10)
+
+            pfsm_net_dict = {'N Cycles': pfnet.N_cycles,
+                             'N Nodes': pfnet.N_nodes,
+                             'N Edges': pfnet.N_edges,
+                             'Connectivity fraction': pfnet.N_edges / pfnet.N_nodes ** 2,
+                             'Out-Degree Max': pfnet.out_dmax,
+                             'In-Degree Max': pfnet.in_dmax,
+                             'Democracy Coefficient': pfnet.dem_coeff,
+                             'Hierarchical Incoherence': pfnet.hier_incoherence,
+                             }
+
+            save_perturbation_net_image = os.path.join(save_path, f'Pert_Net_{net_name}_' + mono_lab + fimg)
+            G_pert = smach.plot_state_perturbation_network(pert_edges_set,
+                                                           charM_all,
+                                                           nodes_listo=nodes_list_fsm,
+                                                           save_file=save_perturbation_net_image,
+                                                           graph_layout=graph_layout,
+                                                           mono_edge=mono_edge,
+                                                           constraint=True,
+                                                           concentrate=False,
+                                                           rank='same',
+                                                           # node_colors=pfnet.hier_node_level.tolist()
+                                                           )
+
+        else:
+            pfsm_net_dict = {'N Cycles': None,
+                             'N Nodes': None,
+                             'N Edges': None,
+                             'Connectivity fraction': None,
+                             'Out-Degree Max': None,
+                             'In-Degree Max': None,
+                             'Democracy Coefficient': None,
+                             'Hierarchical Incoherence': None,
+                             }
 
         save_transition_net_image = os.path.join(save_path, f'Trans_Net_{net_name}_' + mono_lab + fimg)
-        G_gv = smach.plot_state_transition_network(nodes_list,
-                                                   edges_list,
+        G_gv = smach.plot_state_transition_network(nodes_list_fsm,
+                                                   edges_list_fsm,
                                                    charM_all,
                                                    save_file=save_transition_net_image,
                                                    graph_layout=graph_layout,
                                                    mono_edge=mono_edge,
                                                    constraint=True,
                                                    concentrate=False,
-                                                   rank='same'
+                                                   rank='same',
+                                                   # node_colors=fnet.hier_node_level.tolist()
                                                    )
 
         save_microarray_image = os.path.join(save_path, f'Microarray_{net_name}_smach.{img_fmt}')
@@ -583,13 +660,94 @@ class NetworkWorkflow(object):
         plt.close(fig)
 
         save_inputs_image = os.path.join(save_path, f'Inputs_{net_name}_smach.{img_fmt}')
-        fig, ax = pnet.plot_sols_array(smach._solsM_all,
-                             gene_inds=pnet.input_node_inds,
+        fig, ax = pnet.plot_pixel_matrix(sig_test_set.T,
+                             pnet.input_node_inds,
                              figsave=save_inputs_image,
-                             cmap=None,
-                             save_format=img_fmt
+                             cmap=None
                              )
         plt.close(fig)
+
+        num_sols = smach._solsM_all.shape[1]
+        if N_pfsm_nodes != 0:
+            num_pert_states = G_pert.number_of_nodes()
+        else:
+            num_pert_states = 0
+
+        graph_data = {'Index': frame_i,
+                      'Base File': net_name,
+                      'Input probability': p_in_type.name,
+                      'Output probability': p_out_type.name,
+                      'N Cycles': pnet.N_cycles,
+                      'N Nodes': pnet.N_nodes,
+                      'N Edges': pnet.N_edges,
+                      'Connectivity fraction': pnet.N_edges / pnet.N_nodes ** 2,
+                      'Out-Degree Max': pnet.out_dmax,
+                      'In-Degree Max': pnet.in_dmax,
+                      'Democracy Coefficient': pnet.dem_coeff,
+                      'Hierarchical Incoherence': pnet.hier_incoherence,
+                      'N Unique Solutions': num_sols,
+                      'N Pert States': num_pert_states}
+
+        # Final thing we'd like to do is for each state, nip out nodes with low
+        # expression to make it its own graph. Then perform network analysis on the network
+        # arising from the state network:
+        net_data = {'State': [-1],
+                    'N Cycles': [pnet.N_cycles],
+                    'N Nodes': [pnet.N_nodes],
+                    'N Edges': [pnet.N_edges],
+                    'Connectivity fraction': [pnet.N_edges / pnet.N_nodes ** 2],
+                    'Out-Degree Max': [pnet.out_dmax],
+                    'In-Degree Max': [pnet.in_dmax],
+                    'Democracy Coefficient': [pnet.dem_coeff],
+                    'Hierarchical Level': [-99],
+                    'Hierarchical Incoherence': [pnet.hier_incoherence],
+                    }
+
+        for si, (state_i, hier_i) in enumerate(zip(smach._solsM_all.T, fnet.hier_node_level)):
+            nodes_clip = (state_i[pnet.noninput_node_inds] < 0.1).nonzero()[0]
+
+            print(f'State {si}, clip nodes {len(nodes_clip)}')
+
+            if len(nodes_clip) < int(N_nodes/2):
+
+                G_state = copy.deepcopy(pnet.GG)
+
+                G_state.remove_nodes_from(np.asarray(pnet.nodes_list)[nodes_clip])
+
+                new_edges = sorted(G_state.edges)
+
+                N_sub_nodes = len(np.unique(new_edges))
+                bnet = BasicNet(N_sub_nodes)
+                bnet.build_network_from_edges(new_edges)
+                bnet.characterize_graph(count_cycles=True,
+                                        cycle_length_bound=10)
+
+                figi, ax = bnet.plot_degree_distributions()
+                deg_dist_fig_i = os.path.join(save_path, f'degree_dist{fname_base}_state_{si}.png')
+                plt.savefig(deg_dist_fig_i, dpi=300, transparent=True, format='png')
+                plt.close(figi)
+
+                net_data['State'].append(si)
+                net_data['N Cycles'].append(bnet.N_cycles)
+                net_data['N Nodes'].append(bnet.N_nodes)
+                net_data['N Edges'].append(bnet.N_edges)
+                net_data['Connectivity fraction'].append(bnet.N_edges / bnet.N_nodes ** 2)
+                net_data['Out-Degree Max'].append(bnet.out_dmax)
+                net_data['In-Degree Max'].append(bnet.in_dmax)
+                net_data['Democracy Coefficient'].append(bnet.dem_coeff)
+                net_data['Hierarchical Level'].append(hier_i)
+                net_data['Hierarchical Incoherence'].append(bnet.hier_incoherence)
+
+        df = pd.DataFrame.from_dict(net_data)
+
+        dframetest_file = os.path.join(save_path, f'subnetwork_data_{net_name}.csv')
+        df.to_csv(dframetest_file)
+
+        print(f"Completed workframe for {net_name}.")
+        print('*****')
+        print('')
+
+        return graph_data, fsm_net_dict, pfsm_net_dict, net_data
 
 
     def work_frame(self,

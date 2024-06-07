@@ -22,7 +22,7 @@ class LibNet(object, metaclass=ABCMeta):
 
         pass
 
-class BinodeNet(LibNet):
+class BinodeChain(LibNet):
 
     def __init__(self, activator_signals: bool=True):
         '''
@@ -34,7 +34,181 @@ class BinodeNet(LibNet):
         # Initialize the superclass:
         super().__init__()
 
-        self.name = 'BinodeNet'
+        self.name = 'BinodeChain'
+
+        self.N_nodes = 4
+        self.edges = [('H0', 'H1'),
+                 ('S0', 'H0'), ('S1', 'H1')
+                 ]
+
+        if activator_signals:
+            self.edge_types = [EdgeType.I,
+                          EdgeType.A, EdgeType.A
+                          ]
+        else:
+            self.edge_types = [EdgeType.I,
+                          EdgeType.A, EdgeType.A,
+                          ]
+
+        self.node_type_dict = {'S': NodeType.signal}
+        # self.node_type_dict = None
+
+        self.add_interactions = True
+
+class BinodeChainSelfLoop(LibNet):
+
+    def __init__(self, activator_signals: bool=True):
+        '''
+        This is indicated to be a tri-stable network. It is used for
+        parameter space searches to look for further states with changes
+        to parameters.
+
+        '''
+        # Initialize the superclass:
+        super().__init__()
+
+        self.name = 'BinodeChainSelfLoop'
+
+        self.N_nodes = 4
+        self.edges = [('H0', 'H1'),
+                 ('H0', 'H0'),
+                 ('S0', 'H0'), ('S1', 'H1')
+                 ]
+
+        if activator_signals:
+            self.edge_types = [EdgeType.I,
+                          EdgeType.A,
+                          EdgeType.A, EdgeType.A
+                          ]
+        else:
+            self.edge_types = [EdgeType.Is,
+                          EdgeType.A,
+                          EdgeType.A, EdgeType.A
+                          ]
+
+        self.node_type_dict = {'S': NodeType.signal}
+        # self.node_type_dict = None
+
+        self.add_interactions = True
+
+class BinodeChainSelfLoops(LibNet):
+
+    def __init__(self, activator_signals: bool=True):
+        '''
+        This is indicated to be a tri-stable network. It is used for
+        parameter space searches to look for further states with changes
+        to parameters.
+
+        '''
+        # Initialize the superclass:
+        super().__init__()
+
+        self.name = 'BinodeChainSelfLoops'
+
+        self.N_nodes = 4
+        self.edges = [('H0', 'H1'),
+                 ('H0', 'H0'), ('H1', 'H1'),
+                 ('S0', 'H0'), ('S1', 'H1')
+                 ]
+
+        if activator_signals:
+            self.edge_types = [EdgeType.I,
+                          EdgeType.A, EdgeType.A,
+                          EdgeType.A, EdgeType.A
+                          ]
+        else:
+            self.edge_types = [EdgeType.Is,
+                          EdgeType.A, EdgeType.A,
+                          EdgeType.A, EdgeType.A
+                          ]
+
+        self.node_type_dict = {'S': NodeType.signal}
+        # self.node_type_dict = None
+
+        self.add_interactions = True
+
+class BinodeCycle(LibNet):
+
+    def __init__(self, activator_signals: bool=True):
+        '''
+        This is indicated to be a tri-stable network. It is used for
+        parameter space searches to look for further states with changes
+        to parameters.
+
+        '''
+        # Initialize the superclass:
+        super().__init__()
+
+        self.name = 'BinodeCycle'
+
+        self.N_nodes = 4
+        self.edges = [('H0', 'H1'), ('H1', 'H0'),
+                 ('S0', 'H0'), ('S1', 'H1')
+                 ]
+
+        if activator_signals:
+            self.edge_types = [EdgeType.I, EdgeType.I,
+                          EdgeType.A, EdgeType.A,
+                          ]
+        else:
+            self.edge_types = [EdgeType.Is, EdgeType.Is,
+                          EdgeType.A, EdgeType.A
+                          ]
+
+        self.node_type_dict = {'S': NodeType.signal}
+        # self.node_type_dict = None
+
+        self.add_interactions = True
+
+class BinodeCycleSelfLoop(LibNet):
+
+    def __init__(self, activator_signals: bool=True):
+        '''
+        This is indicated to be a tri-stable network. It is used for
+        parameter space searches to look for further states with changes
+        to parameters.
+
+        '''
+        # Initialize the superclass:
+        super().__init__()
+
+        self.name = 'BinodeCycleSelfLoop'
+
+        self.N_nodes = 4
+        self.edges = [('H0', 'H1'), ('H1', 'H0'),
+                 ('H0', 'H0'),
+                 ('S0', 'H0'), ('S1', 'H1')
+                 ]
+
+        if activator_signals:
+            self.edge_types = [EdgeType.I, EdgeType.I,
+                          EdgeType.A,
+                          EdgeType.A, EdgeType.A
+                          ]
+        else:
+            self.edge_types = [EdgeType.Is, EdgeType.Is,
+                          EdgeType.A,
+                          EdgeType.A, EdgeType.A
+                          ]
+
+        self.node_type_dict = {'S': NodeType.signal}
+        # self.node_type_dict = None
+
+        self.add_interactions = True
+
+class BinodeCycleSelfLoops(LibNet):
+
+    def __init__(self, activator_signals: bool=True):
+        '''
+        This is indicated to be a tri-stable network. It is used for
+        parameter space searches to look for further states with changes
+        to parameters.
+
+        '''
+        # Initialize the superclass:
+        super().__init__()
+
+        self.name = 'BinodeCycleSelfLoops'
 
         self.N_nodes = 4
         self.edges = [('H0', 'H1'), ('H1', 'H0'),
@@ -48,9 +222,9 @@ class BinodeNet(LibNet):
                           EdgeType.A, EdgeType.A
                           ]
         else:
-            self.edge_types = [EdgeType.I, EdgeType.I,
+            self.edge_types = [EdgeType.Is, EdgeType.Is,
                           EdgeType.A, EdgeType.A,
-                          EdgeType.Is, EdgeType.Is
+                          EdgeType.A, EdgeType.A
                           ]
 
         self.node_type_dict = {'S': NodeType.signal}
@@ -58,40 +232,115 @@ class BinodeNet(LibNet):
 
         self.add_interactions = True
 
-class BasicBinodeNet(LibNet):
+class TrinodeChain(LibNet):
+    '''
+    Example of the lowest hierarchically incoherent network
+    for a 3-node network.
+    '''
+    # Initialize the superclass:
 
-    def __init__(self, activator_signals: bool=True):
-        '''
-        This is indicated to be a tri-stable network. It is used for
-        parameter space searches to look for further states with changes
-        to parameters.
+    def __init__(self, activator_signals: bool = True):
 
-        '''
         # Initialize the superclass:
         super().__init__()
 
-        self.name = 'BasicBinodeNet'
+        self.name = 'TrinodeChain'
 
-        self.N_nodes = 4
-        self.edges = [('H0', 'H1'), ('H1', 'H0'),
-                 ('S0', 'H0'), ('S1', 'H1')
-                 ]
+        self.N_nodes = 3
+        self.edges = [('H0', 'H1'), ('H1', 'H2'),
+                      ('S0', 'H0'), ('S1', 'H1'), ('S2', 'H2')
+                      ]
 
         if activator_signals:
             self.edge_types = [EdgeType.I, EdgeType.I,
-                          EdgeType.A, EdgeType.A,
-                          ]
+                               EdgeType.A, EdgeType.A, EdgeType.A,
+                               ]
         else:
-            self.edge_types = [EdgeType.I, EdgeType.I,
-                          EdgeType.Is, EdgeType.Is
-                          ]
+            self.edge_types = [EdgeType.Is, EdgeType.Is,
+                               EdgeType.A, EdgeType.A, EdgeType.A,
+                               ]
 
         self.node_type_dict = {'S': NodeType.signal}
         # self.node_type_dict = None
 
         self.add_interactions = True
 
-class TrinodeNet(LibNet):
+class TrinodeChainSelfLoops(LibNet):
+    '''
+    Example of the lowest hierarchically incoherent network
+    for a 3-node network.
+    '''
+    # Initialize the superclass:
+
+    def __init__(self, activator_signals: bool = True):
+
+        # Initialize the superclass:
+        super().__init__()
+
+        self.name = 'TrinodeChainSelfLoops'
+
+        self.N_nodes = 3
+        self.edges = [('H0', 'H1'), ('H1', 'H2'),
+                      ('S0', 'H0'), ('S1', 'H1'), ('S2', 'H2'),
+                      ('H0', 'H0'), ('H2', 'H2'), ('H1', 'H1'),
+                      ]
+
+        if activator_signals:
+            self.edge_types = [EdgeType.I, EdgeType.I,
+                               EdgeType.A, EdgeType.A, EdgeType.A,
+                               EdgeType.A, EdgeType.A, EdgeType.A,
+                               ]
+        else:
+            self.edge_types = [EdgeType.Is, EdgeType.Is,
+                               EdgeType.A, EdgeType.A, EdgeType.A,
+                               EdgeType.A, EdgeType.A, EdgeType.A,
+                               ]
+
+        self.node_type_dict = {'S': NodeType.signal}
+        # self.node_type_dict = None
+
+        self.add_interactions = True
+
+class TrinodeChainFullyConnected(LibNet):
+    '''
+    Example of the lowest hierarchically incoherent network
+    for a 3-node network.
+    '''
+    # Initialize the superclass:
+
+    def __init__(self, activator_signals: bool = True):
+
+        # Initialize the superclass:
+        super().__init__()
+
+        self.name = 'TrinodeChainFullyConnected'
+
+        self.N_nodes = 3
+        self.edges = [('H0', 'H1'), ('H1', 'H2'),
+                      ('H1', 'H0'), ('H2', 'H1'),
+                      ('S0', 'H0'), ('S1', 'H1'), ('S2', 'H2'),
+                      ('H0', 'H0'), ('H2', 'H2'), ('H1', 'H1'),
+                      ]
+
+        if activator_signals:
+            self.edge_types = [EdgeType.I, EdgeType.I,
+                               EdgeType.I, EdgeType.I,
+                               EdgeType.A, EdgeType.A, EdgeType.A,
+                               EdgeType.A, EdgeType.A, EdgeType.A,
+                               ]
+        else:
+            self.edge_types = [EdgeType.Is, EdgeType.Is,
+                               EdgeType.Is, EdgeType.Is,
+                               EdgeType.A, EdgeType.A, EdgeType.A,
+                               EdgeType.A, EdgeType.A, EdgeType.A,
+                               ]
+
+        self.node_type_dict = {'S': NodeType.signal}
+        # self.node_type_dict = None
+
+        self.add_interactions = True
+
+class TrinodeCycle(LibNet):
 
     def __init__(self, activator_signals: bool=True):
         '''
@@ -100,7 +349,36 @@ class TrinodeNet(LibNet):
         # Initialize the superclass:
         super().__init__()
 
-        self.name = 'TrinodeNet'
+        self.name = 'TrinodeCycle'
+
+        self.N_nodes = 3
+        self.edges = [('H0', 'H1'), ('H1', 'H2'), ('H2', 'H0'),
+                 ('S0', 'H0'), ('S1', 'H1'), ('S2', 'H2')
+                 ]
+
+        if activator_signals:
+            self.edge_types = [EdgeType.I, EdgeType.A, EdgeType.I,
+                          EdgeType.A, EdgeType.A, EdgeType.A,
+                          ]
+        else:
+            self.edge_types = [EdgeType.Is, EdgeType.A, EdgeType.Is,
+                          EdgeType.Is, EdgeType.Is, EdgeType.Is,
+                          ]
+
+        self.node_type_dict = {'S': NodeType.signal}
+
+        self.add_interactions = True
+
+class TrinodeCycleSelfLoops(LibNet):
+
+    def __init__(self, activator_signals: bool=True):
+        '''
+
+        '''
+        # Initialize the superclass:
+        super().__init__()
+
+        self.name = 'TrinodeCycleSelfLoops'
 
         self.N_nodes = 3
         self.edges = [('H0', 'H1'), ('H1', 'H2'), ('H2', 'H0'),
@@ -114,7 +392,7 @@ class TrinodeNet(LibNet):
                           EdgeType.A, EdgeType.A, EdgeType.A,
                           ]
         else:
-            self.edge_types = [EdgeType.I, EdgeType.I, EdgeType.I,
+            self.edge_types = [EdgeType.Is, EdgeType.Is, EdgeType.Is,
                           EdgeType.A, EdgeType.A, EdgeType.A,
                           EdgeType.Is, EdgeType.Is, EdgeType.Is,
                           ]
@@ -124,7 +402,7 @@ class TrinodeNet(LibNet):
 
         self.add_interactions = True
 
-class BasicTrinodeNet(LibNet):
+class TrinodeCycleFullyConnected(LibNet):
 
     def __init__(self, activator_signals: bool=True):
         '''
@@ -133,23 +411,30 @@ class BasicTrinodeNet(LibNet):
         # Initialize the superclass:
         super().__init__()
 
-        self.name = 'BasicTrinodeNet'
+        self.name = 'TrinodeCycleFullyConnected'
 
-        self.N_nodes = 3
+        self.N_nodes = 6
         self.edges = [('H0', 'H1'), ('H1', 'H2'), ('H2', 'H0'),
-                 ('S0', 'H0'), ('S1', 'H1'), ('S2', 'H2')
-                 ]
+                      ('H1', 'H0'), ('H2', 'H1'), ('H0', 'H2'),
+                      ('H0', 'H0'), ('H2', 'H2'), ('H1', 'H1'),
+                     ('S0', 'H0'), ('S1', 'H1'), ('S2', 'H2')
+                     ]
 
         if activator_signals:
-            self.edge_types = [EdgeType.I, EdgeType.A, EdgeType.I,
+            self.edge_types = [EdgeType.I, EdgeType.I, EdgeType.I,
+                               EdgeType.I, EdgeType.I, EdgeType.I,
+                               EdgeType.A, EdgeType.A, EdgeType.A,
                           EdgeType.A, EdgeType.A, EdgeType.A,
                           ]
         else:
-            self.edge_types = [EdgeType.I, EdgeType.A, EdgeType.I,
+            self.edge_types = [EdgeType.Is, EdgeType.Is, EdgeType.Is,
+                               EdgeType.Is, EdgeType.Is, EdgeType.Is,
+                               EdgeType.A, EdgeType.A, EdgeType.A,
                           EdgeType.Is, EdgeType.Is, EdgeType.Is,
                           ]
 
         self.node_type_dict = {'S': NodeType.signal}
+        # self.node_type_dict = None
 
         self.add_interactions = True
 
@@ -250,87 +535,6 @@ class PentanodeNet(LibNet):
 
         self.node_type_dict = {'S': NodeType.signal}
         # self.node_type_dict = None
-
-        self.add_interactions = True
-
-class TrinodeNetLoaded(LibNet):
-
-    def __init__(self, activator_signals: bool=True):
-        '''
-
-        '''
-        # Initialize the superclass:
-        super().__init__()
-
-        self.name = 'TrinodeNet_Loaded'
-
-        self.N_nodes = 6
-        self.edges = [('H0', 'H1'), ('H1', 'H2'), ('H2', 'H0'),
-                      ('H1', 'H0'), ('H2', 'H1'), ('H0', 'H2'),
-                      ('H0', 'H0'), ('H2', 'H2'), ('H1', 'H1'),
-                     ('S0', 'H0'), ('S1', 'H1'), ('S2', 'H2')
-                     ]
-
-        if activator_signals:
-            self.edge_types = [EdgeType.I, EdgeType.I, EdgeType.I,
-                               EdgeType.I, EdgeType.I, EdgeType.I,
-                               EdgeType.A, EdgeType.A, EdgeType.A,
-                          EdgeType.A, EdgeType.A, EdgeType.A,
-                          ]
-        else:
-            self.edge_types = [EdgeType.I, EdgeType.I, EdgeType.I,
-                               EdgeType.I, EdgeType.I, EdgeType.I,
-                               EdgeType.A, EdgeType.A, EdgeType.A,
-                          EdgeType.Is, EdgeType.Is, EdgeType.Is,
-                          ]
-
-        self.node_type_dict = {'S': NodeType.signal}
-        # self.node_type_dict = None
-
-        self.add_interactions = True
-
-class TrinodeChain(LibNet):
-
-    def __init__(self, activator_signals: bool=True):
-        '''
-
-        '''
-        # Initialize the superclass:
-        super().__init__()
-
-        self.name = 'QuadStateChain'
-
-        self.N_nodes = 12
-        self.edges = [('H0', 'H1'), ('H1', 'H2'), ('H2', 'H0'),
-                 ('H0', 'H0'), ('H2', 'H2'), ('H1', 'H1'),
-                 ('S0', 'H0'), ('S1', 'H1'), ('S2', 'H2'),
-                      ('G0', 'G1'), ('G1', 'G2'), ('G2', 'G0'),
-                      ('G0', 'G0'), ('G2', 'G2'), ('G1', 'G1'),
-                      ('S3', 'G0'), ('S4', 'G1'), ('S5', 'G2'),
-                      ('H2', 'G0')
-                 ]
-
-        if activator_signals:
-            self.edge_types = [EdgeType.I, EdgeType.I, EdgeType.I,
-                          EdgeType.A, EdgeType.A, EdgeType.A,
-                          EdgeType.A, EdgeType.A, EdgeType.A,
-                               EdgeType.I, EdgeType.I, EdgeType.I,
-                               EdgeType.A, EdgeType.A, EdgeType.A,
-                               EdgeType.A, EdgeType.A, EdgeType.A,
-                               EdgeType.A
-                          ]
-
-        else:
-            self.edge_types = [EdgeType.I, EdgeType.I, EdgeType.I,
-                          EdgeType.A, EdgeType.A, EdgeType.A,
-                          EdgeType.Is, EdgeType.Is, EdgeType.Is,
-                               EdgeType.I, EdgeType.I, EdgeType.I,
-                               EdgeType.A, EdgeType.A, EdgeType.A,
-                               EdgeType.Is, EdgeType.Is, EdgeType.Is,
-                               EdgeType.A
-                          ]
-
-        self.node_type_dict = {'S': NodeType.signal}
 
         self.add_interactions = True
 
@@ -872,3 +1076,4 @@ class AKTNet(LibNet):
         self.node_type_dict = None
 
         self.add_interactions = True
+
