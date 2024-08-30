@@ -10,6 +10,7 @@ set and corresponding GeneNetworkModel.
 
 import os
 import itertools
+import copy
 import numpy as np
 from scipy.cluster.hierarchy import fclusterdata
 import networkx as nx
@@ -210,7 +211,8 @@ class StateMachine(object):
                                       N_round_sol: int=1,
                                       search_cycle_nodes_only: bool = False,
                                       cluster_threshhold: float=0.1,
-                                      cluster_method: str = 'inconsistent'
+                                      cluster_method: str = 'inconsistent',
+                                      sig_lino: list|None = None
                                       ):
         '''
         Search through all possible combinations of signal node values
@@ -218,7 +220,11 @@ class StateMachine(object):
 
         '''
 
-        sig_lin = [1.0e-6, 1.0]
+        if sig_lino is None:
+            sig_lin = [1.0e-6, 1.0]
+        else:
+            sig_lin = sig_lino
+
         sig_lin_set = [sig_lin for i in self._pnet.input_node_inds]
 
         sigGrid = np.meshgrid(*sig_lin_set)
@@ -404,6 +410,8 @@ class StateMachine(object):
 
         # make a copy of solsM_all:
         solsM_all = solsM_allo.copy()
+        # make a copy of the states dict that's only used for modifications:
+        states_dict_2 = copy.deepcopy(states_dict)
 
         # States for perturbation of the zero state inputs
         # Let's start the system off in the zero vector, then
@@ -493,7 +501,13 @@ class StateMachine(object):
                         if verbose:
                             print(f'Initial state not found; adding new state to the solution set...')
                         solsM_all = np.column_stack((solsM_all, c_initial))
-                        initial_state = solsM_all.shape[1]
+                        initial_state = solsM_all.shape[1] - 1
+
+                        # Update the states listing for this input state set
+                        sc_dict2 = states_dict_2[sig_base_set]['States']
+                        sc_dict2.append(initial_state)
+                        states_dict_2[sig_base_set]['States'] = sc_dict2
+
 
                     c_held = np.mean(ctime[inds_win2[0]:inds_win2[1], :], axis=0)
                     # var_c_held = np.sum(np.std(ctime[inds_win2[0]:inds_win2[1], :], axis=0))
@@ -506,7 +520,12 @@ class StateMachine(object):
                         if verbose:
                             print(f'Held state not found; adding new state to the solution set...')
                         solsM_all = np.column_stack((solsM_all, c_held))
-                        held_state = solsM_all.shape[1]
+                        held_state = solsM_all.shape[1] -1
+
+                        # Update the states listing for this input state set
+                        sc_dict2 = states_dict_2[sig_base_set]['States']
+                        sc_dict2.append(held_state)
+                        states_dict_2[sig_base_set]['States'] = sc_dict2
 
                     c_final = np.mean(ctime[inds_win3[0]:inds_win3[1], :], axis=0)
                     # var_c_final = np.sum(np.std(ctime[inds_win3[0]:inds_win3[1], :], axis=0))
@@ -518,7 +537,12 @@ class StateMachine(object):
                         if verbose:
                             print(f'Final state not found; adding new state to the solution set...')
                         solsM_all = np.column_stack((solsM_all, c_final))
-                        final_state = solsM_all.shape[1]
+                        final_state = solsM_all.shape[1] -1
+
+                        # Update the states listing for this input state set
+                        sc_dict2 = states_dict_2[sig_base_set]['States']
+                        sc_dict2.append(final_state)
+                        states_dict_2[sig_base_set]['States'] = sc_dict2
 
                     if verbose:
                         print(num_step)
@@ -562,6 +586,7 @@ class StateMachine(object):
             self._all_time_runs = None
 
         self._solsM_all = solsM_all
+        self._states_dict = states_dict_2
 
         # Create the multidigraph:
         GG = nx.MultiDiGraph()
@@ -713,7 +738,7 @@ class StateMachine(object):
         cmap = colormaps[clr_map]
 
         if node_colors is None:
-            norm = colors.Normalize(vmin=0, vmax=len(nodes_list))
+            norm = colors.Normalize(vmin=0, vmax=self._solsM_all.shape[1] +1)
         else:
             norm = colors.Normalize(vmin=np.min(node_colors),
                                     vmax=np.max(node_colors))
@@ -724,9 +749,9 @@ class StateMachine(object):
             nde_index = nodes_list.index(nde_i)
 
             if node_colors is None:
-                nde_color = colors.rgb2hex(cmap(norm(nde_index)))
+                nde_color = colors.rgb2hex(cmap(norm(nde_lab)))
             else:
-                nde_color = colors.rgb2hex(cmap(norm(node_colors[nde_index])))
+                nde_color = colors.rgb2hex(cmap(norm(node_colors[nde_lab])))
 
             nde_color += hex_transparency  # add some transparancy to the node
 
@@ -823,7 +848,7 @@ class StateMachine(object):
         cmap = colormaps[clr_map]
 
         if node_colors is None:
-            norm = colors.Normalize(vmin=0, vmax=len(nodes_list))
+            norm = colors.Normalize(vmin=0, vmax=self._solsM_all.shape[1] +1)
         else:
             norm = colors.Normalize(vmin=np.min(node_colors), vmax=np.max(node_colors))
 

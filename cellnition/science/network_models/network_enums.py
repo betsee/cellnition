@@ -47,6 +47,7 @@ class EquilibriumType(Enum):
     repellor = 4
     repellor_limit_cycle = 5
     undetermined = 6
+    hidden = 7 # corresponds to a hidden attractor
 
 class InterFuncType(Enum):
     logistic = 'Logistic'

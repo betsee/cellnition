@@ -91,8 +91,7 @@ class PhaseSpace(object):
             unconstrained_inds = np.setdiff1d(self._pnet._nodes_index, constrained_inds).tolist()
 
         c_vect_set, c_lin_set, C_M_SET = self._pnet.generate_state_space(unconstrained_inds,
-                                                                         N_pts,
-                                                                         pmin)
+                                                                         N_pts)
 
         M_shape = C_M_SET[0].shape
 
@@ -104,12 +103,14 @@ class PhaseSpace(object):
                                                beta_base=beta_base)
 
         for i, c_vecti in enumerate(c_vect_set):
-            dcdt_i = dcdt_vect_f(c_vecti, *function_args)
-            dcdt_M[i] = dcdt_i * 1
+            dcdt_i = dcdt_vect_f(c_vecti[unconstrained_inds], *function_args)
+            dcdt_M[i, unconstrained_inds] = dcdt_i * 1
+
+        dcdt_M[:, constrained_inds] = constrained_vals
 
         dcdt_M_set = []
         for dci in dcdt_M.T:
-            dcdt_M_set.append(dci.reshape(M_shape))
+            dcdt_M_set.append(dci.reshape((N_pts, N_pts)))
 
         dcdt_M_set = np.asarray(dcdt_M_set)
         dcdt_dmag = np.sqrt(np.sum(dcdt_M_set ** 2, axis=0))
