@@ -85,6 +85,7 @@ class StateMachine(object):
         repellor_limitcycle_fname = FileRelative(GLYPH_DIR, 'glyph_repellor_limit_cycle.png')
         repellor_fname = FileRelative(GLYPH_DIR, 'glyph_repellor.png')
         unknown_fname = FileRelative(GLYPH_DIR, 'glyph_unknown.png')
+        hidden_fname = FileRelative(GLYPH_DIR, 'glyph_hidden.png')
 
         # Associate each equilibrium type with an image file
         self._node_image_dict = {
@@ -94,7 +95,8 @@ class StateMachine(object):
             EquilibriumType.attractor_limit_cycle.name: str(attractor_limitcycle_fname),
             EquilibriumType.repellor_limit_cycle.name: str(repellor_limitcycle_fname),
             EquilibriumType.repellor.name: str(repellor_fname),
-            EquilibriumType.undetermined.name: str(unknown_fname)
+            EquilibriumType.undetermined.name: str(unknown_fname),
+            EquilibriumType.hidden.name: str(hidden_fname)
         }
 
     def run_state_machine(self, beta_base: float | list = 0.25,
@@ -211,7 +213,7 @@ class StateMachine(object):
                                       N_round_sol: int=1,
                                       search_cycle_nodes_only: bool = False,
                                       cluster_threshhold: float=0.1,
-                                      cluster_method: str = 'inconsistent',
+                                      cluster_method: str = 'distance',
                                       sig_lino: list|None = None
                                       ):
         '''
@@ -256,6 +258,8 @@ class StateMachine(object):
                                                                     return_saddles=return_saddles,
                                                                     search_cycle_nodes_only=search_cycle_nodes_only
                                                                     )
+
+
 
 
             solsM_allo.append(solsM)  # append all unique sols
@@ -410,6 +414,7 @@ class StateMachine(object):
 
         # make a copy of solsM_all:
         solsM_all = solsM_allo.copy()
+
         # make a copy of the states dict that's only used for modifications:
         states_dict_2 = copy.deepcopy(states_dict)
 
