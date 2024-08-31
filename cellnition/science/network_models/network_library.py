@@ -24,7 +24,7 @@ class LibNet(object, metaclass=ABCMeta):
 
 class BinodeChain(LibNet):
 
-    def __init__(self, activator_signals: bool=True):
+    def __init__(self, activator_signals: bool=True, one_input: bool=False):
         '''
         This is indicated to be a tri-stable network. It is used for
         parameter space searches to look for further states with changes
@@ -36,10 +36,16 @@ class BinodeChain(LibNet):
 
         self.name = 'BinodeChain'
 
-        self.N_nodes = 4
-        self.edges = [('H0', 'H1'),
-                 ('S0', 'H0'), ('S1', 'H1')
-                 ]
+        if one_input is False:
+            self.N_nodes = 4
+            self.edges = [('H0', 'H1'),
+                     ('S0', 'H0'), ('S1', 'H1')
+                     ]
+        else:
+            self.N_nodes = 3
+            self.edges = [('H0', 'H1'),
+                     ('S0', 'H0')
+                     ]
 
         if activator_signals:
             self.edge_types = [EdgeType.I,
@@ -57,7 +63,7 @@ class BinodeChain(LibNet):
 
 class BinodeChainSelfLoop(LibNet):
 
-    def __init__(self, activator_signals: bool=True):
+    def __init__(self, activator_signals: bool=True, one_input: bool=False):
         '''
         This is indicated to be a tri-stable network. It is used for
         parameter space searches to look for further states with changes
@@ -69,11 +75,18 @@ class BinodeChainSelfLoop(LibNet):
 
         self.name = 'BinodeChainSelfLoop'
 
-        self.N_nodes = 4
-        self.edges = [('H0', 'H1'),
-                 ('H0', 'H0'),
-                 ('S0', 'H0'), ('S1', 'H1')
-                 ]
+        if one_input is False:
+            self.N_nodes = 4
+            self.edges = [('H0', 'H1'),
+                     ('H0', 'H0'),
+                     ('S0', 'H0'), ('S1', 'H1')
+                     ]
+        else:
+            self.N_nodes = 3
+            self.edges = [('H0', 'H1'),
+                     ('H0', 'H0'),
+                     ('S0', 'H0')
+                     ]
 
         if activator_signals:
             self.edge_types = [EdgeType.I,
@@ -93,7 +106,7 @@ class BinodeChainSelfLoop(LibNet):
 
 class BinodeChainSelfLoops(LibNet):
 
-    def __init__(self, activator_signals: bool=True):
+    def __init__(self, activator_signals: bool=True, one_input: bool=False):
         '''
         This is indicated to be a tri-stable network. It is used for
         parameter space searches to look for further states with changes
@@ -105,11 +118,18 @@ class BinodeChainSelfLoops(LibNet):
 
         self.name = 'BinodeChainSelfLoops'
 
-        self.N_nodes = 4
-        self.edges = [('H0', 'H1'),
-                 ('H0', 'H0'), ('H1', 'H1'),
-                 ('S0', 'H0'), ('S1', 'H1')
-                 ]
+        if one_input is False:
+            self.N_nodes = 4
+            self.edges = [('H0', 'H1'),
+                     ('H0', 'H0'), ('H1', 'H1'),
+                     ('S0', 'H0'), ('S1', 'H1')
+                     ]
+        else:
+            self.N_nodes = 3
+            self.edges = [('H0', 'H1'),
+                     ('H0', 'H0'), ('H1', 'H1'),
+                     ('S0', 'H0')
+                     ]
 
         if activator_signals:
             self.edge_types = [EdgeType.I,
@@ -129,7 +149,7 @@ class BinodeChainSelfLoops(LibNet):
 
 class BinodeCycle(LibNet):
 
-    def __init__(self, activator_signals: bool=True):
+    def __init__(self, activator_signals: bool=True, one_input: bool=False):
         '''
         This is indicated to be a tri-stable network. It is used for
         parameter space searches to look for further states with changes
@@ -141,10 +161,16 @@ class BinodeCycle(LibNet):
 
         self.name = 'BinodeCycle'
 
-        self.N_nodes = 4
-        self.edges = [('H0', 'H1'), ('H1', 'H0'),
-                 ('S0', 'H0'), ('S1', 'H1')
-                 ]
+        if one_input is False:
+            self.N_nodes = 4
+            self.edges = [('H0', 'H1'), ('H1', 'H0'),
+                     ('S0', 'H0'), ('S1', 'H1')
+                     ]
+        else:
+            self.N_nodes = 4
+            self.edges = [('H0', 'H1'), ('H1', 'H0'),
+                     ('S0', 'H0')
+                     ]
 
         if activator_signals:
             self.edge_types = [EdgeType.I, EdgeType.I,
@@ -162,7 +188,7 @@ class BinodeCycle(LibNet):
 
 class BinodeCycleSelfLoop(LibNet):
 
-    def __init__(self, activator_signals: bool=True):
+    def __init__(self, activator_signals: bool=True, one_input: bool=False):
         '''
         This is indicated to be a tri-stable network. It is used for
         parameter space searches to look for further states with changes
@@ -174,11 +200,18 @@ class BinodeCycleSelfLoop(LibNet):
 
         self.name = 'BinodeCycleSelfLoop'
 
-        self.N_nodes = 4
-        self.edges = [('H0', 'H1'), ('H1', 'H0'),
-                 ('H0', 'H0'),
-                 ('S0', 'H0'), ('S1', 'H1')
-                 ]
+        if one_input is False:
+            self.N_nodes = 4
+            self.edges = [('H0', 'H1'), ('H1', 'H0'),
+                     ('H0', 'H0'),
+                     ('S0', 'H0'), ('S1', 'H1')
+                     ]
+        else:
+            self.N_nodes = 3
+            self.edges = [('H0', 'H1'), ('H1', 'H0'),
+                     ('H0', 'H0'),
+                     ('S0', 'H0')
+                     ]
 
         if activator_signals:
             self.edge_types = [EdgeType.I, EdgeType.I,
@@ -198,7 +231,7 @@ class BinodeCycleSelfLoop(LibNet):
 
 class BinodeCycleSelfLoops(LibNet):
 
-    def __init__(self, activator_signals: bool=True):
+    def __init__(self, activator_signals: bool=True, one_input: bool=False):
         '''
         This is indicated to be a tri-stable network. It is used for
         parameter space searches to look for further states with changes
@@ -210,11 +243,18 @@ class BinodeCycleSelfLoops(LibNet):
 
         self.name = 'BinodeCycleSelfLoops'
 
-        self.N_nodes = 4
-        self.edges = [('H0', 'H1'), ('H1', 'H0'),
-                 ('H0', 'H0'), ('H1', 'H1'),
-                 ('S0', 'H0'), ('S1', 'H1')
-                 ]
+        if one_input is False:
+            self.N_nodes = 4
+            self.edges = [('H0', 'H1'), ('H1', 'H0'),
+                     ('H0', 'H0'), ('H1', 'H1'),
+                     ('S0', 'H0'), ('S1', 'H1')
+                     ]
+        else:
+            self.N_nodes = 4
+            self.edges = [('H0', 'H1'), ('H1', 'H0'),
+                     ('H0', 'H0'), ('H1', 'H1'),
+                     ('S0', 'H0')
+                     ]
 
         if activator_signals:
             self.edge_types = [EdgeType.I, EdgeType.I,
