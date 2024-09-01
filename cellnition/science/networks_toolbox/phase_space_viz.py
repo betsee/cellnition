@@ -110,7 +110,7 @@ class PhaseSpace(object):
 
         dcdt_M_set = []
         for dci in dcdt_M.T:
-            dcdt_M_set.append(dci.reshape((N_pts, N_pts)))
+            dcdt_M_set.append(dci.reshape(C_M_SET.shape))
 
         dcdt_M_set = np.asarray(dcdt_M_set)
         dcdt_dmag = np.sqrt(np.sum(dcdt_M_set ** 2, axis=0))

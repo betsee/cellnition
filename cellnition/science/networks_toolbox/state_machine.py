@@ -458,18 +458,18 @@ class StateMachine(object):
         _all_time_runs = []
 
         # We want to step through all 'held' signals and potentially multistable states:
-        for sig_base_set, sc_dict in states_dict.items():
+        for base_input_label, (sig_base_set, sc_dict) in enumerate(states_dict.items()):
 
             states_set = sc_dict['States']
 
             # Get an integer label for the 'bitstring' of signal node inds defining the base:
-            base_input_label = self._get_integer_label(sig_base_set)
+            # base_input_label = self._get_integer_label(sig_base_set)
 
             # We then step through all possible perturbation signals:
-            for sig_val_set in sig_test_set:
+            for pert_input_label, sig_val_set in enumerate(sig_test_set):
 
                 # Get an integer label for the 'bitstring' of signal node inds on perturbation:
-                pert_input_label = self._get_integer_label(sig_val_set)
+                # pert_input_label = self._get_integer_label(sig_val_set)
 
                 # we want the signals to go from zero to the new held state defined in sig_val set:
                 sig_mags = [(sigb, sigi) for sigb, sigi in zip(sig_base_set, sig_val_set)]
@@ -1011,8 +1011,8 @@ class StateMachine(object):
         # state label and the original signals tuple:
         input_int_to_signals = {}
 
-        for input_sigs in sig_test_set:
-            int_label = self._get_integer_label(input_sigs)
+        for int_label, input_sigs in enumerate(sig_test_set):
+            # int_label = self._get_integer_label(input_sigs)
             input_int_to_signals[f'I{int_label}'] = tuple(input_sigs)
 
         return input_int_to_signals
@@ -1067,28 +1067,28 @@ class StateMachine(object):
 
         return ind
 
-    def _get_integer_label(self, sig_set: tuple|list|ndarray) -> int:
-        '''
-        Given a list of digits representing a bit string
-        (i.e. a list of values close to zero or 1), this method
-        treats the list as a binary bit-string and returns the
-        base-2 integer representation of the bit-string.
-
-        Parameters
-        ----------
-        sig_set : list[float|int]
-            The list containing floats or ints that are taken to represent
-            a bit string.
-
-        Returns
-        -------
-        An integer representation of the binary bit-string.
-
-        '''
-        base_str = ''
-        for sigi in sig_set:
-            base_str += str(int(sigi))
-        return int(base_str, 2)
+    # def _get_integer_label(self, sig_set: tuple|list|ndarray) -> int:
+    #     '''
+    #     Given a list of digits representing a bit string
+    #     (i.e. a list of values close to zero or 1), this method
+    #     treats the list as a binary bit-string and returns the
+    #     base-2 integer representation of the bit-string.
+    #
+    #     Parameters
+    #     ----------
+    #     sig_set : list[float|int]
+    #         The list containing floats or ints that are taken to represent
+    #         a bit string.
+    #
+    #     Returns
+    #     -------
+    #     An integer representation of the binary bit-string.
+    #
+    #     '''
+    #     base_str = ''
+    #     for sigi in sig_set:
+    #         base_str += str(int(sigi))
+    #     return int(base_str, 2)
 
     def _find_state_match(self,
                          solsM: ndarray,

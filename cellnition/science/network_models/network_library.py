@@ -286,7 +286,7 @@ class TrinodeChain(LibNet):
 
         self.name = 'TrinodeChain'
 
-        self.N_nodes = 3
+        self.N_nodes = 6
         self.edges = [('H0', 'H1'), ('H1', 'H2'),
                       ('S0', 'H0'), ('S1', 'H1'), ('S2', 'H2')
                       ]
@@ -319,7 +319,7 @@ class TrinodeChainSelfLoops(LibNet):
 
         self.name = 'TrinodeChainSelfLoops'
 
-        self.N_nodes = 3
+        self.N_nodes = 6
         self.edges = [('H0', 'H1'), ('H1', 'H2'),
                       ('S0', 'H0'), ('S1', 'H1'), ('S2', 'H2'),
                       ('H0', 'H0'), ('H2', 'H2'), ('H1', 'H1'),
@@ -355,7 +355,7 @@ class TrinodeChainFullyConnected(LibNet):
 
         self.name = 'TrinodeChainFullyConnected'
 
-        self.N_nodes = 3
+        self.N_nodes = 6
         self.edges = [('H0', 'H1'), ('H1', 'H2'),
                       ('H1', 'H0'), ('H2', 'H1'),
                       ('S0', 'H0'), ('S1', 'H1'), ('S2', 'H2'),
@@ -391,7 +391,7 @@ class TrinodeCycle(LibNet):
 
         self.name = 'TrinodeCycle'
 
-        self.N_nodes = 3
+        self.N_nodes = 6
         self.edges = [('H0', 'H1'), ('H1', 'H2'), ('H2', 'H0'),
                  ('S0', 'H0'), ('S1', 'H1'), ('S2', 'H2')
                  ]
@@ -420,7 +420,7 @@ class TrinodeCycleSelfLoops(LibNet):
 
         self.name = 'TrinodeCycleSelfLoops'
 
-        self.N_nodes = 3
+        self.N_nodes = 6
         self.edges = [('H0', 'H1'), ('H1', 'H2'), ('H2', 'H0'),
                  ('H0', 'H0'), ('H2', 'H2'), ('H1', 'H1'),
                  ('S0', 'H0'), ('S1', 'H1'), ('S2', 'H2')
