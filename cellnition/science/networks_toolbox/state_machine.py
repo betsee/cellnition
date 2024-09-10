@@ -120,7 +120,7 @@ class StateMachine(object):
                           graph_layout: str = 'dot',
                           remove_inaccessible_states: bool = True,
                           unique_sol_index: bool=True,
-                          search_cycle_nodes_only: bool = False
+                          search_main_nodes_only: bool = False
                           ) -> MultiDiGraph:
         '''
         Run all steps to generate a state transition network and associated
@@ -141,7 +141,7 @@ class StateMachine(object):
                                                             search_tol=search_tol,
                                                             sol_tol=sol_tol,
                                                             N_round_sol=N_round_sol,
-                                                            search_cycle_nodes_only=search_cycle_nodes_only
+                                                            search_main_nodes_only=search_main_nodes_only
                                                             )
 
         # save entities to the object:
@@ -211,7 +211,7 @@ class StateMachine(object):
                                       search_tol: float=1.0e-15,
                                       sol_tol: float=1.0e-2,
                                       N_round_sol: int=1,
-                                      search_cycle_nodes_only: bool = False,
+                                      search_main_nodes_only: bool = False,
                                       cluster_threshhold: float=0.1,
                                       cluster_method: str = 'distance',
                                       sig_lino: list|None = None
@@ -245,19 +245,19 @@ class StateMachine(object):
         for sigis in sig_test_set:
             print(f'Signals: {np.round(sigis, 1)}')
             solsM, sol_M_char, sol_0 = self._pnet.solve_probability_equms(constraint_inds=None,
-                                                                    constraint_vals=None,
-                                                                    signal_constr_vals=sigis.tolist(),
-                                                                    d_base=d_base,
-                                                                    n_base=n_base,
-                                                                    beta_base=beta_base,
-                                                                    N_space=N_space,
-                                                                    search_tol=search_tol,
-                                                                    sol_tol=sol_tol,
-                                                                    N_round_sol=N_round_sol,
-                                                                    verbose=verbose,
-                                                                    return_saddles=return_saddles,
-                                                                    search_cycle_nodes_only=search_cycle_nodes_only
-                                                                    )
+                                                                          constraint_vals=None,
+                                                                          signal_constr_vals=sigis.tolist(),
+                                                                          d_base=d_base,
+                                                                          n_base=n_base,
+                                                                          beta_base=beta_base,
+                                                                          N_space=N_space,
+                                                                          search_tol=search_tol,
+                                                                          sol_tol=sol_tol,
+                                                                          N_round_sol=N_round_sol,
+                                                                          verbose=verbose,
+                                                                          return_saddles=return_saddles,
+                                                                          search_main_nodes_only=search_main_nodes_only
+                                                                          )
 
 
 
@@ -592,6 +592,7 @@ class StateMachine(object):
 
         self._solsM_all = solsM_all
         self._states_dict = states_dict_2
+        self._sig_test_set = sig_test_set
 
         # Create the multidigraph:
         GG = nx.MultiDiGraph()
@@ -688,7 +689,8 @@ class StateMachine(object):
         matched_states = []
         for i, (si, ei) in enumerate(c_ave_phase_inds):
             c_ave = np.mean(ctime[si:ei, :], axis=0)
-            state_matcho, match_error = self._find_state_match(solsM_all, c_ave)
+            state_matcho, match_error = self._find_state_match(solsM_all[self._pnet.noninput_node_inds,:],
+                                                               c_ave[self._pnet.noninput_node_inds])
             if match_error < match_tol:
                 state_match = state_matcho
 
@@ -722,6 +724,8 @@ class StateMachine(object):
         # FIXME: Should these be options in the method?
 
         # Convert nodes from string to int
+
+        self._charM_all = charM_all
         nodes_list = [int(ni) for ni in nodes_listo]
         img_pos = 'bc'  # position of the glyph in the node
         subcluster_font = 'DejaVu Sans Bold'

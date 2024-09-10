@@ -504,7 +504,7 @@ class NetworkWorkflow(object):
             search_tol=1.0e-15,
             sol_tol=1.0e-3,
             N_round_sol=N_round_sol,
-            search_cycle_nodes_only=False,
+            search_main_nodes_only=False,
             cluster_threshhold=0.1,
             cluster_method='inconsistent'
             )
@@ -913,19 +913,19 @@ class NetworkWorkflow(object):
             save_solns = os.path.join(save_path, soln_fn)
 
             solsM, sol_M0_char, sol_0 = pnet.solve_probability_equms(constraint_inds=constraint_inds,
-                                                                  constraint_vals=constraint_vals,
-                                                                  signal_constr_vals=signal_constr_vals,
-                                                                  d_base=d_base,
-                                                                  n_base=n_base,
-                                                                  beta_base=beta_base,
-                                                                  N_space=N_search_space,
-                                                                  search_tol=sol_search_tol,
-                                                                  sol_tol=sol_unique_tol,
-                                                                  N_round_sol=N_round_unique_sol,
-                                                                  save_file=save_solns,
-                                                                  verbose=extra_verbose,
-                                                                  search_cycle_nodes_only=search_cycle_nodes_only
-                                                                  )
+                                                                     constraint_vals=constraint_vals,
+                                                                     signal_constr_vals=signal_constr_vals,
+                                                                     d_base=d_base,
+                                                                     n_base=n_base,
+                                                                     beta_base=beta_base,
+                                                                     N_space=N_search_space,
+                                                                     search_tol=sol_search_tol,
+                                                                     sol_tol=sol_unique_tol,
+                                                                     N_round_sol=N_round_unique_sol,
+                                                                     save_file=save_solns,
+                                                                     verbose=extra_verbose,
+                                                                     search_main_nodes_only=search_cycle_nodes_only
+                                                                     )
 
 
             if len(solsM):

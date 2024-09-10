@@ -472,7 +472,7 @@ class ProbabilityNet(NetworkABC):
                                 verbose: bool=True,
                                 save_file: str|None = None,
                                 return_saddles: bool = False,
-                                search_cycle_nodes_only: bool=False
+                                search_main_nodes_only: bool=False
                                 ):
         '''
         Solve for the equilibrium points of gene product probabilities in
@@ -495,16 +495,16 @@ class ProbabilityNet(NetworkABC):
         else:
             unconstrained_inds = np.setdiff1d(self._nodes_index, constrained_inds).tolist()
 
-        if search_cycle_nodes_only is False:
+        if search_main_nodes_only is False:
             M_pstates, _, _ = self.generate_state_space(unconstrained_inds, N_space)
 
         else:
-            if len(self.nodes_in_cycles):
-                M_pstates, _, _ = self.generate_state_space(self.nodes_in_cycles, N_space)
+            if len(self.main_nodes):
+                M_pstates, _, _ = self.generate_state_space(self.main_nodes, N_space)
 
             else:
-                raise Exception("No nodes exist in cycles; cannot perform state search with "
-                                "search_cycle_nodes_only=True.")
+                raise Exception("No main nodes; cannot perform state search with "
+                                "search_main_nodes_only=True.")
 
         sol_Mo = []
 

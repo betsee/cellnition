@@ -128,7 +128,7 @@ def multistability_search(pnet: ProbabilityNet,
                                                                  N_round_sol=N_round_unique_sol,
                                                                  save_file=None,
                                                                  verbose=verbose,
-                                                                 search_cycle_nodes_only=search_cycle_nodes_only
+                                                                 search_main_nodes_only=search_cycle_nodes_only
                                                                  )
 
         if len(solsM):
@@ -275,7 +275,7 @@ def param_space_search(pnet: ProbabilityNet,
                                                                  N_round_sol=N_unique_sol_round,
                                                                  save_file=None,
                                                                  verbose=verbose,
-                                                                 search_cycle_nodes_only=search_cycle_nodes_only
+                                                                 search_main_nodes_only=search_cycle_nodes_only
                                                                  )
 
 

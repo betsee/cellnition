@@ -85,7 +85,7 @@ class GeneKnockout(object):
                                                                         search_tol=tol,
                                                                         sol_tol=sol_tol,
                                                                         N_round_sol=round_unique_sol,
-                                                                        search_cycle_nodes_only=search_cycle_nodes_only
+                                                                        search_main_nodes_only=search_cycle_nodes_only
                                                                         )
 
         if verbose:
@@ -107,17 +107,17 @@ class GeneKnockout(object):
             # We also need to add in naturally-occurring constraints from unregulated nodes:
 
             solsM, sol_M0_char, sols_1 = self._pnet.solve_probability_equms(constraint_inds=cinds,
-                                                                        constraint_vals=cvals,
-                                                                        signal_constr_vals=signal_constr_vals,
-                                                                        d_base=d_base,
-                                                                        n_base=n_base,
-                                                                        beta_base=beta_base,
-                                                                        N_space=Ns,
-                                                                        search_tol=tol,
-                                                                        sol_tol=sol_tol,
-                                                                        N_round_sol=round_unique_sol,
-                                                                        verbose=verbose,
-                                                                        search_cycle_nodes_only=search_cycle_nodes_only
+                                                                            constraint_vals=cvals,
+                                                                            signal_constr_vals=signal_constr_vals,
+                                                                            d_base=d_base,
+                                                                            n_base=n_base,
+                                                                            beta_base=beta_base,
+                                                                            N_space=Ns,
+                                                                            search_tol=tol,
+                                                                            sol_tol=sol_tol,
+                                                                            N_round_sol=round_unique_sol,
+                                                                            verbose=verbose,
+                                                                            search_main_nodes_only=search_cycle_nodes_only
                                                                             )
 
             if verbose:

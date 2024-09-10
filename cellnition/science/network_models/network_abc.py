@@ -520,6 +520,9 @@ class NetworkABC(object, metaclass=ABCMeta):
 
         self.factor_node_inds = self.node_type_inds[NodeType.factor.name]
 
+        # also determine the "main nodes", which are nodes that are not input and also are not effectors:
+        self.main_nodes = np.setdiff1d(self.noninput_node_inds, self.effector_node_inds).tolist()
+
     def edges_from_path(self, path_nodes: list|ndarray) -> list:
         '''
         If specifying a path in terms of a set of nodes, this method
@@ -596,7 +599,7 @@ class NetworkABC(object, metaclass=ABCMeta):
                 raise Exception("Node type not found.")
 
     #----Methods for Analytical Models--------
-    def reduce_model_dimensions(self):
+    def reduce_model_dimensions(self, use_nonlinsolve: bool=False):
         '''
         Using analytical methods, attempt to reduce the multidimensional
         network equations to as few equations as possible.
@@ -609,12 +612,19 @@ class NetworkABC(object, metaclass=ABCMeta):
         # We want to restrict this model reduction to homogeneous networks that
         # only contain genes and signals.
         if len(self.process_node_inds) or self._inter_fun_type is InterFuncType.logistic:
+            print("System unsolvable due to use of logistic interaction function. Try Hill-type equations.")
             nosol = True # Immediately flag the sysem as unsolvable
 
         else:
 
             try:
-                sol_csetoo = sp.nonlinsolve(self._dcdt_vect_s, self._c_vect_s)
+                if use_nonlinsolve:
+                    sol_csetoo = sp.nonlinsolve(self._dcdt_vect_s,
+                                                self._c_vect_s[self.noninput_node_inds.tolist(),:])
+
+                else:
+                    sol_csetoo = sp.solve(self._dcdt_vect_s,
+                                                self._c_vect_s[self.noninput_node_inds.tolist(),:])
                 # Clean up the sympy container for the solutions:
                 sol_cseto = list(list(sol_csetoo)[0])
 
@@ -626,7 +636,7 @@ class NetworkABC(object, metaclass=ABCMeta):
                         if c_eq in self._c_vect_s:  # If it's a non-solution for the term, append it as a non-reduced conc.
                             c_master_i.append(self._c_vect_s.index(c_eq))
                         else:  # Otherwise append the plug-and-play solution set:
-                            sol_cset[self._c_vect_s[i]] = c_eq
+                            sol_cset[self._c_vect_s[self.noninput_node_inds.tolist(),:][i]] = c_eq
 
                     master_eq_list = []  # master equations to be numerically optimized (reduced dimension network equations)
                     c_vect_reduced = []  # concentrations involved in the master equations
@@ -643,9 +653,11 @@ class NetworkABC(object, metaclass=ABCMeta):
                         self._solved_analytically = True
 
                 else:
+                    print("No solutions found for the system.")
                     nosol = True
 
             except:
+                print("Exception called in Sympy.")
                 nosol = True
 
         # Results:
@@ -712,19 +724,22 @@ class NetworkABC(object, metaclass=ABCMeta):
 
                 # The sol_cset exists and can be lambdified for full solutions. Here we lambdify it without the c_vect:
                 if len(self.process_node_inds):
-                    lambda_params_r = [self.d_vect_s,
-                                       self.B_vect_s,
-                                       self.n_vect_s,
+                    lambda_params_r = [self._d_vect_s,
+                                       self._beta_vect_s,
+                                       self._n_vect_s,
+                                       self._c_vect_s[self.input_node_inds, :],
                                        self.extra_params_s]
 
                 else:
-                    lambda_params_r = [self.d_vect_s,
-                                       self.B_vect_s,
-                                       self.n_vect_s]
+                    lambda_params_r = [self._d_vect_s,
+                                       self._beta_vect_s,
+                                       self._n_vect_s,
+                                       self._c_vect_s[self.input_node_inds, :]]
 
                 self.sol_cset_f = {}
                 for ci, eqci in self.sol_cset_s.items():
-                    self.sol_cset_f[ci.indices[0]] = sp.lambdify(lambda_params_r, eqci)
+                    # self.sol_cset_f[ci.indices[0]] = sp.lambdify(lambda_params_r, eqci)
+                    self.sol_cset_f[ci] = sp.lambdify(lambda_params_r, eqci)
 
     #----Time Dynamics Methods----------------
     def pulses(self,
