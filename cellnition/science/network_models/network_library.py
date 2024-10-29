@@ -652,12 +652,12 @@ class TrinodeCycle(LibNet):
                  ]
 
         if activator_signals:
-            self.edge_types = [EdgeType.I, EdgeType.A, EdgeType.I,
+            self.edge_types = [EdgeType.I, EdgeType.A, EdgeType.A,
                           EdgeType.A, EdgeType.A, EdgeType.A,
                           ]
         else:
-            self.edge_types = [EdgeType.Is, EdgeType.A, EdgeType.Is,
-                          EdgeType.Is, EdgeType.Is, EdgeType.Is,
+            self.edge_types = [EdgeType.I, EdgeType.A, EdgeType.A,
+                          EdgeType.I, EdgeType.I, EdgeType.I,
                           ]
 
         self.node_type_dict = {'S': NodeType.signal}
@@ -666,7 +666,7 @@ class TrinodeCycle(LibNet):
 
 class TrinodeDoubleCycle(LibNet):
 
-    def __init__(self, activator_signals: bool=True):
+    def __init__(self, activator_signals: bool=False):
         '''
 
         '''
@@ -687,9 +687,9 @@ class TrinodeDoubleCycle(LibNet):
                           EdgeType.A, EdgeType.A, EdgeType.A,
                           ]
         else:
-            self.edge_types = [EdgeType.A, EdgeType.A, EdgeType.A,
-                               EdgeType.A, EdgeType.A, EdgeType.A,
-                          EdgeType.Is, EdgeType.Is, EdgeType.Is,
+            self.edge_types = [EdgeType.I, EdgeType.A, EdgeType.I,
+                               EdgeType.I, EdgeType.I, EdgeType.A,
+                          EdgeType.I, EdgeType.I, EdgeType.I,
                           ]
 
         self.node_type_dict = {'S': NodeType.signal}
@@ -754,10 +754,10 @@ class TrinodeCycleFullyConnected(LibNet):
                           EdgeType.A, EdgeType.A, EdgeType.A,
                           ]
         else:
-            self.edge_types = [EdgeType.A, EdgeType.A, EdgeType.A,
+            self.edge_types = [EdgeType.I, EdgeType.I, EdgeType.I,
+                               EdgeType.I, EdgeType.I, EdgeType.I,
                                EdgeType.A, EdgeType.A, EdgeType.A,
-                               EdgeType.A, EdgeType.A, EdgeType.A,
-                          EdgeType.I, EdgeType.I, EdgeType.I,
+                          EdgeType.I, EdgeType.A, EdgeType.A,
                           ]
 
         self.node_type_dict = {'S': NodeType.signal}
