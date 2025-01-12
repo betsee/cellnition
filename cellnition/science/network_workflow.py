@@ -25,6 +25,7 @@ from cellnition.science.networks_toolbox.phase_space_searches import multistabil
 from cellnition.science.networks_toolbox.state_machine import StateMachine
 from cellnition.science.network_models.basic_network import BasicNet
 import pandas as pd
+from scipy.cluster.hierarchy import fclusterdata
 
 
 # FIXME: document throughout
@@ -778,7 +779,9 @@ class NetworkWorkflow(object):
                    extra_verbose: bool=False,
                    coupling_type: CouplingType=CouplingType.mixed,
                    label_edges: bool = False,
-                   search_cycle_nodes_only: bool = False
+                   search_cycle_nodes_only: bool = False,
+                   cluster_threshhold: float = 0.1,
+                   cluster_method: str = 'distance'
                    ):
         '''
         A single frame of the workflow
@@ -928,6 +931,12 @@ class NetworkWorkflow(object):
                                                                      )
 
 
+            # cluster close solutions to avoid degeneracy in solutions:
+            solsM = self.find_unique_sols(solsM,
+                                          cluster_threshhold=cluster_threshhold,
+                                          cluster_method=cluster_method,
+                                          N_round_sol=N_round_unique_sol)
+
             if len(solsM):
                 num_sols = solsM.shape[1]
             else:
@@ -936,13 +945,13 @@ class NetworkWorkflow(object):
             fign = f'solArray_{fname_base}.png'
             figsave = os.path.join(save_path, fign)
 
-            fig, ax = pnet.plot_sols_array(solsM, figsave)
+            fig, ax = pnet.plot_sols_array(solsM, gene_inds=None, figsave=figsave)
             plt.close(fig)
 
             # Perform knockout experiments, if desired:
             if knockout_experiments:
                 gko = GeneKnockout(pnet)
-                knockout_sol_set, knockout_matrix = gko.gene_knockout_ss_solve(
+                knockout_sol_set, knockout_matrix, ko_header_o = gko.gene_knockout_ss_solve(
                                                                        Ns=N_search_space,
                                                                        tol=sol_search_tol,
                                                                        d_base=d_base,
@@ -954,7 +963,9 @@ class NetworkWorkflow(object):
                                                                        save_file_basename=None,
                                                                        constraint_vals=constraint_vals,
                                                                        constraint_inds=constraint_inds,
-                                                                       signal_constr_vals=signal_constr_vals
+                                                                       signal_constr_vals=signal_constr_vals,
+                                                                       cluster_threshhold = cluster_threshhold,
+                                                                       cluster_method = cluster_method
                                                                        )
 
                 ko_file = f'knockoutArrays{fname_base}.png'
@@ -963,8 +974,11 @@ class NetworkWorkflow(object):
                 plt.close(fig)
 
                 # save the knockout data to a file:
+                ko_header = ''
+                for si in ko_header_o:
+                    ko_header += si
                 dat_knockout_save = os.path.join(save_path, f'knockoutData_f{fname_base}.csv')
-                np.savetxt(dat_knockout_save, knockout_matrix, delimiter=',')
+                np.savetxt(dat_knockout_save, knockout_matrix, delimiter=',', header=ko_header)
 
         else:
             num_sols = 0
@@ -1020,6 +1034,42 @@ class NetworkWorkflow(object):
                 graph_files_list.append(file)
 
         return graph_files_list
+
+    def find_unique_sols(self,
+                         solsM,
+                         cluster_threshhold: float=0.1,
+                         cluster_method: str='distance',
+                         N_round_sol: int=2):
+        '''
+
+        '''
+
+        if solsM.shape[1] > 1:
+            print("resizing by clustering")
+            unique_sol_clusters = fclusterdata(solsM.T, t=cluster_threshhold, criterion=cluster_method)
+
+            cluster_index = np.unique(unique_sol_clusters)
+
+            cluster_pool = [[] for i in cluster_index]
+            for i, clst_i in enumerate(unique_sol_clusters):
+                cluster_pool[int(clst_i) - 1].append(i)
+
+            solsM_all_unique = np.zeros((solsM.shape[0], len(cluster_pool)))
+
+            for ii, sol_i in enumerate(cluster_pool):
+                if len(sol_i):
+                    solsM_all_unique[:, ii] = (np.mean(solsM[:, sol_i], 1))
+
+            # redefine the solsM data structures:
+            solsM = solsM_all_unique
+
+            # # # first use numpy unique on rounded set of solutions to exclude similar cases:
+            _, inds_solsM_all_unique = np.unique(np.round(solsM, N_round_sol), return_index=True, axis=1)
+            solsM = solsM[:, inds_solsM_all_unique]
+        else:
+            print("not resizing by clustering")
+
+        return solsM
 
 
 

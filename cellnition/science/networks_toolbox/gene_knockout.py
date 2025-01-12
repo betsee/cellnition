@@ -12,6 +12,7 @@ import numpy as np
 from numpy import ndarray
 import matplotlib.pyplot as plt
 from cellnition.science.network_models.probability_networks import ProbabilityNet
+from scipy.cluster.hierarchy import fclusterdata
 
 # FIXME: DOCUMENT THROUGHOUT
 
@@ -48,7 +49,9 @@ class GeneKnockout(object):
                                constraint_vals: list[float]|None = None,
                                constraint_inds: list[int]|None = None,
                                signal_constr_vals: list | None = None,
-                               search_cycle_nodes_only: bool = False
+                               search_cycle_nodes_only: bool = False,
+                               cluster_threshhold: float = 0.1,
+                               cluster_method: str='distance'
                                ):
         '''
         Performs a sequential knockout of all genes in the network, computing all possible steady-state
@@ -61,7 +64,8 @@ class GeneKnockout(object):
             if len(constraint_vals) != len(constraint_inds):
                 raise Exception("Node constraint values must be same length as constrained node indices!")
 
-        knockout_sol_set = []
+        knockout_sol_set = [] # Master list to hold all -- possibly multistable -- solutions.
+        knockout_header = [] # Header to hold an index of the gene knockout and the sub-solution indices
 
         if save_file_basename is not None:
             save_file_list = [f'{save_file_basename}_allc.csv']
@@ -91,24 +95,49 @@ class GeneKnockout(object):
         if verbose:
             print(f'-------------------')
 
+        # print(f'size of solM before clustering: {solsM.shape}')
+
+        # Cluster solutions to exclude those that are very similar
+        solsM = self.find_unique_sols(solsM,
+                                      cluster_threshhold=cluster_threshhold,
+                                      cluster_method=cluster_method)
+
+        # print(f'size of solM after clustering: {solsM.shape}')
+
         knockout_sol_set.append(solsM.copy()) # append the "wild-type" solution set
+        knockout_header.extend([f'wt,' for j in range(solsM.shape[1])])
 
-        for i in self._pnet.regular_node_inds:  # Include only 'gene' nodes as silenced
+        for nde_i in self._pnet.nodes_index:
 
-            if constraint_vals is None or constraint_inds is None:
-                # Gene knockout is the only constraint:
-                cvals = [0.0]
-                cinds = [i]
+            if nde_i in self._pnet.input_node_inds:
+                sig_ind = self._pnet.input_node_inds.index(nde_i)
+                signal_constr_vals_mod = signal_constr_vals.copy()
+                signal_constr_vals_mod[sig_ind] = self._pnet.p_min
 
-            else: # add the gene knockout as a final constraint:
-                cvals = constraint_vals + [0.0]
-                cinds = constraint_inds + [i]
+                if constraint_vals is not None or constraint_inds is not None:
+                    cvals = constraint_vals
+                    cinds = constraint_inds
+                else:
+                    cvals = None
+                    cinds = None
+
+            else:
+                signal_constr_vals_mod = signal_constr_vals
+
+                if constraint_vals is None or constraint_inds is None:
+                    # Gene knockout is the only constraint:
+                    cvals = [self._pnet.p_min]
+                    cinds = [nde_i]
+
+                else: # add the gene knockout as a final constraint:
+                    cvals = constraint_vals + [self._pnet.p_min]
+                    cinds = constraint_inds + [nde_i]
 
             # We also need to add in naturally-occurring constraints from unregulated nodes:
 
             solsM, sol_M0_char, sols_1 = self._pnet.solve_probability_equms(constraint_inds=cinds,
                                                                             constraint_vals=cvals,
-                                                                            signal_constr_vals=signal_constr_vals,
+                                                                            signal_constr_vals=signal_constr_vals_mod,
                                                                             d_base=d_base,
                                                                             n_base=n_base,
                                                                             beta_base=beta_base,
@@ -123,7 +152,17 @@ class GeneKnockout(object):
             if verbose:
                 print(f'-------------------')
 
+            # print(f'size of solM {i} before clustering: {solsM.shape}')
+
+            # Cluster solutions to exclude those that are very similar
+            solsM = self.find_unique_sols(solsM,
+                                          cluster_threshhold=cluster_threshhold,
+                                          cluster_method=cluster_method)
+
+            # print(f'size of solM {i} after clustering: {solsM.shape}')
+
             knockout_sol_set.append(solsM.copy())
+            knockout_header.extend([f'{self._pnet.nodes_list[nde_i]},' for j in range(solsM.shape[1])])
 
         # merge this into a master matrix:
         ko_M = None
@@ -138,7 +177,7 @@ class GeneKnockout(object):
             else:
                 ko_M = np.hstack((ko_M, ko_ar))
 
-        return knockout_sol_set, ko_M
+        return knockout_sol_set, ko_M, knockout_header
 
     # def gene_knockout_time_solve(self,
     #                              tend: float,
@@ -258,3 +297,36 @@ class GeneKnockout(object):
                 plt.savefig(figsave, dpi=300, transparent=True, format='png')
 
             return fig, axes
+
+    def find_unique_sols(self,
+                         solsM,
+                         cluster_threshhold: float=0.1,
+                         cluster_method: str='distance',
+                         N_round_sol: int=2):
+        '''
+
+        '''
+
+        if solsM.shape[1] > 1:
+            unique_sol_clusters = fclusterdata(solsM.T, t=cluster_threshhold, criterion=cluster_method)
+
+            cluster_index = np.unique(unique_sol_clusters)
+
+            cluster_pool = [[] for i in cluster_index]
+            for i, clst_i in enumerate(unique_sol_clusters):
+                cluster_pool[int(clst_i) - 1].append(i)
+
+            solsM_all_unique = np.zeros((self._pnet.N_nodes, len(cluster_pool)))
+
+            for ii, sol_i in enumerate(cluster_pool):
+                if len(sol_i):
+                    solsM_all_unique[:, ii] = (np.mean(solsM[:, sol_i], 1))
+
+            # redefine the solsM data structures:
+            solsM = solsM_all_unique
+
+            # # # first use numpy unique on rounded set of solutions to exclude similar cases:
+            _, inds_solsM_all_unique = np.unique(np.round(solsM, N_round_sol), return_index=True, axis=1)
+            solsM = solsM[:, inds_solsM_all_unique]
+
+        return solsM

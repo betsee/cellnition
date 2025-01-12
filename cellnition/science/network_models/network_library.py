@@ -22,6 +22,64 @@ class LibNet(object, metaclass=ABCMeta):
 
         pass
 
+class ActivatorExample(LibNet):
+
+    def __init__(self, activator_signals: bool=True, one_input: bool=False):
+        '''
+        This is indicated to be a tri-stable network. It is used for
+        parameter space searches to look for further states with changes
+        to parameters. This is the monostable example in our first paper.
+
+        '''
+        # Initialize the superclass:
+        super().__init__()
+
+        self.name = 'ActivatorExample'
+
+        self.N_nodes = 2
+        self.edges = [('S0', 'H0')]
+
+        if activator_signals:
+            self.edge_types = [EdgeType.A,
+                               ]
+        else:
+            self.edge_types = [EdgeType.I,
+                               ]
+
+        self.node_type_dict = {'S': NodeType.signal}
+        # self.node_type_dict = None
+
+        self.add_interactions = True
+
+class InhibitorExample(LibNet):
+
+    def __init__(self, activator_signals: bool=False, one_input: bool=False):
+        '''
+        This is indicated to be a tri-stable network. It is used for
+        parameter space searches to look for further states with changes
+        to parameters. This is the monostable example in our first paper.
+
+        '''
+        # Initialize the superclass:
+        super().__init__()
+
+        self.name = 'InhibitorExample'
+
+        self.N_nodes = 2
+        self.edges = [('S0', 'H0')]
+
+        if activator_signals:
+            self.edge_types = [EdgeType.A,
+                               ]
+        else:
+            self.edge_types = [EdgeType.I,
+                               ]
+
+        self.node_type_dict = {'S': NodeType.signal}
+        # self.node_type_dict = None
+
+        self.add_interactions = True
+
 class BinodeChain(LibNet):
 
     def __init__(self, activator_signals: bool=True, one_input: bool=False):
@@ -64,8 +122,6 @@ class BinodeChain(LibNet):
                 self.edge_types = [EdgeType.I,
                                    EdgeType.I,
                                    ]
-
-
 
         self.node_type_dict = {'S': NodeType.signal}
         # self.node_type_dict = None
@@ -1874,3 +1930,210 @@ class hESC_9(LibNet):
         self.add_interactions = True
 
         self.N_input_edges = 4
+
+
+class inference_B(LibNet):
+    '''
+    Works from the DNase Footprint derived TF networks to generate
+    more structure around the classic SOX2-OCT4-NANOG triad.
+    This network allows inputs on all Yamanka factors (SOX2, OCT4, NANOG and KLF4)
+    '''
+
+    def __init__(self, activator_signals: bool=True):
+        '''
+        Works from the DNase Footprint derived TF networks to generate
+        more structure around the classic SOX2-OCT4-NANOG triad.
+
+        '''
+        # Initialize the superclass:
+        super().__init__()
+
+        self.name = 'GRN_B'
+
+        self.N_nodes = 15
+        SOX2 = 'G0'
+        POU5F1 = 'G1'
+        NANOG = 'G2'
+        KLF4 = 'G3'
+        KLF15 = 'G4'
+        SP1 = 'G5'
+        SP2 = 'G6'
+        SP3 = 'G7'
+        EGR2 = 'G8'
+        S0 = 'G9'
+        S1 = 'G10'
+        S2 = 'G11'
+        E3 = 'G12'
+        E0 = 'G13'
+        E1 = 'G14'
+        E2 = 'G15'
+
+
+        self.edges = [
+            (EGR2, KLF15),
+            (EGR2, KLF4),
+            (EGR2, POU5F1),
+            (EGR2, SOX2),
+            (EGR2, SP1),
+            (EGR2, SP2),
+            (EGR2, SP3),
+            (KLF15, KLF15),
+            (KLF15, KLF4),
+            (KLF15, POU5F1),
+            (KLF15, SOX2),
+            (KLF15, SP1),
+            (KLF15, SP2),
+            (KLF15, SP3),
+            (KLF4, KLF15),
+            (KLF4, KLF4),
+            (KLF4, NANOG),
+            (KLF4, POU5F1),
+            (KLF4, SOX2),
+            (KLF4, SP1),
+            (NANOG, POU5F1),
+            (NANOG, SOX2),
+            (POU5F1, EGR2),
+            (POU5F1, NANOG),
+            (POU5F1, POU5F1),
+            (POU5F1, SOX2),
+            (SOX2, NANOG),
+            (SOX2, POU5F1),
+            (SOX2, SOX2),
+            (SP1, EGR2),
+            (SP1, KLF15),
+            (SP1, KLF4),
+            (SP1, POU5F1),
+            (SP1, SOX2),
+            (SP1, SP1),
+            (SP1, SP2),
+            (SP1, SP3),
+            (SP2, EGR2),
+            (SP2, KLF15),
+            (SP2, KLF4),
+            (SP2, POU5F1),
+            (SP2, SOX2),
+            (SP2, SP1),
+            (SP2, SP2),
+            (SP2, SP3),
+            (SP3, EGR2),
+            (SP3, KLF15),
+            (SP3, KLF4),
+            (SP3, POU5F1),
+            (SP3, SOX2),
+            (SP3, SP1),
+            (SP3, SP2),
+            (SP3, SP3),
+            (S2, NANOG),
+            (S1, SOX2),
+            (S0, POU5F1),
+            (SOX2, E0),
+            (SOX2, E3),
+            (KLF4, E1),
+            (POU5F1, E2)
+                 ]
+
+        self.edge_types = [EdgeType.A for i in self.edges]
+        # self.edge_types[-4:] = [EdgeType.I, EdgeType.I, EdgeType.I, EdgeType.I]
+
+        self.node_type_dict = None
+
+        self.add_interactions = True
+
+        self.N_input_edges = 3
+
+class inference_A(LibNet):
+    '''
+
+    '''
+
+    def __init__(self, activator_signals: bool=True):
+        '''
+        This biological network is the PI3K/AKT/mTOR signaling transduction pathway.
+
+        The network is sourced from the reference:
+
+        Glaviano et al. PI3K/AKT/mTOR signaling transduction pathway and targeted therapies in cancer.
+        Mol Cancer. 2023 Aug 18;22(1):138. doi: 10.1186/s12943-023-01827-6.
+
+        The modelled network has been simplified from the source reference by combining elements in direct
+        signalling chains.
+
+        '''
+        # Initialize the superclass:
+        super().__init__()
+
+        self.name = 'GRN_A'
+
+        GrowthRTK = 'G0'
+        RAS = 'G1'
+        GAB12 = 'G2'
+        SurvivalRTK = 'G3'
+        PI3K = 'G4'
+        WntFrizzled = 'G5'
+        Dsh = 'G6'
+        RAF = 'G7'
+        AKT = 'G8'
+        TSCComplex = 'G9'
+        FOXO = 'G10'
+        AxinComplex = 'G11'
+        ERK= 'G12'
+        bCAT = 'G13'
+        mTORC1 = 'G14'
+        eIF4E = 'G15'
+        EBP1 = 'G16'
+
+        self.N_nodes = 17
+        self.edges = [
+                      (GrowthRTK, RAS),
+                      (GrowthRTK, GAB12),
+                      (SurvivalRTK, PI3K),
+                      (WntFrizzled, Dsh),
+                      (RAS, RAF),
+                      (RAS, PI3K),
+                      (GAB12, PI3K),
+                      (PI3K, AKT),
+                      (AKT, RAF),
+                      (AKT, TSCComplex),
+                      (AKT, FOXO),
+                      (AKT, AxinComplex),
+                      (AKT, bCAT),
+                      (Dsh, AxinComplex),
+                      (AxinComplex, bCAT),
+                      (RAF, ERK),
+                      (ERK, TSCComplex),
+                      (ERK, mTORC1),
+                      (ERK, eIF4E),
+                      (TSCComplex, mTORC1),
+                      (mTORC1, EBP1),
+                      (EBP1, eIF4E),
+
+                 ]
+
+        self.edge_types = [EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.I,
+                           EdgeType.I,
+                           EdgeType.I,
+                           EdgeType.I,
+                           EdgeType.A,
+                           EdgeType.I,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.I,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.I,
+                           EdgeType.I
+                      ]
+
+
+        self.node_type_dict = None
+
+        self.add_interactions = True
