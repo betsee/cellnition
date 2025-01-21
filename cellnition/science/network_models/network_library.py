@@ -1310,15 +1310,15 @@ class StemCellNet(LibNet):
 
                  ]
 
-        self.edge_types = [EdgeType.A,
-                           EdgeType.A,
-                           EdgeType.A,
-                           EdgeType.A,
-                           EdgeType.A,
-                           EdgeType.A,
+        self.edge_types = [EdgeType.I,
                            EdgeType.A,
                            EdgeType.A,
                            EdgeType.I,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
                            EdgeType.A,
                            EdgeType.I,
                       ]
@@ -1350,7 +1350,7 @@ class StemCellTriad(LibNet):
 
         self.name = 'StemCellTriad'
 
-        self.N_nodes = 8
+        self.N_nodes = 3
         self.edges = [
                       ('NANOG', 'OCT4'),
                       ('OCT4', 'NANOG'),
@@ -1360,25 +1360,19 @@ class StemCellTriad(LibNet):
                       ('NANOG', 'SOX2'),
                       ('SOX2', 'SOX2'),
                       ('OCT4', 'OCT4'),
-                      ('S1', 'SOX2'),
-                      ('S2', 'NANOG'),
-                      ('S0', 'OCT4')
                  ]
 
-        self.edge_types = [EdgeType.A,
-                           EdgeType.A,
-                           EdgeType.A,
-                           EdgeType.A,
-                           EdgeType.A,
-                           EdgeType.A,
+        self.edge_types = [EdgeType.I,
                            EdgeType.A,
                            EdgeType.A,
                            EdgeType.I,
-                           EdgeType.I,
-                           EdgeType.I
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
                       ]
 
-        self.N_input_edges = 3
+        self.N_input_edges = 0
 
         self.node_type_dict = None
 
