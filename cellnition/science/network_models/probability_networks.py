@@ -513,6 +513,8 @@ class ProbabilityNet(NetworkABC):
                                                n_base=n_base,
                                                beta_base=beta_base)
 
+        self._function_args = function_args
+
         for cvecto in M_pstates: # for each test vector:
             # get values for the genes we're solving for...
             # Note: fsolve doesn't allow us to impose constraints so we need to push this initial guess

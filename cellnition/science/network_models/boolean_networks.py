@@ -315,7 +315,7 @@ class BooleanNet():
                 elif etype is EdgeType.I or etype is EdgeType.Is:
                     A_inhi_so[nde_j, nde_i] = 1
 
-            ic_vect_s = sp.Matrix([1, 1, 1]) - c_vect_s
+            ic_vect_s = sp.Matrix(onesv) - c_vect_s
 
             denom = (A_acti_so + A_inhi_so).dot(onesv)
             idenom = (denom == 0).nonzero()[0]  # indices where denom is zero
@@ -369,7 +369,10 @@ class BooleanNet():
     def net_state_compute(self,
                               cc_o: ndarray|list,
                               A_bool_f: Callable,
-                              n_max_steps: int=10):
+                              n_max_steps: int=10,
+                              constraint_inds: list|None=None,
+                              constraint_vals: list|None=None,
+                              verbose: bool=False):
         '''
 
         '''
@@ -378,14 +381,32 @@ class BooleanNet():
         sol_char = EquilibriumType.undetermined # initialize to undetermined
 
         for i in range(n_max_steps):
+            # A true "OR" function will return the maximum of the list of booleans.
+            # Here we divide through our system by the number of agents participating
+            # in the target node interaction. This produces a fractional output.
+            # We have found that if we round this fractional output, which sends 0.5 <= to 0.0 and
+            # 0.5 > to 1.0, then we do not obtain results that match the continuous model, and also,
+            # this method is not performing an "OR" operation between the elements. However,
+            # if we instead say *any* non-expression -> 1.0 then the system does match that of the
+            # continuous pdes, and it is also the true "OR" operation.
+            cc_i = np.int8(np.sign(A_bool_f(cc_i)[0]))  # calculate new state values
 
-            cc_i = np.int8(np.round(A_bool_f(cc_i)[0]))  # calculate new ones
+            # If there are constraints on some node vals, force them to the constraint:
+            if constraint_inds is not None and constraint_vals is not None:
+                cc_i[constraint_inds] = constraint_vals
+
             solsv.append(cc_i)
 
+            if verbose:
+                print(solsv[-2], solsv[-1])
+
+            # Detect whether we're at a steady-state:
             if (solsv[i] == solsv[i - 1]).all() is NumpyTrue:
                 sol_char = EquilibriumType.attractor
                 break
 
+            # Detect whether we're oscillating in a limit cycle (back and forth
+            # between two states).
             elif i >= 2 and (solsv[i - 2] == solsv[i]).all() is NumpyTrue:
                 sol_char = EquilibriumType.limit_cycle
                 break
@@ -399,7 +420,8 @@ class BooleanNet():
                            constraint_vals: list|None = None,
                            signal_constr_vals: list|None = None,
                            search_main_nodes_only: bool=False,
-                           n_max_steps: int = 10
+                           n_max_steps: int = 10,
+                           verbose: bool=False,
                            ):
         '''
         Solve for the equilibrium states of gene product in
@@ -412,7 +434,6 @@ class BooleanNet():
         constrained_inds, constrained_vals = self._handle_constrained_nodes(constraint_inds,
                                                                             constraint_vals,
                                                                             signal_constr_vals=signal_constr_vals)
-
 
         if constrained_inds is None or constrained_vals is None:
             unconstrained_inds = self.nodes_index
@@ -434,18 +455,29 @@ class BooleanNet():
         sol_char = []
 
         for cvecto in M_pstates: # for each test vector:
-            # get values for the genes we're solving for...
-            # Note: fsolve doesn't allow us to impose constraints so we need to push this initial guess
-            # quite far away from zero with the added constant:
-            sol_i, char_i = self.net_state_compute(cvecto, A_bool_f, n_max_steps=n_max_steps)
-            c_eqms = np.zeros(self.N_nodes, dtype=int)
-            c_eqms[unconstrained_inds] = sol_i
-
+            # Need to modify the cvect vector to hold the value of the input nodes:
             if constrained_inds is not None and constrained_vals is not None:
-                c_eqms[constrained_inds] = constrained_vals
+                cvecto[constrained_inds] = constrained_vals
 
-            sol_Mo.append(c_eqms)
+            # get values for the genes we're solving for:
+            sol_i, char_i = self.net_state_compute(cvecto,
+                                                   A_bool_f,
+                                                   n_max_steps=n_max_steps,
+                                                   verbose=False,
+                                                   constraint_inds = constrained_inds,
+                                                   constraint_vals = constrained_vals)
+
+            # c_eqms = np.zeros(self.N_nodes, dtype=int)
+            # c_eqms[unconstrained_inds] = sol_i[unconstrained_inds]
+            #
+            # if constrained_inds is not None and constrained_vals is not None:
+            #     c_eqms[constrained_inds] = constrained_vals
+
+            sol_Mo.append(sol_i)
             sol_char.append(char_i)
+
+            if verbose:
+                print(cvecto, sol_i, char_i)
 
         _, unique_inds = np.unique(sol_Mo, axis=0, return_index=True)
 

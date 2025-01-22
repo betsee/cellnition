@@ -1925,7 +1925,6 @@ class hESC_9(LibNet):
 
         self.N_input_edges = 4
 
-
 class inference_B(LibNet):
     '''
     Works from the DNase Footprint derived TF networks to generate
