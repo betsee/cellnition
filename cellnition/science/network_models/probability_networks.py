@@ -683,7 +683,7 @@ class ProbabilityNet(NetworkABC):
                                   constr_inds: list | None,
                                   constr_vals: list[float] | None,
                                   signal_constr_vals: list[float] | None = None
-                                  ) -> tuple[list, list[float]]:
+                                  ) -> tuple[list, list]:
         '''
         Networks will often have nodes without regulation that need to
         be constrained during optimization. This helper-method augments
@@ -705,8 +705,13 @@ class ProbabilityNet(NetworkABC):
                 constrained_inds = constr_inds + self.input_node_inds.copy()
                 constrained_vals = constr_vals + sig_vals
         else:
-            constrained_inds = constr_inds*1
-            constrained_vals = constr_vals*1
+            if constr_inds is None or constr_vals is None:
+                constrained_inds = []
+                constrained_vals = []
+
+            else:
+                constrained_inds = constr_inds*1
+                constrained_vals = constr_vals*1
 
         return constrained_inds, constrained_vals
 

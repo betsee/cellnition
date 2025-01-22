@@ -30,7 +30,6 @@ from sympy.core.symbol import Symbol
 from sympy.tensor.indexed import Indexed
 import pygraphviz as pgv
 
-
 class BooleanNet():
     '''
     Initialize the class and build and characterize a network.
@@ -365,6 +364,8 @@ class BooleanNet():
 
         return c_vect_s, A_bool_s, A_bool_f
 
+    #---Boolean Model Solving----------
+
     def net_state_compute(self,
                               cc_o: ndarray|list,
                               A_bool_f: Callable,
@@ -390,6 +391,127 @@ class BooleanNet():
                 break
 
         return cc_i, sol_char
+
+
+    def solve_system_equms(self,
+                           A_bool_f: Callable,
+                           constraint_inds: list|None = None,
+                           constraint_vals: list|None = None,
+                           signal_constr_vals: list|None = None,
+                           search_main_nodes_only: bool=False,
+                           n_max_steps: int = 10
+                           ):
+        '''
+        Solve for the equilibrium states of gene product in
+        terms of a given set of boolean (0, 1) values.
+        '''
+
+        # For any network, there may be nodes without regulation that require constraints
+        # (these are in self._constrained_nodes). Therefore, add these to any user-supplied
+        # constraints:
+        constrained_inds, constrained_vals = self._handle_constrained_nodes(constraint_inds,
+                                                                            constraint_vals,
+                                                                            signal_constr_vals=signal_constr_vals)
+
+
+        if constrained_inds is None or constrained_vals is None:
+            unconstrained_inds = self.nodes_index
+        else:
+            unconstrained_inds = np.setdiff1d(self.nodes_index, constrained_inds).tolist()
+
+        if search_main_nodes_only is False:
+            M_pstates, _, _ = self.generate_state_space(unconstrained_inds)
+
+        else:
+            if len(self.main_nodes):
+                M_pstates, _, _ = self.generate_state_space(self.main_nodes)
+
+            else:
+                raise Exception("No main nodes; cannot perform state search with "
+                                "search_main_nodes_only=True.")
+
+        sol_Mo = []
+        sol_char = []
+
+        for cvecto in M_pstates: # for each test vector:
+            # get values for the genes we're solving for...
+            # Note: fsolve doesn't allow us to impose constraints so we need to push this initial guess
+            # quite far away from zero with the added constant:
+            sol_i, char_i = self.net_state_compute(cvecto, A_bool_f, n_max_steps=n_max_steps)
+            c_eqms = np.zeros(self.N_nodes, dtype=int)
+            c_eqms[unconstrained_inds] = sol_i
+
+            if constrained_inds is not None and constrained_vals is not None:
+                c_eqms[constrained_inds] = constrained_vals
+
+            sol_Mo.append(c_eqms)
+            sol_char.append(char_i)
+
+        _, unique_inds = np.unique(sol_Mo, axis=0, return_index=True)
+
+        sol_M = (np.asarray(sol_Mo, dtype=int)[unique_inds]).T
+        sol_char = np.asarray(sol_char)[unique_inds]
+
+        return sol_M, sol_char
+
+    def generate_state_space(self,
+                             c_inds: list,
+                             ) -> tuple[ndarray, list, ndarray]:
+        '''
+        Generate a discrete state space over the range of probabilities of
+        each individual gene in the network.
+        '''
+        c_lins = []
+
+        for i in c_inds:
+            c_lins.append(np.asarray([0, 1], dtype=int))
+
+        cGrid = np.meshgrid(*c_lins)
+
+        N_pts = len(cGrid[0].ravel())
+
+        cM = np.zeros((N_pts, self.N_nodes), dtype=int)
+
+        for i, cGrid in zip(c_inds, cGrid):
+            cM[:, i] = cGrid.ravel()
+
+        return cM, c_lins, cGrid
+
+    def _handle_constrained_nodes(self,
+                                  constr_inds: list | None,
+                                  constr_vals: list | None,
+                                  signal_constr_vals: list | None = None
+                                  ) -> tuple[list, list]:
+        '''
+        Networks will often have nodes without regulation that need to
+        be constrained during optimization. This helper-method augments
+        these naturally-occuring nodes with any additional constraints
+        supplied by the user.
+        '''
+        len_constr = len(self.input_node_inds)
+
+        if signal_constr_vals is None: # default to zero
+            sig_vals = (np.int8(np.zeros(len_constr))).tolist()
+        else:
+            sig_vals = signal_constr_vals
+
+        if len_constr != 0:
+            if constr_inds is None or constr_vals is None:
+                constrained_inds = self.input_node_inds.copy()
+                constrained_vals = sig_vals
+            else:
+                constrained_inds = constr_inds + self.input_node_inds.copy()
+                constrained_vals = constr_vals + sig_vals
+        else:
+            if constr_inds is None or constr_vals is None:
+                constrained_inds = []
+                constrained_vals = []
+
+            else:
+                constrained_inds = constr_inds*1
+                constrained_vals = constr_vals*1
+
+        return constrained_inds, constrained_vals
 
 
     #----Characterizing the Network/Graph--------
