@@ -409,6 +409,9 @@ class BooleanNet():
             # between two states).
             elif i >= 2 and (solsv[i - 2] == solsv[i]).all() is NumpyTrue:
                 sol_char = EquilibriumType.limit_cycle
+                # FIXME: this should be the average of the two states,
+                # yet that would be a float. So how do we do this?
+                cc_i = (solsv[i - 2] + solsv[i]) # sum of the two bi-stable states
                 break
 
         return cc_i, sol_char
@@ -1071,24 +1074,6 @@ class BooleanNet():
         # dtv[self.sensor_node_inds] = 1.0
 
         return tvect, tvectr
-
-    # @abstractmethod
-    def run_time_sim(self,
-                     tvect: ndarray | list,
-                     tvectr: ndarray | list,
-                     cvecti: ndarray | list,
-                     sig_inds: ndarray | list | None = None,
-                     sig_vals: list | ndarray | None = None,
-                     constrained_inds: list | None = None,
-                     constrained_vals: list | None = None,
-                     d_base: float = 1.0,
-                     n_base: float = 15.0,
-                     beta_base: float = 0.25
-                     ):
-        '''
-
-        '''
-        pass
 
     # ----Plots and Data Export----------------
     def save_network(self, filename: str):
