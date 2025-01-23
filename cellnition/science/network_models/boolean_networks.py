@@ -411,7 +411,6 @@ class BooleanNet():
                 sol_char = EquilibriumType.limit_cycle
                 # FIXME: this should be the average of the two states,
                 # yet that would be a float. So how do we do this?
-                cc_i = (solsv[i - 2] + solsv[i]) # sum of the two bi-stable states
                 break
 
         return cc_i, sol_char

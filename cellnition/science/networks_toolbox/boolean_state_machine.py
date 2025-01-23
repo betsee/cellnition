@@ -20,6 +20,7 @@ from cellnition._util.path.utilpathmake import FileRelative
 from cellnition._util.path.utilpathself import get_data_png_glyph_stability_dir
 from collections import OrderedDict
 from numpy import ndarray
+from cellnition.types import NumpyTrue
 import matplotlib.pyplot as plt
 from matplotlib import colors
 from matplotlib import colormaps
@@ -194,7 +195,7 @@ class BoolStateMachine(object):
             sig_test_set[:, i] = sigM.ravel()
 
         solsM_allo = np.zeros((self._bnet.N_nodes, 1), dtype=int)
-        charM_allo = [EquilibriumType.undetermined]
+        charM_allo = [EquilibriumType.attractor]
         sols_list = []
 
         for sigis in sig_test_set:
@@ -217,9 +218,11 @@ class BoolStateMachine(object):
                 print(sols_M)
                 print('----')
 
-        # first use numpy unique set of solutions to exclude identical states:
-        _, inds_solsM_all_unique = np.unique(solsM_allo[self._bnet.noninput_node_inds, :],
-                                             return_index=True, axis=1)
+        # Eliminate duplicate states, but stack on strings of the eqm char
+        # so we don't lose states with the same values but with different eq'm:
+        chrm = [eqt.name for eqt in charM_allo]
+        checkM = np.vstack((solsM_allo[self._bnet.noninput_node_inds, :], chrm))
+        _, inds_solsM_all_unique = np.unique(checkM, return_index=True, axis=1)
         solsM_all = solsM_allo[:, inds_solsM_all_unique]
         charM_all = np.asarray(charM_allo)[inds_solsM_all_unique]
 
