@@ -189,7 +189,7 @@ class BoolStateMachine(object):
 
         N_vocab = len(sigGrid[0].ravel())
 
-        sig_test_set = np.zeros((N_vocab, len(self._bnet.input_node_inds)))
+        sig_test_set = np.zeros((N_vocab, len(self._bnet.input_node_inds)), dtype=int)
 
         for i, sigM in enumerate(sigGrid):
             sig_test_set[:, i] = sigM.ravel()
@@ -248,7 +248,7 @@ class BoolStateMachine(object):
                                   verbose: bool = True,
                                   remove_inaccessible_states: bool=False,
                                   save_graph_file: str|None = None,
-                                  save_time_runs: bool=False
+                                  n_max_steps: int=10
                                   ) -> tuple[set, set, MultiDiGraph]:
         '''
         Build a state transition matrix/diagram by starting the system
@@ -305,156 +305,107 @@ class BoolStateMachine(object):
         # the perturbation.
 
         sig_inds = self._bnet.input_node_inds
-        N_sigs = len(sig_inds)
-
-        # We want all signals on at the same time (we want the sim to end before
-        # the signal changes again:
-        sig_times = [(delta_sig, 2*delta_sig) for i in range(N_sigs)]
-
-        tend = sig_times[-1][1] + delta_sig
 
         transition_edges_set = set()
         perturbation_edges_set = set()
 
         num_step = 0
 
-        # Get the full time vector and the sampled time vector (tvectr)
-        tvect, tvectr = self._bnet.make_time_vects(tend, dt, dt_samp)
-
-        # Create sampling windows in time:
-        window1 = (0.0 + t_relax, sig_times[0][0])
-        window2 = (sig_times[0][0] + t_relax, sig_times[0][1])
-        window3 = (sig_times[0][1] + t_relax, tend)
-        # get the indices for each window time:
-        inds_win1 = (
-            self._get_index_from_val(tvectr, window1[0], dt_samp),
-            self._get_index_from_val(tvectr, window1[1], dt_samp))
-        inds_win2 = (
-            self._get_index_from_val(tvectr, window2[0], dt_samp),
-            self._get_index_from_val(tvectr, window2[1], dt_samp))
-        inds_win3 = (
-            self._get_index_from_val(tvectr, window3[0], dt_samp),
-            self._get_index_from_val(tvectr, window3[1], dt_samp))
-
-        _all_time_runs = []
-
         # We want to step through all 'held' signals and potentially multistable states:
+        # The "base" refers to the base context of the system:
         for base_input_label, (sig_base_set, sc_dict) in enumerate(states_dict.items()):
 
-            states_set = sc_dict['States']
+            # states_set = sc_dict['States']
 
             # Get an integer label for the 'bitstring' of signal node inds defining the base:
             # base_input_label = self._get_integer_label(sig_base_set)
+            # We want to use each state in states_set as the initial condition:
+            for si, cvect_co in enumerate(solsM_all.T): # step through all stable states
 
-            # We then step through all possible perturbation signals:
-            for pert_input_label, sig_val_set in enumerate(sig_test_set):
+                # Initial state vector, which will be held at the base_input context
+                cvect_co[sig_inds] = sig_base_set
+                # ensure that this initial state is indeed stable in the context:
+                cvect_c, char_c = self._bnet.net_state_compute(cvect_co,
+                                                               self._bnet._A_bool_f,
+                                                               n_max_steps=n_max_steps,
+                                                               verbose=False)
+                initial_state, match_error_initial = self._find_state_match(solsM_all[self._bnet.noninput_node_inds, :],
+                                                                      cvect_c[self._bnet.noninput_node_inds])
 
-                # Get an integer label for the 'bitstring' of signal node inds on perturbation:
-                # pert_input_label = self._get_integer_label(sig_val_set)
+                if match_error_initial > 0.0:  # if held state is unmatched, flag it with a nan
+                    solsM_all = np.column_stack((solsM_all, cvect_c))
+                    initial_state = solsM_all.shape[1] - 1
 
-                # we want the signals to go from zero to the new held state defined in sig_val set:
-                sig_mags = [(sigb, sigi) for sigb, sigi in zip(sig_base_set, sig_val_set)]
+                    if verbose:
+                        print(f'WARNING: Initial state not found; adding new state {initial_state} to the solution set...')
 
-                # We want to use each state in states_set as the initial condition:
-                for si in states_set:
-                    # Initial state vector: add the small non-zero amount to prevent 0/0 in Hill functions:
-                    cvecti = 1 * solsM_all[:, si] + self._bnet.p_min
+                # Add this transition to the state transition diagram:
+                transition_edges_set.add((si, initial_state, base_input_label))
+                if verbose:
+                    print(f'Transition from State {si} to {initial_state} via {base_input_label}')
 
-                    # if verbose:
-                    #     print(f'Start state {si}...')
 
-                    c_signals = self._bnet.make_pulsed_signals_matrix(tvect, sig_inds, sig_times, sig_mags)
+                # We then step through all possible perturbation signals that act on the state in the set:
+                for pert_input_label, sig_pert_set in enumerate(sig_test_set):
+                    cvect_ho = cvect_co.copy()
+                    cvect_ho[sig_inds] = sig_pert_set # apply the perturbation to the state
+                    cvect_h, char_h = self._bnet.net_state_compute(cvect_ho,
+                                                               self._bnet._A_bool_f,
+                                                               n_max_steps=n_max_steps,
+                                                               verbose=False)
 
-                    ctime = self._bnet.run_time_sim(tvect, tvectr, cvecti.copy(),
-                                                    sig_inds=sig_inds,
-                                                    sig_vals=c_signals,
-                                                    constrained_inds=None,
-                                                    constrained_vals=None,
-                                                    d_base=d_base,
-                                                    n_base=n_base,
-                                                    beta_base=beta_base
-                                                    )
-
-                    c_initial = np.mean(ctime[inds_win1[0]:inds_win1[1], :], axis=0)
-                    # var_c_initial = np.sum(np.std(ctime[inds_win1[0]:inds_win1[1], :], axis=0))
-
+                    # FIXME: the find_state_match method should use the equm' char as well as the state values!
                     # match the network state to one that only involves the hub nodes:
-                    initial_state, match_error_initial = self._find_state_match(solsM_all[self._bnet.noninput_node_inds, :],
-                                                                                c_initial[self._bnet.noninput_node_inds])
-                    # initial_state, match_error_initial = self._find_state_match(solsM_all, c_initial)
-
-                    if match_error_initial > match_tol: # if state is unmatched, flag it with a nan
-                        if verbose:
-                            print(f'Initial state not found; adding new state to the solution set...')
-                        solsM_all = np.column_stack((solsM_all, c_initial))
-                        initial_state = solsM_all.shape[1] - 1
-
-                        # Update the states listing for this input state set
-                        sc_dict2 = states_dict_2[sig_base_set]['States']
-                        sc_dict2.append(initial_state)
-                        states_dict_2[sig_base_set]['States'] = sc_dict2
-
-
-                    c_held = np.mean(ctime[inds_win2[0]:inds_win2[1], :], axis=0)
-                    # var_c_held = np.sum(np.std(ctime[inds_win2[0]:inds_win2[1], :], axis=0))
-
                     held_state, match_error_held = self._find_state_match(solsM_all[self._bnet.noninput_node_inds, :],
-                                                                          c_held[self._bnet.noninput_node_inds])
+                                                                                cvect_h[self._bnet.noninput_node_inds])
+
+                    if match_error_held > 0.0: # if held state is unmatched, flag it with a nan
+                        solsM_all = np.column_stack((solsM_all, cvect_h))
+                        held_state = solsM_all.shape[1] - 1
+
+                        if verbose:
+                            print(f'WARNING: Held state not found; adding new state {held_state} to the solution set...')
+
+                    # Next, re-apply the initial context input state to the held state and see what final state results:
+                    cvect_fo = cvect_h.copy()
+                    cvect_fo[sig_inds] = sig_base_set
+
+                    # find the stable state that results from re-applying the context input state to the held state:
+                    cvect_f, char_f = self._bnet.net_state_compute(cvect_fo,
+                                                               self._bnet._A_bool_f,
+                                                               n_max_steps=n_max_steps,
+                                                               verbose=False)
+
+                    final_state, match_error_final = self._find_state_match(solsM_all[self._bnet.noninput_node_inds, :],
+                                                                          cvect_f[self._bnet.noninput_node_inds])
                     # held_state, match_error_held = self._find_state_match(solsM_all, c_held)
 
-                    if match_error_held > match_tol: # if state is unmatched, flag it
-                        if verbose:
-                            print(f'Held state not found; adding new state to the solution set...')
-                        solsM_all = np.column_stack((solsM_all, c_held))
-                        held_state = solsM_all.shape[1] -1
-
-                        # Update the states listing for this input state set
-                        sc_dict2 = states_dict_2[sig_base_set]['States']
-                        sc_dict2.append(held_state)
-                        states_dict_2[sig_base_set]['States'] = sc_dict2
-
-                    c_final = np.mean(ctime[inds_win3[0]:inds_win3[1], :], axis=0)
-                    # var_c_final = np.sum(np.std(ctime[inds_win3[0]:inds_win3[1], :], axis=0))
-                    final_state, match_error_final = self._find_state_match(solsM_all[self._bnet.noninput_node_inds, :],
-                                                                            c_final[self._bnet.noninput_node_inds])
-                    # final_state, match_error_final = self._find_state_match(solsM_all, c_final)
-
-                    if match_error_final > match_tol: # if state is unmatched, add it to the system
-                        if verbose:
-                            print(f'Final state not found; adding new state to the solution set...')
-                        solsM_all = np.column_stack((solsM_all, c_final))
+                    if match_error_held > 0.0: # if state is unmatched, flag it
+                        solsM_all = np.column_stack((solsM_all, cvect_f))
                         final_state = solsM_all.shape[1] -1
 
-                        # Update the states listing for this input state set
-                        sc_dict2 = states_dict_2[sig_base_set]['States']
-                        sc_dict2.append(final_state)
-                        states_dict_2[sig_base_set]['States'] = sc_dict2
+                        if verbose:
+                            print(f'WARNING: Final state not found; adding new state {final_state} to the solution set...')
+
+
+                    # Now we can consolidate the results:
+                    # This creates the general NFSM:
+                    transition_edges_set.add((initial_state, held_state, pert_input_label))
+                    transition_edges_set.add((held_state, final_state, base_input_label))
 
                     if verbose:
                         print(num_step)
+                        print(f'Transition State {initial_state} to {held_state} via {pert_input_label}')
+                        print(f'Transition State {held_state} to {final_state} via {base_input_label}')
 
-                    if initial_state is not np.nan and held_state is not np.nan and final_state is not np.nan:
-                        transition_edges_set.add((initial_state, held_state, pert_input_label))
-                        transition_edges_set.add((held_state, final_state, base_input_label))
+                    if initial_state != final_state:  # add this to the perturbed transitions:
+                        perturbation_edges_set.add((initial_state, final_state, pert_input_label, base_input_label))
 
                         if verbose:
-                            print(f'Transition State {initial_state} to {held_state} via {pert_input_label}')
-                            print(f'Transition State {held_state} to {final_state} via {base_input_label}')
+                            print(f'Non-trivial perturbed transition identified from State {initial_state} to {final_state} via '
+                                  f'{pert_input_label} under base context {base_input_label}')
 
-                        if initial_state != final_state:  # add this to the perturbed transitions:
-                            perturbation_edges_set.add((initial_state, final_state, pert_input_label, base_input_label))
 
-                            if verbose:
-                                print(f'Perturbed Transition from State {initial_state} to {final_state} via '
-                                      f'{pert_input_label}')
-
-                    else:
-                        if verbose:
-                            print(f'Warning: {initial_state} to {held_state} via {pert_input_label} not added \n '
-                                  f'as state match not found! \n'
-                                  f'Match errors {match_error_initial, match_error_held, match_error_final}')
-
-                    _all_time_runs.append(ctime.copy())
                     num_step += 1
 
                     if verbose:
@@ -465,11 +416,6 @@ class BoolStateMachine(object):
         # transition edges set is make a multidigraph and
         # use networkx to pre-process & simplify it, removing inaccessible states
         # (states with no non-self input degree)
-
-        if save_time_runs:
-            self._all_time_runs = _all_time_runs
-        else:
-            self._all_time_runs = None
 
         self._solsM_all = solsM_all
         self._states_dict = states_dict_2
@@ -493,88 +439,6 @@ class BoolStateMachine(object):
             nx.write_gml(GG, save_graph_file)
 
         return transition_edges_set, perturbation_edges_set, GG
-
-    def sim_time_trajectory(self,
-                            starting_state_i: int,
-                            solsM_all: ndarray,
-                            input_list: list[str],
-                            sig_test_set: list|ndarray,
-                            verbose: bool = True,
-                            ):
-        '''
-        Use a provided starting state and a list of input signals to hold for
-        a specified duration to simulate a time trajectory of the state machine.
-
-        Parameters
-        ----------
-
-        Returns
-        -------
-        '''
-        c_vecti = solsM_all[:, starting_state_i]  # get the starting state concentrations
-
-        sig_inds = self._bnet.input_node_inds
-
-        N_phases = len(input_list)
-        end_t = N_phases * input_hold_duration
-
-        time_noise = np.random.uniform(0.0, time_wobble)
-
-        phase_time_tuples = [(i * input_hold_duration, (i + 1) * input_hold_duration + time_noise) for i in range(N_phases)]
-
-        # Get the full time vector and the sampled time vector (tvectr)
-        tvect, tvectr = self._bnet.make_time_vects(end_t, dt, dt_samp)
-
-        # list of tuples with indices defining start and stop of phase averaging region (for state matching solutions)
-        c_ave_phase_inds = []
-        for ts, te in phase_time_tuples:
-            rtinds = self._bnet.get_interval_inds(tvectr, ts, te, t_wait=t_wait)
-            c_ave_phase_inds.append((rtinds[0], rtinds[-1]))
-
-        # Get the dictionary that allows us to convert between input signal labels and actual held signal values:
-        signal_lookup_dict = self._get_input_signals_from_label_dict(sig_test_set)
-
-        # Generate a signals matrix:
-        sig_M = np.zeros((len(tvect), self._bnet.N_nodes))
-
-        for sig_label, (ts, te) in zip(input_list, phase_time_tuples):
-            # Get the indices for the time this phase is active:
-            tinds_phase = self._bnet.get_interval_inds(tvect, ts, te, t_wait=0.0)
-
-            sig_vals = signal_lookup_dict[sig_label]
-
-            for si, sigv in zip(sig_inds, sig_vals):
-                sig_M[tinds_phase, si] = sigv
-
-        # now we're ready to run the time sim:
-        ctime = self._bnet.run_time_sim(tvect, tvectr, c_vecti.copy(),
-                                        sig_inds=sig_inds,
-                                        sig_vals=sig_M,
-                                        constrained_inds=None,
-                                        constrained_vals=None,
-                                        d_base=d_base,
-                                        n_base=n_base,
-                                        beta_base=beta_base
-                                        )
-
-        # now we want to state match based on average concentrations in each held-input phase:
-        matched_states = []
-        for i, (si, ei) in enumerate(c_ave_phase_inds):
-            c_ave = np.mean(ctime[si:ei, :], axis=0)
-            state_matcho, match_error = self._find_state_match(solsM_all[self._bnet.noninput_node_inds, :],
-                                                               c_ave[self._bnet.noninput_node_inds])
-            if match_error < match_tol:
-                state_match = state_matcho
-
-                matched_states.append(state_match)
-                if verbose:
-                    print(f'Phase {i} state matched to State {state_match} with input {input_list[i]}')
-            else:
-                matched_states.append(np.nan)
-                if verbose:
-                    print(f'Warning! Phase {i} state matched not found (match error: {match_error})!')
-
-        return tvectr, ctime, matched_states, c_ave_phase_inds
 
     def plot_state_transition_network(self,
                                       nodes_listo: list,
