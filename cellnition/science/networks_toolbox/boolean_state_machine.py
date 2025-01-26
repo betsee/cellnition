@@ -195,7 +195,7 @@ class BoolStateMachine(object):
             sig_test_set[:, i] = sigM.ravel()
 
         solsM_allo = np.zeros((self._bnet.N_nodes, 1), dtype=int)
-        charM_allo = [EquilibriumType.attractor]
+        charM_allo = [EquilibriumType.undetermined]
         sols_list = []
 
         for sigis in sig_test_set:
@@ -225,6 +225,21 @@ class BoolStateMachine(object):
         _, inds_solsM_all_unique = np.unique(checkM, return_index=True, axis=1)
         solsM_all = solsM_allo[:, inds_solsM_all_unique]
         charM_all = np.asarray(charM_allo)[inds_solsM_all_unique]
+
+        # Order states by distance from the zero vector
+        solsM_all, charM_all = self._order_states_by_distance(solsM_all, charM_all)
+
+        # Get rid of a duplicate zeros vector:
+        iud = None
+        if (solsM_all[:, 0] == solsM_all[:, 1]).all() is NumpyTrue:
+            if charM_all[0] is EquilibriumType.undetermined:
+                iud = 0
+            elif charM_all[1] is EquilibriumType.undetermined:
+                iud = 1
+
+        if iud is not None:
+            solsM_all = np.delete(solsM_all, iud, axis=1)
+            charM_all = np.delete(charM_all, iud)
 
         states_dict = OrderedDict()
         for sigi in sig_test_set:
@@ -315,12 +330,18 @@ class BoolStateMachine(object):
         # The "base" refers to the base context of the system:
         for base_input_label, (sig_base_set, sc_dict) in enumerate(states_dict.items()):
 
-            # states_set = sc_dict['States']
+            states_set = sc_dict['States']
 
             # Get an integer label for the 'bitstring' of signal node inds defining the base:
             # base_input_label = self._get_integer_label(sig_base_set)
             # We want to use each state in states_set as the initial condition:
-            for si, cvect_co in enumerate(solsM_all.T): # step through all stable states
+            for si in states_set:
+            # for si, cvect_co in enumerate(solsM_all.T): # step through all stable states
+
+                if verbose:
+                    print(f"Testing State {si} in held context I{base_input_label}...")
+
+                cvect_co = solsM_all[:, si]
 
                 # Initial state vector, which will be held at the base_input context
                 cvect_co[sig_inds] = sig_base_set
@@ -339,15 +360,20 @@ class BoolStateMachine(object):
                     if verbose:
                         print(f'WARNING: Initial state not found; adding new state {initial_state} to the solution set...')
 
-                # Add this transition to the state transition diagram:
-                transition_edges_set.add((si, initial_state, base_input_label))
-                if verbose:
-                    print(f'Transition from State {si} to {initial_state} via {base_input_label}')
+                if initial_state != si:
+                    # Add this transition to the state transition diagram:
+                    transition_edges_set.add((si, initial_state, base_input_label))
+                    if verbose:
+                        print(f'State {si} not stable in base context I{base_input_label}:')
+                        print(f'   ->Transitions to {initial_state} via I{base_input_label}...')
+                else:
+                    if verbose:
+                        print(f'State {si} is stable in base context I{base_input_label}.')
 
 
                 # We then step through all possible perturbation signals that act on the state in the set:
                 for pert_input_label, sig_pert_set in enumerate(sig_test_set):
-                    cvect_ho = cvect_co.copy()
+                    cvect_ho = cvect_c.copy()
                     cvect_ho[sig_inds] = sig_pert_set # apply the perturbation to the state
                     cvect_h, char_h = self._bnet.net_state_compute(cvect_ho,
                                                                self._bnet._A_bool_f,
@@ -365,6 +391,10 @@ class BoolStateMachine(object):
 
                         if verbose:
                             print(f'WARNING: Held state not found; adding new state {held_state} to the solution set...')
+
+                    transition_edges_set.add((initial_state, held_state, pert_input_label))
+                    if verbose:
+                        print(f'Initial to Held: Transition from State {initial_state} to {held_state} via pert I{pert_input_label}...')
 
                     # Next, re-apply the initial context input state to the held state and see what final state results:
                     cvect_fo = cvect_h.copy()
@@ -387,30 +417,26 @@ class BoolStateMachine(object):
                         if verbose:
                             print(f'WARNING: Final state not found; adding new state {final_state} to the solution set...')
 
-
-                    # Now we can consolidate the results:
-                    # This creates the general NFSM:
-                    transition_edges_set.add((initial_state, held_state, pert_input_label))
                     transition_edges_set.add((held_state, final_state, base_input_label))
-
                     if verbose:
-                        print(num_step)
-                        print(f'Transition State {initial_state} to {held_state} via {pert_input_label}')
-                        print(f'Transition State {held_state} to {final_state} via {base_input_label}')
+                        print(f'Held to final: Transition from State {held_state} to {final_state} via base I{base_input_label}')
+
+                    # Look for change in the system from initial to final state:
 
                     if initial_state != final_state:  # add this to the perturbed transitions:
                         perturbation_edges_set.add((initial_state, final_state, pert_input_label, base_input_label))
 
                         if verbose:
-                            print(f'Non-trivial perturbed transition identified from State {initial_state} to {final_state} via '
-                                  f'{pert_input_label} under base context {base_input_label}')
+                            print(f'Event-driven transition identified from State {initial_state} to {final_state} via '
+                                  f'event I{pert_input_label} under context I{base_input_label}')
 
 
                     num_step += 1
 
-                    if verbose:
-                        # print(f'Match errors {match_error_initial, match_error_held, match_error_final}')
-                        print('------')
+
+                if verbose:
+                    # print(f'Match errors {match_error_initial, match_error_held, match_error_final}')
+                    print('------')
 
         # The first thing we do after the construction of the
         # transition edges set is make a multidigraph and
@@ -500,7 +526,7 @@ class BoolStateMachine(object):
 
             nde_color += hex_transparency  # add some transparancy to the node
 
-            char_i = charM_all[nde_i] # Get the stability characterization for this state
+            char_i = charM_all[nde_i].name # Get the stability characterization for this state
 
             G.add_node(nde_i,
                            label=f'State {nde_lab}',
@@ -612,7 +638,7 @@ class BoolStateMachine(object):
 
             nde_i_color += hex_transparency  # add some transparency to the node
 
-            chr_i = charM_all[st_i]
+            chr_i = charM_all[st_i].name
 
             Gsub.add_node(nde_i_name,
                           label=nde_i_lab,
@@ -630,7 +656,7 @@ class BoolStateMachine(object):
             nde_f_lab = f'State {st_f}'
             nde_f_color = colors.rgb2hex(cmap(norm(st_f)))
             nde_f_color += hex_transparency  # add some transparency to the node
-            chr_f = charM_all[st_f]
+            chr_f = charM_all[st_f].name
 
             Gsub.add_node(nde_f_name,
                           label=nde_f_lab,
@@ -689,7 +715,7 @@ class BoolStateMachine(object):
         progressively closer to one another, in order to see a more
         logical transition through the network with perturbation.
         '''
-        zer_sol = np.zeros(solsM_all[:, 0].shape)
+        zer_sol = np.zeros(solsM_all[:, 0].shape, dtype=int)
         dist_list = []
 
         for soli in solsM_all.T:
