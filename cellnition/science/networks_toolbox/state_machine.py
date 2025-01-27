@@ -107,19 +107,18 @@ class StateMachine(object):
                           N_space: int=3,
                           search_tol: float=1.0e-15,
                           sol_tol: float=1.0e-2,
-                          N_round_sol: int=1,
                           dt: float = 1.0e-3,
                           space_sig: float = 30.0,
                           delta_sig: float = 30.0,
                           t_relax: float = 15.0,
                           dt_samp: float = 0.15,
-                          match_tol: float = 0.05,
+                          match_tol: float = 0.0,
                           save_graph_file: str|None =None,
                           save_transition_net_image: str | None = None,
                           save_perturbation_net_image: str|None = None,
                           graph_layout: str = 'dot',
                           remove_inaccessible_states: bool = True,
-                          unique_sol_index: bool=True,
+                          node_expression_levels: int|float = 4.0,
                           search_main_nodes_only: bool = False
                           ) -> MultiDiGraph:
         '''
@@ -140,8 +139,8 @@ class StateMachine(object):
                                                             N_space=N_space,
                                                             search_tol=search_tol,
                                                             sol_tol=sol_tol,
-                                                            N_round_sol=N_round_sol,
-                                                            search_main_nodes_only=search_main_nodes_only
+                                                            search_main_nodes_only=search_main_nodes_only,
+                                                            node_expression_levels=node_expression_levels,
                                                             )
 
         # save entities to the object:
@@ -154,7 +153,6 @@ class StateMachine(object):
         # Create the edges of the transition network:
         transition_edges_set, pert_edges_set, G_nx = self.create_transition_network(states_dict, sig_test_set, solsM_all,
                                                                      dt=dt,
-                                                                     space_sig=space_sig,
                                                                      delta_sig=delta_sig,
                                                                      t_relax=t_relax,
                                                                      dt_samp=dt_samp,
@@ -177,11 +175,9 @@ class StateMachine(object):
             G_pert = self.plot_state_perturbation_network(self.pert_edges_set,
                                                            self.states_dict,
                                                           solsM_all,
-                                                           nodes_listo=nodes_list,
                                                            save_file=save_perturbation_net_image,
-                                                          graph_layout=graph_layout,
-                                                          unique_sol_index=unique_sol_index,
-                                                          N_round_sol=N_round_sol)
+                                                          graph_layout=graph_layout
+                                                          )
 
         if save_transition_net_image is not None: # save an image of the network to file:
             # get nodes and edges list:
@@ -192,10 +188,7 @@ class StateMachine(object):
                                                       edges_list,
                                                       solsM_all,
                                                       charM_all,
-                                                      save_file=save_transition_net_image,
-                                                      graph_layout=graph_layout,
-                                                      use_unique_sol_index=unique_sol_index,
-                                                      N_round_sol=N_round_sol
+                                                      graph_layout=graph_layout
                                                       )
 
         return G_nx
@@ -212,8 +205,7 @@ class StateMachine(object):
                                       sol_tol: float=1.0e-2,
                                       N_round_sol: int=1,
                                       search_main_nodes_only: bool = False,
-                                      cluster_threshhold: float=0.1,
-                                      cluster_method: str = 'distance',
+                                      node_expression_levels: int|float = 4.0,
                                       sig_lino: list|None = None
                                       ):
         '''
@@ -221,6 +213,9 @@ class StateMachine(object):
         and collect and identify all equilibrium points of the system.
 
         '''
+
+        if node_expression_levels <= 1:
+            raise Exception("Node expression levels must be greater than 1!")
 
         if sig_lino is None:
             sig_lin = [1.0e-6, 1.0]
@@ -282,7 +277,13 @@ class StateMachine(object):
                 solsM_all = np.hstack((solsM_all, soli))
             charM_all.extend(chari)
 
-        # First append all attractor types as an integer value as a way to
+
+
+        # Use numpy unique on specially-rounded set of solutions to exclude similar state cases:
+        solsM_all = np.round(solsM_all*(node_expression_levels -1))/(node_expression_levels -1)
+        self._node_expression_levels = node_expression_levels # need to save this for later
+
+        # Next, append all attractor types as an integer value as a way to
         # further distinguish states by their dynamics:
         charM_all_vals = []
         for ci in charM_all:
@@ -290,52 +291,20 @@ class StateMachine(object):
             if attr_type is not None:
                 charM_all_vals.append(attr_type.value)
 
-        solsM_all_char = np.vstack((solsM_all, charM_all_vals))
-
         select_inds = []
         select_inds.extend(self._pnet.noninput_node_inds)
         select_inds.append(-1)
 
-        # # # first use numpy unique on rounded set of solutions to exclude similar cases:
-        # _, inds_solsM_all_unique = np.unique(np.round(solsM_all_char[select_inds, :],
-        #                                               N_round_sol), return_index=True, axis=1)
-        # #
-        # solsM_all_char = solsM_all_char[:, inds_solsM_all_unique]
-        # charM_all = np.asarray(charM_all)[inds_solsM_all_unique]
+        solsM_all_char = np.vstack((solsM_all, charM_all_vals))
 
-        # Next use a clustering algorithm to disregard solutions that are very close
-        # to one another in terms of an Euclidian vector distance:
+        # Indices of unique solutions:
+        _, inds_solsM_all_unique = np.unique(solsM_all_char[select_inds, :], return_index=True, axis=1)
 
-        unique_sol_clusters = fclusterdata(solsM_all_char[select_inds, :].T,
-                                           t=cluster_threshhold,
-                                           criterion=cluster_method)
-
-        cluster_index = np.unique(unique_sol_clusters)
-
-        cluster_pool = [[] for i in cluster_index]
-        for i, clst_i in enumerate(unique_sol_clusters):
-            cluster_pool[int(clst_i) - 1].append(i)
-
-        solsM_all_unique = np.zeros((self._pnet.N_nodes, len(cluster_pool)))
-        charM_all_unique = []
-
-        for ii, sol_i in enumerate(cluster_pool):
-            if len(sol_i):
-                solsM_all_unique[self._pnet.noninput_node_inds, ii] = (
-                    np.mean(solsM_all[:, sol_i][self._pnet.noninput_node_inds], 1))
-                # print(np.asarray(charM_all)[sol_i])
-                charM_all_unique.append(charM_all[sol_i[0]])
-
-        # redefine the solsM_all and charM_all data structures:
-        solsM_all = solsM_all_unique
-        charM_all = np.asarray(charM_all_unique)
-
-        # # # first use numpy unique on rounded set of solutions to exclude similar cases:
-        _, inds_solsM_all_unique = np.unique(np.round(solsM_all[self._pnet.noninput_node_inds, :],
-                                                      N_round_sol), return_index=True, axis=1)
-        # #
         solsM_all = solsM_all[:, inds_solsM_all_unique]
-        charM_all = charM_all[inds_solsM_all_unique]
+        charM_all = np.asarray(charM_all)[inds_solsM_all_unique]
+
+        # Order states by distance from the zero vector:
+        solsM_all, charM_all = self._order_states_by_distance(solsM_all, charM_all)
 
         states_dict = OrderedDict()
         for sigi in sig_test_set:
@@ -495,7 +464,9 @@ class StateMachine(object):
                                                            )
 
                     c_initial = np.mean(ctime[inds_win1[0]:inds_win1[1], :], axis=0)
-                    # var_c_initial = np.sum(np.std(ctime[inds_win1[0]:inds_win1[1], :], axis=0))
+                    # round c_initial so we can match it in solsM_all:
+                    c_initial = np.round(c_initial*(self._node_expression_levels-1))/(self._node_expression_levels-1)
+
 
                     # match the network state to one that only involves the hub nodes:
                     initial_state, match_error_initial = self._find_state_match(solsM_all[self._pnet.noninput_node_inds, :],
@@ -516,6 +487,8 @@ class StateMachine(object):
 
                     c_held = np.mean(ctime[inds_win2[0]:inds_win2[1], :], axis=0)
                     # var_c_held = np.sum(np.std(ctime[inds_win2[0]:inds_win2[1], :], axis=0))
+                    # round c_held so that we can match it in solsM_all:
+                    c_held = np.round(c_held*(self._node_expression_levels-1))/(self._node_expression_levels -1)
 
                     held_state, match_error_held = self._find_state_match(solsM_all[self._pnet.noninput_node_inds, :],
                                                                     c_held[self._pnet.noninput_node_inds])
@@ -533,7 +506,9 @@ class StateMachine(object):
                         states_dict_2[sig_base_set]['States'] = sc_dict2
 
                     c_final = np.mean(ctime[inds_win3[0]:inds_win3[1], :], axis=0)
-                    # var_c_final = np.sum(np.std(ctime[inds_win3[0]:inds_win3[1], :], axis=0))
+                    # round c_final so that we can match it in solsM_all:
+                    c_final = np.round(c_final * (self._node_expression_levels-1)) / (self._node_expression_levels -1)
+
                     final_state, match_error_final = self._find_state_match(solsM_all[self._pnet.noninput_node_inds, :],
                                                                       c_final[self._pnet.noninput_node_inds])
                     # final_state, match_error_final = self._find_state_match(solsM_all, c_final)
@@ -1165,37 +1140,3 @@ class StateMachine(object):
 
         return fig, ax
 
-    # def _get_unique_sol_dict(self, solsM_all: ndarray, match_tol: float=0.05, N_round_sol: int=1):
-    #     '''
-    #     Returns a dictionary that maps an index in solsM_all to an index to the unique
-    #     sols in solsM_all with respect to the noninput node indes.
-    #
-    #     Parameters
-    #     ----------
-    #     solsM_all : ndarray
-    #         An array of concentrations in rows and unique equilibrium states in columns.
-    #
-    #     match_tol : float=0.05
-    #         The tolerance, above which a state is taken to not be a match.
-    #
-    #     '''
-    #     # The sols that are unique with respect to the non-input nodes:
-    #     solsM_all_unique, unique_inds = np.unique(np.round(solsM_all[self._pnet.noninput_node_inds],
-    #                                                        N_round_sol), axis=1, return_index=True)
-    #
-    #     N_unique_sols = len(unique_inds)
-    #
-    #     unique_sol_dict = {}
-    #     inv_unique_sols_dict = {}
-    #     for si, soli in enumerate(solsM_all.T):
-    #         # Find a match between soli and a solution in solsM_all_unique:
-    #         state_match, match_error = self._find_state_match(solsM_all_unique,
-    #                                                            soli[self._pnet.noninput_node_inds])
-    #         if match_error < match_tol:
-    #             unique_sol_dict[si] = state_match
-    #             inv_unique_sols_dict[state_match] = si # record the inverse mapping as well
-    #
-    #         else:
-    #             raise Exception("State not found!")
-    #
-    #     return unique_sol_dict, inv_unique_sols_dict, N_unique_sols
