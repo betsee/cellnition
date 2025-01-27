@@ -368,7 +368,8 @@ class BooleanNet():
                               n_max_steps: int=10,
                               constraint_inds: list|None=None,
                               constraint_vals: list|None=None,
-                              verbose: bool=False):
+                              verbose: bool=False,
+                              cooperative: bool=False):
         '''
 
         '''
@@ -377,18 +378,16 @@ class BooleanNet():
         sol_char = EquilibriumType.undetermined # initialize to undetermined
 
         for i in range(n_max_steps):
-            # A true "OR" function will return the maximum of the list of booleans.
-            # Here we divide through our system by the number of agents participating
-            # in the target node interaction. This produces a fractional output.
-            # We have found that if we round this fractional output, which sends 0.5 <= to 0.0 and
-            # 0.5 > to 1.0, then we do not obtain results that match the continuous model, and also,
-            # this method is not performing an "OR" operation between the elements. However,
-            # if we instead say *any* non-expression -> 1.0 then the system does match that of the
-            # continuous pdes, and it is also the true "OR" operation.
-            # cc_i = np.int8(np.sign(A_bool_f(cc_i)[0]))  # calculate new state values
-            # cc_i = np.sign(A_bool_f(cc_i)[0])  # calculate new state values
-            # cc_i = np.int8(np.round(A_bool_f(cc_i)[0]))
-            cc_i = np.ceil(A_bool_f(cc_i)[0])  # calculate new state values
+            # A true "OR" function will return the maximum of the list of booleans. This can
+            # be achieved by using the "ceiling" function. If cooperative interaction is
+            # desired, then rounding is better
+            if cooperative is True:
+                cc_i = np.round(A_bool_f(cc_i)[0])  # calculate new state values
+
+            else:
+                cc_i = np.sign(A_bool_f(cc_i)[0])  # calculate new state values
+
+            cc_i = np.int8(cc_i) # convert into integers
 
             # If there are constraints on some node vals, force them to the constraint:
             if constraint_inds is not None and constraint_vals is not None:
@@ -423,6 +422,7 @@ class BooleanNet():
                            search_main_nodes_only: bool=False,
                            n_max_steps: int = 10,
                            verbose: bool=False,
+                           cooperative: bool = False
                            ):
         '''
         Solve for the equilibrium states of gene product in
@@ -466,7 +466,8 @@ class BooleanNet():
                                                    n_max_steps=n_max_steps,
                                                    verbose=False,
                                                    constraint_inds = constrained_inds,
-                                                   constraint_vals = constrained_vals)
+                                                   constraint_vals = constrained_vals,
+                                                   cooperative=cooperative)
 
             # c_eqms = np.zeros(self.N_nodes, dtype=int)
             # c_eqms[unconstrained_inds] = sol_i[unconstrained_inds]
@@ -711,7 +712,7 @@ class BooleanNet():
 
         return self.paths_matrix
 
-    def get_edge_types(self, p_acti: float = 0.5, set_selfloops_acti: bool = True):
+    def get_edge_types(self, p_acti: float = 0.5, set_selfloops_acti: bool = True, set_sigs_inhi: bool=True):
         '''
         Automatically generate an edge "type" vector for use in model building.
         Edge type specifies whether the edge is an activating or inhibiting
@@ -740,6 +741,11 @@ class BooleanNet():
 
         if set_selfloops_acti:  # if self-loops of the network are forced to be activators:
             edge_types[self.selfloop_edge_inds] = EdgeType.A
+
+        if set_sigs_inhi:
+            edge_types[self.input_edge_inds] = EdgeType.I
+        else:
+            edge_types[self.input_edge_inds] = EdgeType.A
 
         return edge_types.tolist()
 
@@ -845,6 +851,12 @@ class BooleanNet():
 
         # also determine the "main nodes", which are nodes that are not input and also are not effectors:
         self.main_nodes = np.setdiff1d(self.noninput_node_inds, self.effector_node_inds).tolist()
+
+        # compute the edges that connect input nodes to the graph:
+        self.input_edge_inds = []
+        for ei, (ni, nj) in enumerate(self.edges_index):
+            if ni in self.input_node_inds or nj in self.input_node_inds:
+                self.input_edge_inds.append(ei)
 
     def edges_from_path(self, path_nodes: list | ndarray) -> list:
         '''

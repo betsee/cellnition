@@ -105,7 +105,8 @@ class BoolStateMachine(object):
                           save_perturbation_net_image: str|None = None,
                           graph_layout: str = 'dot',
                           remove_inaccessible_states: bool = True,
-                          search_main_nodes_only: bool = False
+                          search_main_nodes_only: bool = False,
+                          cooperative: bool = False
                           ) -> MultiDiGraph:
         '''
         Run all steps to generate a state transition network and associated
@@ -170,7 +171,8 @@ class BoolStateMachine(object):
     def steady_state_solutions_search(self,
                                       verbose: bool=True,
                                       search_main_nodes_only: bool = False,
-                                      n_max_steps: int = 10
+                                      n_max_steps: int = 10,
+                                      cooperative: bool = False
                                       ):
         '''
         Search through all possible combinations of signal node values
@@ -208,7 +210,8 @@ class BoolStateMachine(object):
                                                         signal_constr_vals=sigis.tolist(),
                                                         search_main_nodes_only=search_main_nodes_only,
                                                         n_max_steps=n_max_steps,
-                                                        verbose=False
+                                                        verbose=False,
+                                                        cooperative=cooperative
                                                         )
 
             solsM_allo = np.hstack((solsM_allo, sols_M))  # append all unique sols
@@ -263,7 +266,8 @@ class BoolStateMachine(object):
                                   verbose: bool = True,
                                   remove_inaccessible_states: bool=False,
                                   save_graph_file: str|None = None,
-                                  n_max_steps: int=10
+                                  n_max_steps: int=10,
+                                  cooperative: bool = False
                                   ) -> tuple[set, set, MultiDiGraph]:
         '''
         Build a state transition matrix/diagram by starting the system
@@ -349,7 +353,9 @@ class BoolStateMachine(object):
                 cvect_c, char_c = self._bnet.net_state_compute(cvect_co,
                                                                self._bnet._A_bool_f,
                                                                n_max_steps=n_max_steps,
-                                                               verbose=False)
+                                                               verbose=False,
+                                                               cooperative=cooperative)
+
                 initial_state, match_error_initial = self._find_state_match(solsM_all[self._bnet.noninput_node_inds, :],
                                                                       cvect_c[self._bnet.noninput_node_inds])
 
@@ -378,7 +384,8 @@ class BoolStateMachine(object):
                     cvect_h, char_h = self._bnet.net_state_compute(cvect_ho,
                                                                self._bnet._A_bool_f,
                                                                n_max_steps=n_max_steps,
-                                                               verbose=False)
+                                                               verbose=False,
+                                                               cooperative=cooperative)
 
                     # FIXME: the find_state_match method should use the equm' char as well as the state values!
                     # match the network state to one that only involves the hub nodes:
@@ -404,7 +411,8 @@ class BoolStateMachine(object):
                     cvect_f, char_f = self._bnet.net_state_compute(cvect_fo,
                                                                self._bnet._A_bool_f,
                                                                n_max_steps=n_max_steps,
-                                                               verbose=False)
+                                                               verbose=False,
+                                                               cooperative=cooperative)
 
                     final_state, match_error_final = self._find_state_match(solsM_all[self._bnet.noninput_node_inds, :],
                                                                           cvect_f[self._bnet.noninput_node_inds])

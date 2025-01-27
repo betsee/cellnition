@@ -1306,22 +1306,47 @@ class StemCellNet(LibNet):
                       ('OCT4', 'OCT4'),
                       ('S0', 'SOX2'),
                       ('S1', 'NANOG'),
-                      ('S2', 'NANOG'),
+                      ('S2', 'OCT4'),
 
                  ]
 
+        # self.edge_types = [EdgeType.I,
+        #                    EdgeType.A,
+        #                    EdgeType.A,
+        #                    EdgeType.I,
+        #                    EdgeType.A,
+        #                    EdgeType.A,
+        #                    EdgeType.A,
+        #                    EdgeType.A,
+        #                    EdgeType.I,
+        #                    EdgeType.I,
+        #                    EdgeType.I,
+        #               ]
+
+        # self.edge_types = [EdgeType.A,
+        #                    EdgeType.A,
+        #                    EdgeType.A,
+        #                    EdgeType.A,
+        #                    EdgeType.A,
+        #                    EdgeType.A,
+        #                    EdgeType.A,
+        #                    EdgeType.A,
+        #                    EdgeType.I,
+        #                    EdgeType.I,
+        #                    EdgeType.I,
+        #               ]
+
         self.edge_types = [EdgeType.I,
-                           EdgeType.A,
-                           EdgeType.A,
-                           EdgeType.I,
-                           EdgeType.A,
-                           EdgeType.A,
-                           EdgeType.A,
-                           EdgeType.A,
-                           EdgeType.A,
-                           EdgeType.A,
-                           EdgeType.I,
-                      ]
+                            EdgeType.I,
+                            EdgeType.I,
+                            EdgeType.I,
+                            EdgeType.I,
+                            EdgeType.A,
+                            EdgeType.A,
+                            EdgeType.A,
+                            EdgeType.A,
+                            EdgeType.A,
+                            EdgeType.A]
 
         self.node_type_dict = None
 
@@ -1719,8 +1744,66 @@ class hESC_9a(LibNet):
             ("S2", KLF4)
                  ]
 
-        self.edge_types = [EdgeType.A for i in self.edges]
-        self.edge_types[-3:] = [EdgeType.I, EdgeType.I, EdgeType.I]
+        # self.edge_types = [EdgeType.A for i in self.edges]
+        # self.edge_types[-3:] = [EdgeType.I, EdgeType.I, EdgeType.I]
+
+        self.edge_types= [EdgeType.A,
+                            EdgeType.A,
+                            EdgeType.A,
+                            EdgeType.I,
+                            EdgeType.A,
+                            EdgeType.I,
+                            EdgeType.A,
+                            EdgeType.A,
+                            EdgeType.A,
+                            EdgeType.I,
+                            EdgeType.A,
+                            EdgeType.I,
+                            EdgeType.A,
+                            EdgeType.I,
+                            EdgeType.I,
+                            EdgeType.A,
+                            EdgeType.I,
+                            EdgeType.A,
+                            EdgeType.I,
+                            EdgeType.I,
+                            EdgeType.I,
+                            EdgeType.I,
+                            EdgeType.I,
+                            EdgeType.A,
+                            EdgeType.A,
+                            EdgeType.A,
+                            EdgeType.I,
+                            EdgeType.A,
+                            EdgeType.A,
+                            EdgeType.I,
+                            EdgeType.I,
+                            EdgeType.I,
+                            EdgeType.I,
+                            EdgeType.I,
+                            EdgeType.A,
+                            EdgeType.I,
+                            EdgeType.A,
+                            EdgeType.I,
+                            EdgeType.A,
+                            EdgeType.I,
+                            EdgeType.I,
+                            EdgeType.A,
+                            EdgeType.I,
+                            EdgeType.A,
+                            EdgeType.I,
+                            EdgeType.A,
+                            EdgeType.I,
+                            EdgeType.A,
+                            EdgeType.I,
+                            EdgeType.I,
+                            EdgeType.A,
+                            EdgeType.I,
+                            EdgeType.A,
+                            EdgeType.I,
+                            EdgeType.I,
+                            EdgeType.I
+        ]
 
         self.node_type_dict = None
 
