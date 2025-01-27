@@ -274,16 +274,16 @@ class BooleanNet():
                 elif etype is EdgeType.I or etype is EdgeType.Is:
                     A_inhi_so[nde_j, nde_i] = 1 - c_vect_s[nde_i]
 
-            # # Need to create a normalized vector for managing cooperativity of the "OR"
-            # denom = A_acti_so.dot(onesv)  # sums the number of activators at each node
-            # idenom = (denom == 0).nonzero()[0]  # indices where denom is zero
-            # denom[idenom] = 1  # set those equal to 1
-            # denom = np.int64(denom)
-            # coopv = np.asarray([sp.Rational(1, di) for di in denom])
+            # Need to create a normalized vector for managing cooperativity of the "OR"
+            denom = A_acti_so.dot(onesv)  # sums the number of activators at each node
+            idenom = (denom == 0).nonzero()[0]  # indices where denom is zero
+            denom[idenom] = 1  # set those equal to 1
+            denom = np.int64(denom)
+            coopv = np.asarray([sp.Rational(1, di) for di in denom])
             # coopv = 1 / denom
 
-            # # Multiply the system through with the normalizing coefficients:
-            # A_acti_so = (coopv * A_acti_so.T).T
+            # Multiply the system through with the normalizing coefficients:
+            A_acti_so = (coopv * A_acti_so.T).T
 
             A_acti_s = sp.Matrix(A_acti_so.dot(c_vect_s))
             A_inhi_s = sp.Matrix(np.prod(A_inhi_so, axis=1))
@@ -313,15 +313,15 @@ class BooleanNet():
 
             ic_vect_s = sp.Matrix(onesv) - c_vect_s
 
-            # denom = (A_acti_so + A_inhi_so).dot(onesv)
-            # idenom = (denom == 0).nonzero()[0]  # indices where denom is zero
-            # denom[idenom] = 1  # set those equal to 1
-            # denom = np.int64(denom)
-            # # coopv = 1 / denom
-            # coopv = np.asarray([sp.Rational(1, di) for di in denom])
+            denom = (A_acti_so + A_inhi_so).dot(onesv)
+            idenom = (denom == 0).nonzero()[0]  # indices where denom is zero
+            denom[idenom] = 1  # set those equal to 1
+            denom = np.int64(denom)
+            # coopv = 1 / denom
+            coopv = np.asarray([sp.Rational(1, di) for di in denom])
 
-            # A_acti_so = (coopv * A_acti_so.T).T
-            # A_inhi_so = (coopv * A_inhi_so.T).T
+            A_acti_so = (coopv * A_acti_so.T).T
+            A_inhi_so = (coopv * A_inhi_so.T).T
 
             A_acti_s = sp.Matrix(A_acti_so.dot(c_vect_s))
             A_inhi_s = sp.Matrix(A_inhi_so.dot(ic_vect_s))
@@ -386,7 +386,9 @@ class BooleanNet():
             # if we instead say *any* non-expression -> 1.0 then the system does match that of the
             # continuous pdes, and it is also the true "OR" operation.
             # cc_i = np.int8(np.sign(A_bool_f(cc_i)[0]))  # calculate new state values
-            cc_i = np.sign(A_bool_f(cc_i)[0])  # calculate new state values
+            # cc_i = np.sign(A_bool_f(cc_i)[0])  # calculate new state values
+            # cc_i = np.int8(np.round(A_bool_f(cc_i)[0]))
+            cc_i = np.ceil(A_bool_f(cc_i)[0])  # calculate new state values
 
             # If there are constraints on some node vals, force them to the constraint:
             if constraint_inds is not None and constraint_vals is not None:
