@@ -59,5 +59,3 @@ class CouplingType(Enum):
     mixed = 'mixed'
     specified = 'specified'
     mixed2 = 'mixed2'
-    mixed3 = 'mixed3'
-    mixed4 = 'mixed4'

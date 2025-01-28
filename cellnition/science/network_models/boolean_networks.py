@@ -289,6 +289,48 @@ class BooleanNet():
             A_inhi_s = sp.Matrix(np.prod(A_inhi_so, axis=1))
             A_bool_s = sp.hadamard_product(A_acti_s, A_inhi_s)
 
+        elif multi_coupling_type is CouplingType.mixed2:
+            # Case #2: Mixed coupling #2, where inhibitors always act in "AND"
+            # configuration and activators act in "OR" configuration.
+            # Initialize an inhibitor matrix:
+            A_inhi_so = np.zeros((self.N_nodes, self.N_nodes), dtype=int)
+            onesv = np.ones(self.N_nodes, dtype=int)
+
+            # Initialize an activator matrix:
+            A_acti_so = np.ones((self.N_nodes, self.N_nodes), dtype=sp.Symbol)
+
+            # Build A_full_s, an adjacency matrix that doesn't distinguish between additive
+            # and multiplicative interactions:cc
+            for ei, ((nde_i, nde_j), etype) in enumerate(zip(self.edges_index, self.edge_types)):
+                # print(type(nde_i))
+                # print(c_vect_s[nde_i])
+                if etype is EdgeType.A or etype is EdgeType.As:
+                    A_acti_so[nde_j, nde_i] = c_vect_s[nde_i]
+                elif etype is EdgeType.I or etype is EdgeType.Is:
+                    A_inhi_so[nde_j, nde_i] = 1
+
+            # Need to create a normalized vector for managing cooperativity of the "OR"
+            denom = A_inhi_so.dot(onesv) +1 # sums the number of activators at each node
+            idenom = (denom == 0).nonzero()[0]  # indices where denom is zero
+            denom[idenom] = 1  # set those equal to 1
+            denom = np.int64(denom)
+            coopv = np.asarray([sp.Rational(1, di) for di in denom])
+            # coopv = 1 / denom
+
+            # Multiply the system through with the normalizing coefficients:
+            A_inhi_so = (coopv * A_inhi_so.T).T
+
+            # A_inhi_s = sp.Matrix(A_inhi_so.dot(sp.Matrix(onesv) - c_vect_s))
+            A_inhi_si = A_inhi_so.dot(sp.Matrix(onesv) - c_vect_s)
+            # Replace zeros in A_inhi_si with 1s (if no inhibitors, node can still activate):
+            # inds_i, inds_j = (A_inhi_si == 0).nonzero()
+            # A_inhi_si[inds_i, inds_j] = 1
+
+            A_inhi_s = sp.Matrix(A_inhi_si)
+            A_acti_s = sp.Matrix(np.prod(A_acti_so, axis=1))
+            # A_bool_s = sp.hadamard_product(A_acti_s, A_inhi_s)
+            A_bool_s = A_acti_s + A_inhi_s
+
         elif multi_coupling_type is CouplingType.additive:
 
             # Case #2: Additive coupling, where all interactions inhibitors always act in
@@ -361,11 +403,10 @@ class BooleanNet():
         return c_vect_s, A_bool_s, A_bool_f
 
     #---Boolean Model Solving----------
-
     def net_state_compute(self,
                               cc_o: ndarray|list,
                               A_bool_f: Callable,
-                              n_max_steps: int=10,
+                              n_max_steps: int=20,
                               constraint_inds: list|None=None,
                               constraint_vals: list|None=None,
                               verbose: bool=False,
@@ -378,25 +419,26 @@ class BooleanNet():
         sol_char = EquilibriumType.undetermined # initialize to undetermined
 
         for i in range(n_max_steps):
+
+            if verbose:
+                print(solsv[-1])
             # A true "OR" function will return the maximum of the list of booleans. This can
             # be achieved by using the "ceiling" function. If cooperative interaction is
             # desired, then rounding is better
+
             if cooperative is True:
                 cc_i = np.round(A_bool_f(cc_i)[0])  # calculate new state values
 
             else:
                 cc_i = np.sign(A_bool_f(cc_i)[0])  # calculate new state values
 
-            cc_i = np.int8(cc_i) # convert into integers
+            # cc_i = np.int8(cc_i) # convert into integers
 
             # If there are constraints on some node vals, force them to the constraint:
             if constraint_inds is not None and constraint_vals is not None:
                 cc_i[constraint_inds] = constraint_vals
 
             solsv.append(cc_i)
-
-            if verbose:
-                print(solsv[-2], solsv[-1])
 
             # Detect whether we're at a steady-state:
             if (solsv[i] == solsv[i - 1]).all() is NumpyTrue:
@@ -405,11 +447,26 @@ class BooleanNet():
 
             # Detect whether we're oscillating in a limit cycle (back and forth
             # between two states).
-            elif i >= 2 and (solsv[i - 2] == solsv[i]).all() is NumpyTrue:
+            elif i > 2 and (solsv[i - 2] == cc_i).all() is NumpyTrue:
                 sol_char = EquilibriumType.limit_cycle
-                # FIXME: this should be the average of the two states,
-                # yet that would be a float. So how do we do this?
+                # solution becomes the (non-integer!) mean of the simple alternating motif:
+                cc_i = (np.asarray(cc_i) + np.asarray(solsv[i-1]))/2
                 break
+
+            elif i == n_max_steps -1:
+                # test to see if we have a more complicated repetition motif:
+                solvr = np.asarray(solsv)[:, self.noninput_node_inds] # get the reduced array
+                si = solvr[2, :] # try selecting the second state...(we may need this to be second?)
+                matched_inds = [i for i, x in enumerate(solvr.tolist()) if x == si.tolist()] # look for repetition
+                if len(matched_inds) > 1: # if there's more than one incidence of the state
+                    motif_period = matched_inds[-1] - matched_inds[-2]
+                    solvrr = solvr[2:, :] # remove the first and second states
+                    test_repeat = np.roll(solvrr, motif_period - 1, axis=1) - solvrr # roll to make the arrays equivalent
+
+                    if (np.sum(test_repeat) == 0):
+                        sol_char = EquilibriumType.limit_cycle
+                        motif = np.asarray(solsv)[matched_inds[-2]:matched_inds[-1], :] # extract a motif from the full array
+                        cc_i = np.mean(motif, axis=0) # solution becomes the (non-integer!) mean of the motif
 
         return cc_i, sol_char
 
@@ -420,7 +477,7 @@ class BooleanNet():
                            constraint_vals: list|None = None,
                            signal_constr_vals: list|None = None,
                            search_main_nodes_only: bool=False,
-                           n_max_steps: int = 10,
+                           n_max_steps: int = 20,
                            verbose: bool=False,
                            cooperative: bool = False
                            ):
@@ -469,12 +526,6 @@ class BooleanNet():
                                                    constraint_vals = constrained_vals,
                                                    cooperative=cooperative)
 
-            # c_eqms = np.zeros(self.N_nodes, dtype=int)
-            # c_eqms[unconstrained_inds] = sol_i[unconstrained_inds]
-            #
-            # if constrained_inds is not None and constrained_vals is not None:
-            #     c_eqms[constrained_inds] = constrained_vals
-
             sol_Mo.append(sol_i)
             sol_char.append(char_i)
 
@@ -483,7 +534,7 @@ class BooleanNet():
 
         _, unique_inds = np.unique(sol_Mo, axis=0, return_index=True)
 
-        sol_M = (np.asarray(sol_Mo, dtype=int)[unique_inds]).T
+        sol_M = (np.asarray(sol_Mo)[unique_inds]).T
         sol_char = np.asarray(sol_char)[unique_inds]
 
         return sol_M, sol_char

@@ -191,12 +191,12 @@ class BoolStateMachine(object):
 
         N_vocab = len(sigGrid[0].ravel())
 
-        sig_test_set = np.zeros((N_vocab, len(self._bnet.input_node_inds)), dtype=int)
+        sig_test_set = np.zeros((N_vocab, len(self._bnet.input_node_inds)))
 
         for i, sigM in enumerate(sigGrid):
             sig_test_set[:, i] = sigM.ravel()
 
-        solsM_allo = np.zeros((self._bnet.N_nodes, 1), dtype=int)
+        solsM_allo = np.zeros((self._bnet.N_nodes, 1))
         charM_allo = [EquilibriumType.undetermined]
         sols_list = []
 
@@ -401,7 +401,7 @@ class BoolStateMachine(object):
 
                     transition_edges_set.add((initial_state, held_state, pert_input_label))
                     if verbose:
-                        print(f'Initial to Held: Transition from State {initial_state} to {held_state} via pert I{pert_input_label}...')
+                        print(f'...State {initial_state} to {held_state} via pert I{pert_input_label}...')
 
                     # Next, re-apply the initial context input state to the held state and see what final state results:
                     cvect_fo = cvect_h.copy()
@@ -427,7 +427,7 @@ class BoolStateMachine(object):
 
                     transition_edges_set.add((held_state, final_state, base_input_label))
                     if verbose:
-                        print(f'Held to final: Transition from State {held_state} to {final_state} via base I{base_input_label}')
+                        print(f'...State {held_state} to {final_state} via base I{base_input_label}')
 
                     # Look for change in the system from initial to final state:
 
@@ -723,7 +723,7 @@ class BoolStateMachine(object):
         progressively closer to one another, in order to see a more
         logical transition through the network with perturbation.
         '''
-        zer_sol = np.zeros(solsM_all[:, 0].shape, dtype=int)
+        zer_sol = np.zeros(solsM_all[:, 0].shape)
         dist_list = []
 
         for soli in solsM_all.T:
@@ -766,29 +766,6 @@ class BoolStateMachine(object):
             raise Exception("No matching index was found.")
 
         return ind
-
-    # def _get_integer_label(self, sig_set: tuple|list|ndarray) -> int:
-    #     '''
-    #     Given a list of digits representing a bit string
-    #     (i.e. a list of values close to zero or 1), this method
-    #     treats the list as a binary bit-string and returns the
-    #     base-2 integer representation of the bit-string.
-    #
-    #     Parameters
-    #     ----------
-    #     sig_set : list[float|int]
-    #         The list containing floats or ints that are taken to represent
-    #         a bit string.
-    #
-    #     Returns
-    #     -------
-    #     An integer representation of the binary bit-string.
-    #
-    #     '''
-    #     base_str = ''
-    #     for sigi in sig_set:
-    #         base_str += str(int(sigi))
-    #     return int(base_str, 2)
 
     def _find_state_match(self,
                          solsM: ndarray,
