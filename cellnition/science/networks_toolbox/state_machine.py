@@ -278,7 +278,6 @@ class StateMachine(object):
             charM_all.extend(chari)
 
 
-
         # Use numpy unique on specially-rounded set of solutions to exclude similar state cases:
         solsM_all = np.round(solsM_all*(node_expression_levels -1))/(node_expression_levels -1)
         self._node_expression_levels = node_expression_levels # need to save this for later
@@ -431,25 +430,21 @@ class StateMachine(object):
 
             states_set = sc_dict['States']
 
-            # Get an integer label for the 'bitstring' of signal node inds defining the base:
-            # base_input_label = self._get_integer_label(sig_base_set)
+            for si in states_set: # We want to use each state in states_set as the initial condition:
+                if verbose:
+                    print(f"Testing State {si} in held context I{base_input_label}...")
 
-            # We then step through all possible perturbation signals:
-            for pert_input_label, sig_val_set in enumerate(sig_test_set):
+                # We then step through all possible perturbation signals:
+                for pert_input_label, sig_val_set in enumerate(sig_test_set):
 
-                # Get an integer label for the 'bitstring' of signal node inds on perturbation:
-                # pert_input_label = self._get_integer_label(sig_val_set)
+                    if verbose:
+                        print(f"--- Step: {num_step} ---")
 
-                # we want the signals to go from zero to the new held state defined in sig_val set:
-                sig_mags = [(sigb, sigi) for sigb, sigi in zip(sig_base_set, sig_val_set)]
+                    # we want the signals to go from zero to the new held state defined in sig_val set:
+                    sig_mags = [(sigb, sigi) for sigb, sigi in zip(sig_base_set, sig_val_set)]
 
-                # We want to use each state in states_set as the initial condition:
-                for si in states_set:
                     # Initial state vector: add the small non-zero amount to prevent 0/0 in Hill functions:
                     cvecti = 1 * solsM_all[:, si] + self._pnet.p_min
-
-                    # if verbose:
-                    #     print(f'Start state {si}...')
 
                     c_signals = self._pnet.make_pulsed_signals_matrix(tvect, sig_inds, sig_times, sig_mags)
 
@@ -475,7 +470,7 @@ class StateMachine(object):
 
                     if match_error_initial > match_tol: # if state is unmatched, flag it with a nan
                         if verbose:
-                            print(f'Initial state not found; adding new state to the solution set...')
+                            print(f'WARNING: Initial state not found; adding new state {initial_state} to the solution set...')
                         solsM_all = np.column_stack((solsM_all, c_initial))
                         initial_state = solsM_all.shape[1] - 1
 
@@ -484,7 +479,12 @@ class StateMachine(object):
                         sc_dict2.append(initial_state)
                         states_dict_2[sig_base_set]['States'] = sc_dict2
 
+                    # Add this transition to the state transition diagram:
+                    transition_edges_set.add((si, initial_state, base_input_label))
+                    if verbose:
+                        print(f'...State {si} to {initial_state} via I{base_input_label}...')
 
+                    # Next detect the state at the transient input signal:
                     c_held = np.mean(ctime[inds_win2[0]:inds_win2[1], :], axis=0)
                     # var_c_held = np.sum(np.std(ctime[inds_win2[0]:inds_win2[1], :], axis=0))
                     # round c_held so that we can match it in solsM_all:
@@ -495,8 +495,6 @@ class StateMachine(object):
                     # held_state, match_error_held = self._find_state_match(solsM_all, c_held)
 
                     if match_error_held > match_tol: # if state is unmatched, flag it
-                        if verbose:
-                            print(f'Held state not found; adding new state to the solution set...')
                         solsM_all = np.column_stack((solsM_all, c_held))
                         held_state = solsM_all.shape[1] -1
 
@@ -504,6 +502,13 @@ class StateMachine(object):
                         sc_dict2 = states_dict_2[sig_base_set]['States']
                         sc_dict2.append(held_state)
                         states_dict_2[sig_base_set]['States'] = sc_dict2
+
+                        if verbose:
+                            print(f'WARNING: Held state not found; adding new state {held_state} to the solution set...')
+
+                    transition_edges_set.add((initial_state, held_state, pert_input_label))
+                    if verbose:
+                        print(f'...State {initial_state} to {held_state} via I{pert_input_label}...')
 
                     c_final = np.mean(ctime[inds_win3[0]:inds_win3[1], :], axis=0)
                     # round c_final so that we can match it in solsM_all:
@@ -514,8 +519,7 @@ class StateMachine(object):
                     # final_state, match_error_final = self._find_state_match(solsM_all, c_final)
 
                     if match_error_final > match_tol: # if state is unmatched, add it to the system
-                        if verbose:
-                            print(f'Final state not found; adding new state to the solution set...')
+
                         solsM_all = np.column_stack((solsM_all, c_final))
                         final_state = solsM_all.shape[1] -1
 
@@ -524,36 +528,24 @@ class StateMachine(object):
                         sc_dict2.append(final_state)
                         states_dict_2[sig_base_set]['States'] = sc_dict2
 
+                        if verbose:
+                            print(f'WARNING: Final state not found; adding new state {final_state} to the solution set...')
+
+                    transition_edges_set.add((held_state, final_state, base_input_label))
                     if verbose:
-                        print(num_step)
+                        print(f'...State {held_state} to {final_state} via I{base_input_label}...')
 
-                    if initial_state is not np.nan and held_state is not np.nan and final_state is not np.nan:
-                        transition_edges_set.add((initial_state, held_state, pert_input_label))
-                        transition_edges_set.add((held_state, final_state, base_input_label))
+
+                    if initial_state != final_state:  # add this to the perturbed transitions:
+                        perturbation_edges_set.add((initial_state, final_state, pert_input_label, base_input_label))
 
                         if verbose:
-                            print(f'Transition State {initial_state} to {held_state} via {pert_input_label}')
-                            print(f'Transition State {held_state} to {final_state} via {base_input_label}')
+                            print(f'Event-driven transition identified from State {initial_state} to {final_state} via '
+                                  f'event I{pert_input_label} under context I{base_input_label}')
 
-                        if initial_state != final_state:  # add this to the perturbed transitions:
-                            perturbation_edges_set.add((initial_state, final_state, pert_input_label, base_input_label))
-
-                            if verbose:
-                                print(f'Perturbed Transition from State {initial_state} to {final_state} via '
-                                      f'{pert_input_label}')
-
-                    else:
-                        if verbose:
-                            print(f'Warning: {initial_state} to {held_state} via {pert_input_label} not added \n '
-                                  f'as state match not found! \n'
-                                  f'Match errors {match_error_initial, match_error_held, match_error_final}')
 
                     _all_time_runs.append(ctime.copy())
                     num_step += 1
-
-                    if verbose:
-                        # print(f'Match errors {match_error_initial, match_error_held, match_error_final}')
-                        print('------')
 
         # The first thing we do after the construction of the
         # transition edges set is make a multidigraph and

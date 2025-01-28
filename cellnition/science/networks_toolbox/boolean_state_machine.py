@@ -196,8 +196,10 @@ class BoolStateMachine(object):
         for i, sigM in enumerate(sigGrid):
             sig_test_set[:, i] = sigM.ravel()
 
-        solsM_allo = np.zeros((self._bnet.N_nodes, 1))
-        charM_allo = [EquilibriumType.undetermined]
+        # solsM_allo = np.zeros((self._bnet.N_nodes, 1))
+        # charM_allo = [EquilibriumType.undetermined]
+        solsM_allo = None
+        charM_allo = []
         sols_list = []
 
         for sigis in sig_test_set:
@@ -213,8 +215,10 @@ class BoolStateMachine(object):
                                                         verbose=False,
                                                         cooperative=cooperative
                                                         )
-
-            solsM_allo = np.hstack((solsM_allo, sols_M))  # append all unique sols
+            if solsM_allo is None:
+                solsM_allo = sols_M
+            else:
+                solsM_allo = np.hstack((solsM_allo, sols_M))  # append all unique sols
             charM_allo.extend(sols_char.tolist())  # append the sol stability characterization tags
             sols_list.append(sols_M)
             if verbose:
@@ -231,18 +235,6 @@ class BoolStateMachine(object):
 
         # Order states by distance from the zero vector
         solsM_all, charM_all = self._order_states_by_distance(solsM_all, charM_all)
-
-        # Get rid of a duplicate zeros vector:
-        iud = None
-        if (solsM_all[:, 0] == solsM_all[:, 1]).all() is NumpyTrue:
-            if charM_all[0] is EquilibriumType.undetermined:
-                iud = 0
-            elif charM_all[1] is EquilibriumType.undetermined:
-                iud = 1
-
-        if iud is not None:
-            solsM_all = np.delete(solsM_all, iud, axis=1)
-            charM_all = np.delete(charM_all, iud)
 
         states_dict = OrderedDict()
         for sigi in sig_test_set:
@@ -366,19 +358,15 @@ class BoolStateMachine(object):
                     if verbose:
                         print(f'WARNING: Initial state not found; adding new state {initial_state} to the solution set...')
 
-                if initial_state != si:
-                    # Add this transition to the state transition diagram:
-                    transition_edges_set.add((si, initial_state, base_input_label))
-                    if verbose:
-                        print(f'State {si} not stable in base context I{base_input_label}:')
-                        print(f'   ->Transitions to {initial_state} via I{base_input_label}...')
-                else:
-                    if verbose:
-                        print(f'State {si} is stable in base context I{base_input_label}.')
-
+                # Add this transition to the state transition diagram:
+                transition_edges_set.add((si, initial_state, base_input_label))
 
                 # We then step through all possible perturbation signals that act on the state in the set:
                 for pert_input_label, sig_pert_set in enumerate(sig_test_set):
+                    if verbose:
+                        print(f"--- Step: {num_step} ---")
+                        print(f'...State {si} to {initial_state} via I{base_input_label}...')
+
                     cvect_ho = cvect_c.copy()
                     cvect_ho[sig_inds] = sig_pert_set # apply the perturbation to the state
                     cvect_h, char_h = self._bnet.net_state_compute(cvect_ho,
@@ -401,7 +389,7 @@ class BoolStateMachine(object):
 
                     transition_edges_set.add((initial_state, held_state, pert_input_label))
                     if verbose:
-                        print(f'...State {initial_state} to {held_state} via pert I{pert_input_label}...')
+                        print(f'...State {initial_state} to {held_state} via I{pert_input_label}...')
 
                     # Next, re-apply the initial context input state to the held state and see what final state results:
                     cvect_fo = cvect_h.copy()
@@ -427,7 +415,7 @@ class BoolStateMachine(object):
 
                     transition_edges_set.add((held_state, final_state, base_input_label))
                     if verbose:
-                        print(f'...State {held_state} to {final_state} via base I{base_input_label}')
+                        print(f'...State {held_state} to {final_state} via I{base_input_label}')
 
                     # Look for change in the system from initial to final state:
 
@@ -438,13 +426,11 @@ class BoolStateMachine(object):
                             print(f'Event-driven transition identified from State {initial_state} to {final_state} via '
                                   f'event I{pert_input_label} under context I{base_input_label}')
 
-
                     num_step += 1
 
-
-                if verbose:
-                    # print(f'Match errors {match_error_initial, match_error_held, match_error_final}')
-                    print('------')
+                    # if verbose:
+                    #     # print(f'Match errors {match_error_initial, match_error_held, match_error_final}')
+                    #     print('------')
 
         # The first thing we do after the construction of the
         # transition edges set is make a multidigraph and
