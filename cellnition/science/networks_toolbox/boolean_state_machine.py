@@ -105,8 +105,7 @@ class BoolStateMachine(object):
                           save_perturbation_net_image: str|None = None,
                           graph_layout: str = 'dot',
                           remove_inaccessible_states: bool = True,
-                          search_main_nodes_only: bool = False,
-                          cooperative: bool = False
+                          search_main_nodes_only: bool = False
                           ) -> MultiDiGraph:
         '''
         Run all steps to generate a state transition network and associated
@@ -171,8 +170,7 @@ class BoolStateMachine(object):
     def steady_state_solutions_search(self,
                                       verbose: bool=True,
                                       search_main_nodes_only: bool = False,
-                                      n_max_steps: int = 10,
-                                      cooperative: bool = False
+                                      n_max_steps: int = 10
                                       ):
         '''
         Search through all possible combinations of signal node values
@@ -212,8 +210,7 @@ class BoolStateMachine(object):
                                                         signal_constr_vals=sigis.tolist(),
                                                         search_main_nodes_only=search_main_nodes_only,
                                                         n_max_steps=n_max_steps,
-                                                        verbose=False,
-                                                        cooperative=cooperative
+                                                        verbose=False
                                                         )
             if solsM_allo is None:
                 solsM_allo = sols_M
@@ -258,8 +255,7 @@ class BoolStateMachine(object):
                                   verbose: bool = True,
                                   remove_inaccessible_states: bool=False,
                                   save_graph_file: str|None = None,
-                                  n_max_steps: int=10,
-                                  cooperative: bool = False
+                                  n_max_steps: int=10
                                   ) -> tuple[set, set, MultiDiGraph]:
         '''
         Build a state transition matrix/diagram by starting the system
@@ -348,7 +344,7 @@ class BoolStateMachine(object):
                                                                verbose=False,
                                                                constraint_inds=self._bnet.input_node_inds,
                                                                constraint_vals=list(sig_base_set),
-                                                               cooperative=cooperative)
+                                                               )
 
                 initial_state, match_error_initial = self._find_state_match(solsM_all[self._bnet.noninput_node_inds, :],
                                                                       cvect_c[self._bnet.noninput_node_inds])
@@ -377,7 +373,7 @@ class BoolStateMachine(object):
                                                                verbose=False,
                                                                constraint_inds=self._bnet.input_node_inds,
                                                                constraint_vals=list(sig_pert_set),
-                                                               cooperative=cooperative)
+                                                               )
 
                     # FIXME: the find_state_match method should use the equm' char as well as the state values!
                     # match the network state to one that only involves the hub nodes:
@@ -406,7 +402,7 @@ class BoolStateMachine(object):
                                                                verbose=False,
                                                                constraint_inds=self._bnet.input_node_inds,
                                                                constraint_vals=list(sig_base_set),
-                                                               cooperative=cooperative)
+                                                               )
 
                     final_state, match_error_final = self._find_state_match(solsM_all[self._bnet.noninput_node_inds, :],
                                                                           cvect_f[self._bnet.noninput_node_inds])

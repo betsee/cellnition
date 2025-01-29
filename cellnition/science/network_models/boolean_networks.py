@@ -304,7 +304,7 @@ class BooleanNet():
                 A_bool_s = sp.hadamard_product(A_acti_s, A_inhi_s) # Use "AND" to combine acti and inhi
 
             # We use and additive "OR" to specify the presence of an activator OR absence of an inhibitor
-            # is required for gene expression
+            # is required for gene expression for all genes
             else:
                 # Need to create a normalized vector for managing cooperativity of the "OR"
                 # sums the number of activators and if inhibitors at each node:
@@ -322,7 +322,7 @@ class BooleanNet():
 
 
         elif multi_coupling_type is CouplingType.mix2:
-            # Case #2: Mixed coupling #2, where inhibitors always act in "AND"
+            # Mixed coupling #2, where inhibitors always act in "AND"
             # configuration and activators act in "OR" configuration.
             # Initialize an inhibitor matrix:
             A_inhi_so = np.zeros((self.N_nodes, self.N_nodes), dtype=int)
@@ -346,27 +346,48 @@ class BooleanNet():
                     A_inhi_so[nde_j, nde_i] = 1
                     inhi_count[nde_j] += 1
 
-            # Need to create a normalized vector for managing cooperativity of the "OR"
-            denom = A_inhi_so.dot(onesv) +1 # sums the number of activators at each node
-            idenom = (denom == 0).nonzero()[0]  # indices where denom is zero
-            denom[idenom] = 1  # set those equal to 1
-            denom = np.int64(denom)
-            coopv = np.asarray([sp.Rational(1, di) for di in denom])
-            # coopv = 1 / denom
+            # Combine so that presence of activators AND absence of inhibitors required for node expressions:
+            if constitutive_express is False:
+                # Need to create a normalized vector for managing cooperativity of the "OR"
+                denom = np.asarray(inhi_count)  # total number of activators at each node
+                idenom = (denom == 0).nonzero()[0]  # indices where denom is zero
+                denom[idenom] = 1  # set those equal to 1
+                denom = np.int64(denom)
+                coopv = np.asarray([sp.Rational(1, di) for di in denom])
 
-            # Multiply the system through with the normalizing coefficients:
-            A_inhi_so = (coopv * A_inhi_so.T).T
+                A_inhi_so = (coopv * A_inhi_so.T).T  # multiply by the normalizing vector coopv
+                A_inhi_ss = A_inhi_so.dot(sp.Matrix(onesv) - c_vect_s)
 
-            # A_inhi_s = sp.Matrix(A_inhi_so.dot(sp.Matrix(onesv) - c_vect_s))
-            A_inhi_si = A_inhi_so.dot(sp.Matrix(onesv) - c_vect_s)
-            # Replace zeros in A_inhi_si with 1s (if no inhibitors, node can still activate):
-            # inds_i, inds_j = (A_inhi_si == 0).nonzero()
-            # A_inhi_si[inds_i, inds_j] = 1
+                const_inds = []  # if there's inhibitor but no activator, node must be const expressed
+                for ndei, (act, ict) in enumerate(zip(acti_count, inhi_count)):
+                    if act != 0 and ict == 0:
+                        const_inds.append(ndei)
 
-            A_inhi_s = sp.Matrix(A_inhi_si)
-            A_acti_s = sp.Matrix(np.prod(A_acti_so, axis=1))
-            # A_bool_s = sp.hadamard_product(A_acti_s, A_inhi_s)
-            A_bool_s = A_acti_s + A_inhi_s
+                A_inhi_ss[const_inds] = 1  # set this to 1 where the const expressed nodes should me
+
+                A_inhi_s = sp.Matrix(A_inhi_ss)  # collect terms into "OR" activators at each node
+                A_acti_s = sp.Matrix(
+                    np.prod(A_acti_so, axis=1))  # collect terms into "AND" inhibitors at each node
+                A_bool_s = sp.hadamard_product(A_acti_s, A_inhi_s)  # Use "AND" to combine acti and inhi
+
+            # We use and additive "OR" to specify the presence of an activator OR absence of an inhibitor
+            # is required for gene expression for all genes
+            else:
+                # Need to create a normalized vector for managing cooperativity of the "OR"
+                # sums the number of activators and if inhibitors at each node:
+                denom = np.asarray(inhi_count) + np.sign(acti_count)
+                idenom = (denom == 0).nonzero()[0]  # indices where denom is zero
+                denom[idenom] = 1  # set those equal to 1
+                denom = np.int64(denom)
+                coopv = sp.Matrix([sp.Rational(1, di) for di in denom])  # write as fractions for pretty display
+
+                # Multiply the system through with the normalizing coefficients:
+                A_inhi_s = sp.hadamard_product(coopv, sp.Matrix(A_inhi_so.dot(sp.Matrix(onesv) - c_vect_s)))
+                A_acti_s = sp.hadamard_product(coopv,
+                                               sp.Matrix(np.sign(acti_count) * np.prod(A_acti_so, axis=1)))
+                # Combine activators and inhibitors as "OR" function:
+                A_bool_s = A_acti_s + A_inhi_s
+
 
         elif multi_coupling_type is CouplingType.additive:
 
@@ -447,7 +468,7 @@ class BooleanNet():
                               constraint_inds: list|None=None,
                               constraint_vals: list|None=None,
                               verbose: bool=False,
-                              cooperative: bool=False):
+                              ):
         '''
 
         '''
@@ -463,13 +484,7 @@ class BooleanNet():
             # be achieved by using the "ceiling" function. If cooperative interaction is
             # desired, then rounding is better
 
-            if cooperative is True:
-                cc_i = np.round(A_bool_f(cc_i)[0])  # calculate new state values
-
-            else:
-                cc_i = np.sign(A_bool_f(cc_i)[0])  # calculate new state values
-
-            # cc_i = np.int8(cc_i) # convert into integers
+            cc_i = np.sign(A_bool_f(cc_i)[0])  # calculate new state values
 
             # If there are constraints on some node vals, force them to the constraint:
             if constraint_inds is not None and constraint_vals is not None:
@@ -507,8 +522,7 @@ class BooleanNet():
                            signal_constr_vals: list|None = None,
                            search_main_nodes_only: bool=False,
                            n_max_steps: int = 20,
-                           verbose: bool=False,
-                           cooperative: bool = False
+                           verbose: bool=False
                            ):
         '''
         Solve for the equilibrium states of gene product in
@@ -553,7 +567,7 @@ class BooleanNet():
                                                    verbose=False,
                                                    constraint_inds = constrained_inds,
                                                    constraint_vals = constrained_vals,
-                                                   cooperative=cooperative)
+                                                   )
 
             sol_Mo.append(sol_i)
             sol_char.append(char_i)
