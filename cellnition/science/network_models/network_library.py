@@ -1575,13 +1575,13 @@ class AKTNet(LibNet):
 
         self.N_nodes = 25
         self.edges = [
-                      ('Growth-RTK', 'RAS'),
-                      ('Growth-RTK', 'GAB1/2'),
-                      ('Survival-RTK', 'PI3K'),
-                      ('Wnt-Frizzled', 'Dsh'),
+                      ('Growth_RTK', 'RAS'),
+                      ('Growth_RTK', 'GAB1_2'),
+                      ('Survival_RTK', 'PI3K'),
+                      ('Wnt_Frizzled', 'Dsh'),
                       ('RAS', 'RAF'),
                       ('RAS', 'PI3K'),
-                      ('GAB1/2', 'PI3K'),
+                      ('GAB1_2', 'PI3K'),
                       ('PI3K', 'AKT'),
                       ('AKT', 'RAF'),
                       ('AKT', 'TSCComplex'),
@@ -1595,16 +1595,16 @@ class AKTNet(LibNet):
                       ('ERK', 'mTORC1'),
                       ('ERK', 'eIF4E'),
                       ('TSCComplex', 'mTORC1'),
-                      ('mTORC1', '4EBP1'),
-                      ('4EBP1', 'eIF4E'),
-                      ('ERK', 'Cell Survival'),
-                      ('eIF4E', 'Translation'),
-                      ('mTORC1', 'Cell Survival'),
-                      ('mTORC1', 'Cell Cycle'),
-                      ('mTORC1', 'Metabolism'),
-                      ('bCAT', 'Proliferation'),
-                      ('bCAT', 'Proteosome'),
-                      ('FOXO', 'Apoptosis'),
+                      ('mTORC1', 'EBP1'),
+                      ('EBP1', 'eIF4E'),
+                      # ('ERK', 'Cell Survival'),
+                      # ('eIF4E', 'Translation'),
+                      # ('mTORC1', 'Cell Survival'),
+                      # ('mTORC1', 'Cell Cycle'),
+                      # ('mTORC1', 'Metabolism'),
+                      # ('bCAT', 'Proliferation'),
+                      # ('bCAT', 'Proteosome'),
+                      # ('FOXO', 'Apoptosis'),
 
                  ]
 
@@ -1630,14 +1630,14 @@ class AKTNet(LibNet):
                            EdgeType.A,
                            EdgeType.I,
                            EdgeType.I,
-                           EdgeType.A,
-                           EdgeType.A,
-                           EdgeType.A,
-                           EdgeType.A,
-                           EdgeType.A,
-                           EdgeType.A,
-                           EdgeType.A,
-                           EdgeType.A
+                           # EdgeType.A,
+                           # EdgeType.A,
+                           # EdgeType.A,
+                           # EdgeType.A,
+                           # EdgeType.A,
+                           # EdgeType.A,
+                           # EdgeType.A,
+                           # EdgeType.A
                       ]
 
         self.effector_edges = [('ERK', 'Cell Survival'),

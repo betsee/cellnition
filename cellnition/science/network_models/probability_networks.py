@@ -144,7 +144,7 @@ class ProbabilityNet(NetworkABC):
                 elif etype is EdgeType.A or etype is EdgeType.As:
                     A_mul_s[nde_i, nde_j] = 1
 
-            elif coupling_type is CouplingType.mixed:
+            elif coupling_type is CouplingType.mix1:
                 if etype is EdgeType.A or etype is EdgeType.As:
                     A_add_s[nde_i, nde_j] = 1
                 elif etype is EdgeType.I or etype is EdgeType.Is:
@@ -156,7 +156,7 @@ class ProbabilityNet(NetworkABC):
 
         return A_add_s, A_mul_s, A_full_s
 
-    def get_adjacency_randomly(self, coupling_type: CouplingType=CouplingType.mixed, set_autoactivation: bool=True):
+    def get_adjacency_randomly(self, coupling_type: CouplingType=CouplingType.mix1, set_autoactivation: bool=True):
         '''
         Return a randomly-generated full adjacency matrix.
         '''
@@ -199,7 +199,7 @@ class ProbabilityNet(NetworkABC):
         return edges_index, edges_type
 
 
-    def process_full_adjacency(self, A_full_s: MutableDenseMatrix, coupling_type: CouplingType=CouplingType.mixed):
+    def process_full_adjacency(self, A_full_s: MutableDenseMatrix, coupling_type: CouplingType=CouplingType.mix1):
         '''
         Process a full adjacency matrix into additive and multiplicative components
         based on a specified coupling type.
@@ -212,7 +212,7 @@ class ProbabilityNet(NetworkABC):
             for j in range(self.N_nodes):
                 afull_ij = A_full_s[i,j]
                 if afull_ij == 1:
-                    if coupling_type is CouplingType.additive or coupling_type is CouplingType.mixed:
+                    if coupling_type is CouplingType.additive or coupling_type is CouplingType.mix1:
                         A_add_s[i,j] = 1
                     elif coupling_type is CouplingType.multiplicative:
                         A_mul_s[i,j] = 1
@@ -222,7 +222,7 @@ class ProbabilityNet(NetworkABC):
                 if afull_ij == -1:
                     if coupling_type is CouplingType.additive:
                         A_add_s[i,j] = -1
-                    elif coupling_type is CouplingType.multiplicative or coupling_type is CouplingType.mixed:
+                    elif coupling_type is CouplingType.multiplicative or coupling_type is CouplingType.mix1:
                         A_mul_s[i,j] = -1
                     else:
                         raise Exception('CouplingType.specified is not supported in this method.')
@@ -235,7 +235,7 @@ class ProbabilityNet(NetworkABC):
 
     def build_analytical_model(self,
                  A_add_s: MutableDenseMatrix,
-                 A_mul_s: MutableDenseMatrix
+                 A_mul_s: MutableDenseMatrix,
                                ):
         '''
 

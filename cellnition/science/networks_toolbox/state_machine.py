@@ -108,7 +108,6 @@ class StateMachine(object):
                           search_tol: float=1.0e-15,
                           sol_tol: float=1.0e-2,
                           dt: float = 1.0e-3,
-                          space_sig: float = 30.0,
                           delta_sig: float = 30.0,
                           t_relax: float = 15.0,
                           dt_samp: float = 0.15,

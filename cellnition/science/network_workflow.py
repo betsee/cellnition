@@ -121,7 +121,7 @@ class NetworkWorkflow(object):
                             delta_out: float,
                             i: int,
                             interaction_function_type: InterFuncType = InterFuncType.logistic,
-                            coupling_type: CouplingType = CouplingType.mixed):
+                            coupling_type: CouplingType = CouplingType.mix1):
         '''
 
         '''
@@ -167,7 +167,7 @@ class NetworkWorkflow(object):
                            p_edge: float,
                            i: int,
                            interaction_function_type: InterFuncType = InterFuncType.logistic,
-                           coupling_type: CouplingType = CouplingType.mixed
+                           coupling_type: CouplingType = CouplingType.mix1
                            ):
         '''
 
@@ -210,7 +210,7 @@ class NetworkWorkflow(object):
                                   edge_types: list[EdgeType]|None = None,
                                   node_type_dict: dict | None = None,
                                   interaction_function_type: InterFuncType=InterFuncType.logistic,
-                                  coupling_type: CouplingType=CouplingType.mixed,
+                                  coupling_type: CouplingType=CouplingType.mix1,
                                   network_name: str='network',
                                   i: int=0,
                                   verbose: bool=False,
@@ -279,7 +279,7 @@ class NetworkWorkflow(object):
     def read_graph_from_file(self,
                              filename: str,
                              interaction_function_type: InterFuncType = InterFuncType.logistic,
-                             coupling_type: CouplingType = CouplingType.mixed,
+                             coupling_type: CouplingType = CouplingType.mix1,
                              i: int=0):
         '''
         Read a network, including edge types, from a saved file.
@@ -352,7 +352,7 @@ class NetworkWorkflow(object):
                           p_bkg: float=0.002,
                           p_act: float=0.5,
                           interfunctype: InterFuncType=InterFuncType.logistic,
-                          coupling_type: CouplingType=CouplingType.mixed,
+                          coupling_type: CouplingType=CouplingType.mix1,
                           fname_base: str='network',
                           frame_i: int=0,
                           save_path: str|None = None,
@@ -777,7 +777,7 @@ class NetworkWorkflow(object):
                    update_string: str|None = None,
                    node_type_dict: dict|None = None,
                    extra_verbose: bool=False,
-                   coupling_type: CouplingType=CouplingType.mixed,
+                   coupling_type: CouplingType=CouplingType.mix1,
                    label_edges: bool = False,
                    search_cycle_nodes_only: bool = False,
                    cluster_threshhold: float = 0.1,

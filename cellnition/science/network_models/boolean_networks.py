@@ -231,7 +231,8 @@ class BooleanNet():
 
     #----Boolean Model Building--------
     def build_boolean_model(self, use_node_name: bool=True,
-                            multi_coupling_type: CouplingType=CouplingType.mixed):
+                            multi_coupling_type: CouplingType=CouplingType.mix1,
+                            constitutive_express: bool = False):
         '''
         Construct a Boolean solver for a network.Returns both the symbolic equations (A_bool_s)
         as well as a vectorized numpy function (A_bool_f) that accepts the list or array of
@@ -254,15 +255,18 @@ class BooleanNet():
             c_vect_s = sp.Matrix([sp.Symbol(f'g_{nde_i}',
                                             positive=True) for nde_i in self.nodes_index])
 
-        if multi_coupling_type is CouplingType.mixed:
+        if multi_coupling_type is CouplingType.mix1:
             # Case #1: Mixed coupling, where inhibitors always act in "OR"
             # configuration and activators act in "AND" configuration.
             # Initialize an activator matrix:
             A_acti_so = np.zeros((self.N_nodes, self.N_nodes), dtype=int)
-            onesv = np.ones(self.N_nodes, dtype=int)
+            # onesv = np.ones(self.N_nodes, dtype=int)
 
             # Initialize an inhibitor matrix:
             A_inhi_so = np.ones((self.N_nodes, self.N_nodes), dtype=sp.Symbol)
+
+            acti_count = [0 for i in range(self.N_nodes)]  # counts the number of activators acting on each node
+            inhi_count = [0 for i in range(self.N_nodes)]  # counts the number of inhibitors acting on each node
 
             # Build A_full_s, an adjacency matrix that doesn't distinguish between additive
             # and multiplicative interactions:cc
@@ -271,30 +275,61 @@ class BooleanNet():
                 # print(c_vect_s[nde_i])
                 if etype is EdgeType.A or etype is EdgeType.As:
                     A_acti_so[nde_j, nde_i] = 1
+                    acti_count[nde_j] += 1
                 elif etype is EdgeType.I or etype is EdgeType.Is:
                     A_inhi_so[nde_j, nde_i] = 1 - c_vect_s[nde_i]
+                    inhi_count[nde_j] += 1
 
-            # Need to create a normalized vector for managing cooperativity of the "OR"
-            denom = A_acti_so.dot(onesv)  # sums the number of activators at each node
-            idenom = (denom == 0).nonzero()[0]  # indices where denom is zero
-            denom[idenom] = 1  # set those equal to 1
-            denom = np.int64(denom)
-            coopv = np.asarray([sp.Rational(1, di) for di in denom])
-            # coopv = 1 / denom
+            # Combine so that presence of activators AND absence of inhibitors required for node expressions:
+            if constitutive_express is False:
+                # Need to create a normalized vector for managing cooperativity of the "OR"
+                denom = np.asarray(acti_count)  # total number of activators at each node
+                idenom = (denom == 0).nonzero()[0]  # indices where denom is zero
+                denom[idenom] = 1  # set those equal to 1
+                denom = np.int64(denom)
+                coopv = np.asarray([sp.Rational(1, di) for di in denom])
 
-            # Multiply the system through with the normalizing coefficients:
-            A_acti_so = (coopv * A_acti_so.T).T
+                A_acti_so = (coopv * A_acti_so.T).T # multiply by the normalizing vector coopv
+                A_acti_ss = A_acti_so.dot(c_vect_s)
 
-            A_acti_s = sp.Matrix(A_acti_so.dot(c_vect_s))
-            A_inhi_s = sp.Matrix(np.prod(A_inhi_so, axis=1))
-            A_bool_s = sp.hadamard_product(A_acti_s, A_inhi_s)
+                const_inds = [] # if there's inhibitor but no activator, node must be const expressed
+                for ndei, (act, ict) in enumerate(zip(acti_count, inhi_count)):
+                    if act == 0 and ict != 0:
+                        const_inds.append(ndei)
 
-        elif multi_coupling_type is CouplingType.mixed2:
+                A_acti_ss[const_inds] = 1 # set this to 1 where the const expressed nodes should me
+
+                A_acti_s = sp.Matrix(A_acti_ss) # collect terms into "OR" activators at each node
+                A_inhi_s = sp.Matrix(np.prod(A_inhi_so, axis=1)) # collect terms into "AND" inhibitors at each node
+                A_bool_s = sp.hadamard_product(A_acti_s, A_inhi_s) # Use "AND" to combine acti and inhi
+
+            # We use and additive "OR" to specify the presence of an activator OR absence of an inhibitor
+            # is required for gene expression
+            else:
+                # Need to create a normalized vector for managing cooperativity of the "OR"
+                # sums the number of activators and if inhibitors at each node:
+                denom = np.asarray(acti_count) + np.sign(inhi_count)
+                idenom = (denom == 0).nonzero()[0]  # indices where denom is zero
+                denom[idenom] = 1  # set those equal to 1
+                denom = np.int64(denom)
+                coopv = sp.Matrix([sp.Rational(1, di) for di in denom]) # write as fractions for pretty display
+
+                # Multiply the system through with the normalizing coefficients:
+                A_acti_s = sp.hadamard_product(coopv, sp.Matrix(A_acti_so.dot(c_vect_s)))
+                A_inhi_s = sp.hadamard_product(coopv, sp.Matrix(np.sign(inhi_count) * np.prod(A_inhi_so, axis=1)))
+                # Combine activators and inhibitors as "OR" function:
+                A_bool_s = A_acti_s + A_inhi_s
+
+
+        elif multi_coupling_type is CouplingType.mix2:
             # Case #2: Mixed coupling #2, where inhibitors always act in "AND"
             # configuration and activators act in "OR" configuration.
             # Initialize an inhibitor matrix:
             A_inhi_so = np.zeros((self.N_nodes, self.N_nodes), dtype=int)
             onesv = np.ones(self.N_nodes, dtype=int)
+
+            acti_count = [0 for i in range(self.N_nodes)]  # counts the number of activators acting on each node
+            inhi_count = [0 for i in range(self.N_nodes)]  # counts the number of inhibitors acting on each node
 
             # Initialize an activator matrix:
             A_acti_so = np.ones((self.N_nodes, self.N_nodes), dtype=sp.Symbol)
@@ -306,8 +341,10 @@ class BooleanNet():
                 # print(c_vect_s[nde_i])
                 if etype is EdgeType.A or etype is EdgeType.As:
                     A_acti_so[nde_j, nde_i] = c_vect_s[nde_i]
+                    acti_count[nde_j] += 1
                 elif etype is EdgeType.I or etype is EdgeType.Is:
                     A_inhi_so[nde_j, nde_i] = 1
+                    inhi_count[nde_j] += 1
 
             # Need to create a normalized vector for managing cooperativity of the "OR"
             denom = A_inhi_so.dot(onesv) +1 # sums the number of activators at each node
@@ -443,14 +480,6 @@ class BooleanNet():
             # Detect whether we're at a steady-state:
             if (solsv[i] == solsv[i - 1]).all() is NumpyTrue:
                 sol_char = EquilibriumType.attractor
-                break
-
-            # Detect whether we're oscillating in a limit cycle (back and forth
-            # between two states).
-            elif i > 2 and (solsv[i - 2] == cc_i).all() is NumpyTrue:
-                sol_char = EquilibriumType.limit_cycle
-                # solution becomes the (non-integer!) mean of the simple alternating motif:
-                cc_i = (np.asarray(cc_i) + np.asarray(solsv[i-1]))/2
                 break
 
             elif i == n_max_steps -1:

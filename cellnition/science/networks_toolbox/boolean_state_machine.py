@@ -346,6 +346,8 @@ class BoolStateMachine(object):
                                                                self._bnet._A_bool_f,
                                                                n_max_steps=n_max_steps,
                                                                verbose=False,
+                                                               constraint_inds=self._bnet.input_node_inds,
+                                                               constraint_vals=list(sig_base_set),
                                                                cooperative=cooperative)
 
                 initial_state, match_error_initial = self._find_state_match(solsM_all[self._bnet.noninput_node_inds, :],
@@ -373,6 +375,8 @@ class BoolStateMachine(object):
                                                                self._bnet._A_bool_f,
                                                                n_max_steps=n_max_steps,
                                                                verbose=False,
+                                                               constraint_inds=self._bnet.input_node_inds,
+                                                               constraint_vals=list(sig_pert_set),
                                                                cooperative=cooperative)
 
                     # FIXME: the find_state_match method should use the equm' char as well as the state values!
@@ -400,6 +404,8 @@ class BoolStateMachine(object):
                                                                self._bnet._A_bool_f,
                                                                n_max_steps=n_max_steps,
                                                                verbose=False,
+                                                               constraint_inds=self._bnet.input_node_inds,
+                                                               constraint_vals=list(sig_base_set),
                                                                cooperative=cooperative)
 
                     final_state, match_error_final = self._find_state_match(solsM_all[self._bnet.noninput_node_inds, :],

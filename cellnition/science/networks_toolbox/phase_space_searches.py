@@ -28,7 +28,7 @@ def multistability_search(pnet: ProbabilityNet,
                           constraint_vals: list[float]|None = None,
                           constraint_inds: list[int]|None = None,
                           signal_constr_vals: list|None = None,
-                          coupling_type: CouplingType = CouplingType.mixed,
+                          coupling_type: CouplingType = CouplingType.mix1,
                           search_cycle_nodes_only: bool=False
                           ) -> tuple[list, list]:
     '''

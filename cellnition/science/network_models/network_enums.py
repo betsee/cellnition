@@ -56,6 +56,6 @@ class InterFuncType(Enum):
 class CouplingType(Enum):
     additive = 'additive'
     multiplicative = 'multiplicative'
-    mixed = 'mixed'
+    mix1 = 'mix1' # activators "OR", inhibitors "AND"
     specified = 'specified'
-    mixed2 = 'mixed2'
+    mix2 = 'mix2' # Activators "AND", inhibitors "OR"
