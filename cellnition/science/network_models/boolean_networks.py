@@ -468,6 +468,7 @@ class BooleanNet():
                               constraint_inds: list|None=None,
                               constraint_vals: list|None=None,
                               verbose: bool=False,
+                              node_express_levels: int|None=None
                               ):
         '''
 
@@ -484,7 +485,11 @@ class BooleanNet():
             # be achieved by using the "ceiling" function. If cooperative interaction is
             # desired, then rounding is better
 
-            cc_i = np.sign(A_bool_f(cc_i)[0])  # calculate new state values
+            if node_express_levels is None:
+                cc_i = np.sign(A_bool_f(cc_i)[0])  # calculate new state values
+            else:
+                cc_io = (A_bool_f(cc_i)[0])
+                cc_i = np.round(cc_io*(node_express_levels -1))/(node_express_levels - 1)
 
             # If there are constraints on some node vals, force them to the constraint:
             if constraint_inds is not None and constraint_vals is not None:
@@ -522,7 +527,8 @@ class BooleanNet():
                            signal_constr_vals: list|None = None,
                            search_main_nodes_only: bool=False,
                            n_max_steps: int = 20,
-                           verbose: bool=False
+                           verbose: bool=False,
+                           node_express_levels: int | None = None
                            ):
         '''
         Solve for the equilibrium states of gene product in
@@ -567,6 +573,7 @@ class BooleanNet():
                                                    verbose=False,
                                                    constraint_inds = constrained_inds,
                                                    constraint_vals = constrained_vals,
+                                                   node_express_levels=node_express_levels
                                                    )
 
             sol_Mo.append(sol_i)

@@ -1557,15 +1557,16 @@ class AKTNet(LibNet):
 
     def __init__(self, activator_signals: bool=True):
         '''
-        This biological network is the PI3K/AKT/mTOR signaling transduction pathway.
+        This biological network is the PI3K/AKT/mTOR (PAM) signaling transduction pathway.
 
         The network is sourced from the reference:
 
         Glaviano et al. PI3K/AKT/mTOR signaling transduction pathway and targeted therapies in cancer.
         Mol Cancer. 2023 Aug 18;22(1):138. doi: 10.1186/s12943-023-01827-6.
 
-        The modelled network has been simplified from the source reference by combining elements in direct
-        signalling chains.
+        The modelled network has been slightly simplified from the source reference by combining elements in direct
+        signalling chains and by adding an inhibitory relationship between "Cell Survival" and "Apoptosis", which is
+        known and prevents nonsense output.
 
         '''
         # Initialize the superclass:
@@ -1573,81 +1574,91 @@ class AKTNet(LibNet):
 
         self.name = 'AKTNet'
 
-        self.N_nodes = 25
+        self.N_nodes = 26
         self.edges = [
+                      # Input edges:
                       ('Growth_RTK', 'RAS'),
-                      ('Growth_RTK', 'GAB1_2'),
                       ('Survival_RTK', 'PI3K'),
                       ('Wnt_Frizzled', 'Dsh'),
+
+                      # RTK-Growth sub-pathway:
                       ('RAS', 'RAF'),
-                      ('RAS', 'PI3K'),
-                      ('GAB1_2', 'PI3K'),
+                      ('RAF', 'MEK'),
+                      ('MEK', 'ERK'),
+                      ('ERK', 'MNK1'),
+                      ('ERK', 'RSK'),
+                      ('ERK', 'mTORC1'),
+                      ('ERK', 'TSCComplex'),
+                      ('RSK', 'mTORC1'),
+                      ('MNK1', 'eIF4E'),
+
+                      # RTK-survival sub-pathway:
                       ('PI3K', 'AKT'),
                       ('AKT', 'RAF'),
                       ('AKT', 'TSCComplex'),
                       ('AKT', 'FOXO'),
                       ('AKT', 'AxinComplex'),
                       ('AKT', 'bCAT'),
-                      ('Dsh', 'AxinComplex'),
-                      ('AxinComplex', 'bCAT'),
-                      ('RAF', 'ERK'),
-                      ('ERK', 'TSCComplex'),
-                      ('ERK', 'mTORC1'),
-                      ('ERK', 'eIF4E'),
                       ('TSCComplex', 'mTORC1'),
                       ('mTORC1', 'EBP1'),
                       ('EBP1', 'eIF4E'),
-                      # ('ERK', 'Cell Survival'),
-                      # ('eIF4E', 'Translation'),
-                      # ('mTORC1', 'Cell Survival'),
-                      # ('mTORC1', 'Cell Cycle'),
-                      # ('mTORC1', 'Metabolism'),
-                      # ('bCAT', 'Proliferation'),
-                      # ('bCAT', 'Proteosome'),
-                      # ('FOXO', 'Apoptosis'),
+
+                      # WNT-Frizzled sub-pathway
+                      ('Dsh', 'AxinComplex'),
+                      ('AxinComplex', 'bCAT'),
+
+                      # Output edges
+                      ('ERK', 'CellSurvival'),
+                      ('eIF4E', 'Translation'),
+                      ('mTORC1', 'CellCycle'),
+                      ('mTORC1', 'Metabolism'),
+                      ('bCAT', 'Proliferation'),
+                      ('bCAT', 'Proteosomes'),
+                      ('FOXO', 'Apoptosis'),
 
                  ]
 
-        self.edge_types = [EdgeType.A,
+        self.edge_types = [
+                          # Input edge types:
                            EdgeType.A,
                            EdgeType.A,
                            EdgeType.A,
-                           EdgeType.A,
-                           EdgeType.A,
-                           EdgeType.A,
-                           EdgeType.A,
-                           EdgeType.I,
-                           EdgeType.I,
-                           EdgeType.I,
-                           EdgeType.I,
-                           EdgeType.A,
-                           EdgeType.I,
-                           EdgeType.A,
-                           EdgeType.A,
-                           EdgeType.I,
-                           EdgeType.A,
-                           EdgeType.A,
-                           EdgeType.A,
-                           EdgeType.I,
-                           EdgeType.I,
-                           # EdgeType.A,
-                           # EdgeType.A,
-                           # EdgeType.A,
-                           # EdgeType.A,
-                           # EdgeType.A,
-                           # EdgeType.A,
-                           # EdgeType.A,
-                           # EdgeType.A
-                      ]
 
-        self.effector_edges = [('ERK', 'Cell Survival'),
-                               ('mTORC1', 'Cell Survival'),
-                               ('mTORC1', 'Cell Cycle'),
-                               ('mTORC1', 'Metabolism'),
-                               ('FOXO', 'Apoptosis'),
-                               ('bCAT', 'Proliferation'),
-                               ('bCAT', 'Proteasome'),
-                               ('eIF4E', 'Translation'),]
+                           # RTK-Growth sub-pathway:
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.I,
+                           EdgeType.A,
+                           EdgeType.A,
+
+                          # RTK-survival sub-pathway:
+                           EdgeType.A,
+                           EdgeType.I,
+                           EdgeType.I,
+                           EdgeType.I,
+                           EdgeType.I,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.I,
+                           EdgeType.I,
+
+                         # WNT-Frizzled sub-pathway:
+                           EdgeType.I,
+                           EdgeType.A,
+
+                         # Output edge types:
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+                      ]
 
         self.node_type_dict = None
 
