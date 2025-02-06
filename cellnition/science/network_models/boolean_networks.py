@@ -467,8 +467,7 @@ class BooleanNet():
                               n_max_steps: int=20,
                               constraint_inds: list|None=None,
                               constraint_vals: list|None=None,
-                              verbose: bool=False,
-                              node_express_levels: int|None=None
+                              verbose: bool=False
                               ):
         '''
 
@@ -485,11 +484,7 @@ class BooleanNet():
             # be achieved by using the "ceiling" function. If cooperative interaction is
             # desired, then rounding is better
 
-            if node_express_levels is None:
-                cc_i = np.sign(A_bool_f(cc_i)[0])  # calculate new state values
-            else:
-                cc_io = (A_bool_f(cc_i)[0])
-                cc_i = np.round(cc_io*(node_express_levels -1))/(node_express_levels - 1)
+            cc_i = np.sign(A_bool_f(cc_i)[0])  # calculate new state values
 
             # If there are constraints on some node vals, force them to the constraint:
             if constraint_inds is not None and constraint_vals is not None:
@@ -505,17 +500,23 @@ class BooleanNet():
             elif i == n_max_steps -1:
                 # test to see if we have a more complicated repetition motif:
                 solvr = np.asarray(solsv)[:, self.noninput_node_inds] # get the reduced array
-                si = solvr[2, :] # try selecting the second state...(we may need this to be second?)
+                si = solvr[-1, :] # try selecting the last state to check for repetition...
                 matched_inds = [i for i, x in enumerate(solvr.tolist()) if x == si.tolist()] # look for repetition
                 if len(matched_inds) > 1: # if there's more than one incidence of the state
                     motif_period = matched_inds[-1] - matched_inds[-2]
-                    solvrr = solvr[2:, :] # remove the first and second states
+                    # solvrr = solvr[3:, :] # remove the first three states...
+                    solvrr = solvr
                     test_repeat = np.roll(solvrr, motif_period - 1, axis=1) - solvrr # roll to make the arrays equivalent
 
                     if (np.sum(test_repeat) == 0):
-                        sol_char = EquilibriumType.limit_cycle
                         motif = np.asarray(solsv)[matched_inds[-2]:matched_inds[-1], :] # extract a motif from the full array
                         cc_i = np.mean(motif, axis=0) # solution becomes the (non-integer!) mean of the motif
+                        if len(motif) > 2:
+                            sol_char = EquilibriumType.limit_cycle
+                        else: # otherwise the motif is a saddle (metabstable point):
+                            sol_char = EquilibriumType.saddle
+
+        self._solsv = solsv # save this so we can investigate the solution
 
         return cc_i, sol_char
 
@@ -527,8 +528,7 @@ class BooleanNet():
                            signal_constr_vals: list|None = None,
                            search_main_nodes_only: bool=False,
                            n_max_steps: int = 20,
-                           verbose: bool=False,
-                           node_express_levels: int | None = None
+                           verbose: bool=False
                            ):
         '''
         Solve for the equilibrium states of gene product in
@@ -572,8 +572,7 @@ class BooleanNet():
                                                    n_max_steps=n_max_steps,
                                                    verbose=False,
                                                    constraint_inds = constrained_inds,
-                                                   constraint_vals = constrained_vals,
-                                                   node_express_levels=node_express_levels
+                                                   constraint_vals = constrained_vals
                                                    )
 
             sol_Mo.append(sol_i)
@@ -1034,157 +1033,70 @@ class BooleanNet():
             else:
                 raise Exception("Node type not found.")
 
-    # ----Time Dynamics Methods----------------
-    def pulses(self,
-               tvect: list | ndarray,
-               t_on: float | int,
-               t_off: float | int,
-               c_base: float | int = 1.0,
-               c_active: float | int = 0.0,
-               ):
+    #---State Space Search -----------------
+    def bool_state_space(self,
+                         A_bool_f: Callable,
+                         constraint_inds: list | None = None,
+                         constraint_vals: list | None = None,
+                         signal_constr_vals: list | None = None,
+                         search_main_nodes_only: bool = False,
+                         n_max_steps: int = 20,
+                         verbose: bool = False):
         '''
 
         '''
-        itop = (tvect >= t_on).nonzero()[0]
-        ibot = (tvect <= t_off).nonzero()[0]
 
-        ipulse = np.intersect1d(ibot, itop)
+        constrained_inds, constrained_vals = self._handle_constrained_nodes(constraint_inds,
+                                                                            constraint_vals,
+                                                                            signal_constr_vals=signal_constr_vals)
 
-        pulse_sig = c_active * np.ones(len(tvect))
-
-        pulse_sig[ipulse] = c_base
-
-        return pulse_sig
-
-    def get_interval_inds(self,
-                          tvect: ndarray,
-                          t_on: float,
-                          t_off: float,
-                          t_wait: float = 0.0
-                          ):
-        '''
-        Returns indices specifying an interval from the
-        supplied vector tvect spanning between vector
-        values t_on and t_off.
-
-        Parameters
-        ----------
-        t_vect : ndarray
-            The vector to pull the interval from.
-
-        t_on : float
-            The first value in the vector defining the interval start.
-
-        t_off : float
-            The value in the vector defining the interval end.
-
-        t_wait: float
-            The amount of time to push up the start of the interval from
-            t_on (which is useful if you're waiting for the system to get
-            back to steady-state).
-
-        '''
-        itop = (tvect >= t_on + t_wait).nonzero()[0]
-        ibot = (tvect <= t_off).nonzero()[0]
-
-        ipulse_inds = np.intersect1d(ibot, itop)
-
-        return ipulse_inds
-
-    def make_pulsed_signals_matrix(self,
-                                   tvect: list | ndarray,
-                                   sig_inds: list | ndarray,
-                                   sig_times: list | ndarray,
-                                   sig_mag: list | ndarray):
-        '''
-
-        '''
-        Nt = len(tvect)
-
-        c_signals = np.zeros((Nt, self.N_nodes))  # Initialize matrix holding the signal sequences
-
-        for si, (ts, te), (smin, smax) in zip(sig_inds, sig_times, sig_mag):
-            c_signals[:, si] += self.pulses(tvect,
-                                            ts,
-                                            te,
-                                            c_base=smax,
-                                            c_active=smin
-                                            )
-
-        return c_signals
-
-    def get_all_intervals(self,
-                          tvect: ndarray,
-                          sig_times: list | ndarray,
-                          t_wait: float = 0.0,
-                          add_end_intervals: bool = True
-                          ):
-        '''
-
-        '''
-        intervals_set = set()  # Initialize set to hold the interval indices
-
-        # sig_times = sorted(sig_times) # sort the time tuples by their start time
-        sig_times.sort(key=lambda x: x[0])  # sort the time tuples by their start time
-
-        for ts, te in sig_times:
-            inti = self.get_interval_inds(tvect,
-                                          ts,
-                                          te,
-                                          t_wait=t_wait
-                                          )
-
-            if len(inti):
-                intervals_set.add((inti[0], inti[-1]))
-
-        if add_end_intervals:
-            # Add a start interval
-            intis = self.get_interval_inds(tvect,
-                                           tvect[0],
-                                           sig_times[0][0],
-                                           t_wait=t_wait
-                                           )
-            if len(intis):
-                intervals_set.add((intis[0], intis[-1]))
-
-            # Add an end interval:
-            intie = self.get_interval_inds(tvect,
-                                           sig_times[-1][1],
-                                           tvect[-1],
-                                           t_wait=t_wait
-                                           )
-            if len(intie):
-                intervals_set.add((intie[0], intie[-1]))
-
-        intervals_list = list(intervals_set)
-        intervals_list.sort(key=lambda x: x[0])  # sort the time tuples by their start time
-
-        return intervals_list
-
-    def make_time_vects(self,
-                        tend: float,
-                        dt: float,
-                        dt_samp: float | None = None, ):
-        '''
-
-        '''
-        Nt = int(tend / dt)
-        tvect = np.linspace(0.0, tend, Nt)
-
-        # sampling compression
-        if dt_samp is not None:
-            sampr = int(dt_samp / dt)
-            tvectr = tvect[0::sampr]
+        if constrained_inds is None or constrained_vals is None:
+            unconstrained_inds = self.nodes_index
         else:
-            tvectr = tvect
+            unconstrained_inds = np.setdiff1d(self.nodes_index, constrained_inds).tolist()
 
-        # make a time-step update vector so we can update any sensors as
-        # an absolute reading (dt = 1.0) while treating the kinetics of the
-        # other node types:
-        # dtv = dt * np.ones(self._N_nodes)
-        # dtv[self.sensor_node_inds] = 1.0
+        if search_main_nodes_only is False:
+            M_pstates, _, _ = self.generate_state_space(unconstrained_inds)
 
-        return tvect, tvectr
+        else:
+            if len(self.main_nodes):
+                M_pstates, _, _ = self.generate_state_space(self.main_nodes)
+
+            else:
+                raise Exception("No main nodes; cannot perform state search with "
+                                "search_main_nodes_only=True.")
+
+        net_edges = set()  # store the edges of the boolean state diagram
+        pos={} # Holds node state position on the state transition diagram
+
+        for cvecto in M_pstates: # for each test vector:
+            # Need to modify the cvect vector to hold the value of the input nodes:
+            if constrained_inds is not None and constrained_vals is not None:
+                cvecto[constrained_inds] = constrained_vals
+
+            cc_i = cvecto  # initialize the function values (node values)
+
+            for i in range(n_max_steps):
+                cc_o = cc_i # save the initial value
+                cc_i = np.sign(A_bool_f(cc_i)[0])  # calculate new state values
+
+                # Need to modify the new concentrations vector to hold the value of the input nodes:
+                if constrained_inds is not None and constrained_vals is not None:
+                    cc_i[constrained_inds] = constrained_vals
+
+                nde1 = str(tuple(cc_o[self.noninput_node_inds]))
+                nde2 = str(tuple(cc_i[self.noninput_node_inds]))
+                net_edges.add((nde1, nde2))
+                pos[nde1] = tuple(cc_o[self.noninput_node_inds])
+                pos[nde2] = tuple(cc_i[self.noninput_node_inds])
+
+                # Detect whether we're at a steady-state:
+                if (cc_i == cc_o).all() is NumpyTrue:
+                    break
+
+        boolG = nx.DiGraph(net_edges)
+        return boolG, pos
+
 
     # ----Plots and Data Export----------------
     def save_network(self, filename: str):

@@ -106,7 +106,7 @@ class BoolStateMachine(object):
                           graph_layout: str = 'dot',
                           remove_inaccessible_states: bool = True,
                           search_main_nodes_only: bool = False,
-                          node_express_levels: int | None = None
+                          order_by_distance: bool = False
                           ) -> MultiDiGraph:
         '''
         Run all steps to generate a state transition network and associated
@@ -120,7 +120,7 @@ class BoolStateMachine(object):
          states_dict,
          sig_test_set) = self.steady_state_solutions_search(verbose=verbose,
                                                             search_main_nodes_only=search_main_nodes_only,
-                                                            node_express_levels=node_express_levels
+                                                            order_by_distance=order_by_distance
                                                             )
 
         # save entities to the object:
@@ -137,7 +137,6 @@ class BoolStateMachine(object):
                                                                      verbose=verbose,
                                                                      remove_inaccessible_states=remove_inaccessible_states,
                                                                      save_graph_file=save_graph_file,
-                                                                     node_express_levels=node_express_levels
                                                                      )
 
         self.transition_edges_set = transition_edges_set
@@ -174,7 +173,7 @@ class BoolStateMachine(object):
                                       verbose: bool=True,
                                       search_main_nodes_only: bool = False,
                                       n_max_steps: int = 10,
-                                      node_express_levels: int | None = None
+                                      order_by_distance: bool=False
                                       ):
         '''
         Search through all possible combinations of signal node values
@@ -215,7 +214,6 @@ class BoolStateMachine(object):
                                                         search_main_nodes_only=search_main_nodes_only,
                                                         n_max_steps=n_max_steps,
                                                         verbose=False,
-                                                        node_express_levels=node_express_levels
                                                         )
             if solsM_allo is None:
                 solsM_allo = sols_M
@@ -235,8 +233,9 @@ class BoolStateMachine(object):
         solsM_all = solsM_allo[:, inds_solsM_all_unique]
         charM_all = np.asarray(charM_allo)[inds_solsM_all_unique]
 
-        # Order states by distance from the zero vector
-        solsM_all, charM_all = self._order_states_by_distance(solsM_all, charM_all)
+        if order_by_distance:
+            # Order states by distance from the zero vector
+            solsM_all, charM_all = self._order_states_by_distance(solsM_all, charM_all)
 
         states_dict = OrderedDict()
         for sigi in sig_test_set:
@@ -261,7 +260,6 @@ class BoolStateMachine(object):
                                   remove_inaccessible_states: bool=False,
                                   save_graph_file: str|None = None,
                                   n_max_steps: int=10,
-                                  node_express_levels: int | None = None
                                   ) -> tuple[set, set, MultiDiGraph]:
         '''
         Build a state transition matrix/diagram by starting the system
@@ -312,6 +310,9 @@ class BoolStateMachine(object):
         # make a copy of the states dict that's only used for modifications:
         states_dict_2 = copy.deepcopy(states_dict)
 
+        # charM_extras:
+        charM_ext = []
+
         # States for perturbation of the zero state inputs
         # Let's start the system off in the zero vector, then
         # temporarily perturb the system with each signal set and see what the final state is after
@@ -350,18 +351,19 @@ class BoolStateMachine(object):
                                                                verbose=False,
                                                                constraint_inds=self._bnet.input_node_inds,
                                                                constraint_vals=list(sig_base_set),
-                                                               node_express_levels=node_express_levels
                                                                )
 
                 initial_state, match_error_initial = self._find_state_match(solsM_all[self._bnet.noninput_node_inds, :],
                                                                       cvect_c[self._bnet.noninput_node_inds])
 
-                if match_error_initial > 0.0:  # if held state is unmatched, flag it with a nan
+                if match_error_initial > 0.01:  # if held state is unmatched, flag it with a nan
                     solsM_all = np.column_stack((solsM_all, cvect_c))
+                    charM_ext.append(char_c)
                     initial_state = solsM_all.shape[1] - 1
 
                     if verbose:
-                        print(f'WARNING: Initial state not found; adding new state {initial_state} to the solution set...')
+                        print(f'WARNING: Initial state not found (error {match_error_initial});'
+                              f' adding new state {initial_state} to the solution set...')
 
                 # Add this transition to the state transition diagram:
                 transition_edges_set.add((si, initial_state, base_input_label))
@@ -380,7 +382,6 @@ class BoolStateMachine(object):
                                                                verbose=False,
                                                                constraint_inds=self._bnet.input_node_inds,
                                                                constraint_vals=list(sig_pert_set),
-                                                               node_express_levels=node_express_levels
                                                                )
 
                     # FIXME: the find_state_match method should use the equm' char as well as the state values!
@@ -388,12 +389,14 @@ class BoolStateMachine(object):
                     held_state, match_error_held = self._find_state_match(solsM_all[self._bnet.noninput_node_inds, :],
                                                                                 cvect_h[self._bnet.noninput_node_inds])
 
-                    if match_error_held > 0.0: # if held state is unmatched, flag it with a nan
+                    if match_error_held > 0.01: # if held state is unmatched, flag it with a nan
                         solsM_all = np.column_stack((solsM_all, cvect_h))
+                        charM_ext.append(char_h)
                         held_state = solsM_all.shape[1] - 1
 
                         if verbose:
-                            print(f'WARNING: Held state not found; adding new state {held_state} to the solution set...')
+                            print(f'WARNING: Held state not found (error {match_error_held}); '
+                                  f'adding new state {held_state} to the solution set...')
 
                     transition_edges_set.add((initial_state, held_state, pert_input_label))
                     if verbose:
@@ -410,19 +413,20 @@ class BoolStateMachine(object):
                                                                verbose=False,
                                                                constraint_inds=self._bnet.input_node_inds,
                                                                constraint_vals=list(sig_base_set),
-                                                               node_express_levels=node_express_levels
                                                                )
 
                     final_state, match_error_final = self._find_state_match(solsM_all[self._bnet.noninput_node_inds, :],
                                                                           cvect_f[self._bnet.noninput_node_inds])
                     # held_state, match_error_held = self._find_state_match(solsM_all, c_held)
 
-                    if match_error_held > 0.0: # if state is unmatched, flag it
+                    if match_error_final > 0.01: # if state is unmatched, flag it
                         solsM_all = np.column_stack((solsM_all, cvect_f))
+                        charM_ext.append(char_f)
                         final_state = solsM_all.shape[1] -1
 
                         if verbose:
-                            print(f'WARNING: Final state not found; adding new state {final_state} to the solution set...')
+                            print(f'WARNING: Final state not found (error {match_error_final}); '
+                                  f'adding new state {final_state} to the solution set...')
 
                     transition_edges_set.add((held_state, final_state, base_input_label))
                     if verbose:
@@ -451,6 +455,8 @@ class BoolStateMachine(object):
         self._solsM_all = solsM_all
         self._states_dict = states_dict_2
         self._sig_test_set = sig_test_set
+        self._charM_ext = charM_ext
+        # self._charM_all = np.hstack((self._charM_all, charM_ext))
 
         # Create the multidigraph:
         GG = nx.MultiDiGraph()

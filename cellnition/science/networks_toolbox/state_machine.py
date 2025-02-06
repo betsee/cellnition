@@ -118,7 +118,8 @@ class StateMachine(object):
                           graph_layout: str = 'dot',
                           remove_inaccessible_states: bool = True,
                           node_expression_levels: int|float = 4.0,
-                          search_main_nodes_only: bool = False
+                          search_main_nodes_only: bool = False,
+                          order_by_distance: bool = False
                           ) -> MultiDiGraph:
         '''
         Run all steps to generate a state transition network and associated
@@ -140,6 +141,7 @@ class StateMachine(object):
                                                             sol_tol=sol_tol,
                                                             search_main_nodes_only=search_main_nodes_only,
                                                             node_expression_levels=node_expression_levels,
+                                                            order_by_distance=order_by_distance
                                                             )
 
         # save entities to the object:
@@ -205,7 +207,8 @@ class StateMachine(object):
                                       N_round_sol: int=1,
                                       search_main_nodes_only: bool = False,
                                       node_expression_levels: int|float = 4.0,
-                                      sig_lino: list|None = None
+                                      sig_lino: list|None = None,
+                                      order_by_distance: bool = False
                                       ):
         '''
         Search through all possible combinations of signal node values
@@ -237,7 +240,7 @@ class StateMachine(object):
         sols_list = []
 
         for sigis in sig_test_set:
-            print(f'Signals: {np.round(sigis, 1)}')
+            # print(f'Signals: {np.round(sigis, 1)}')
             solsM, sol_M_char, sol_0 = self._pnet.solve_probability_equms(constraint_inds=None,
                                                                           constraint_vals=None,
                                                                           signal_constr_vals=sigis.tolist(),
@@ -301,8 +304,9 @@ class StateMachine(object):
         solsM_all = solsM_all[:, inds_solsM_all_unique]
         charM_all = np.asarray(charM_all)[inds_solsM_all_unique]
 
-        # Order states by distance from the zero vector:
-        solsM_all, charM_all = self._order_states_by_distance(solsM_all, charM_all)
+        if order_by_distance:
+            # Order states by distance from the zero vector:
+            solsM_all, charM_all = self._order_states_by_distance(solsM_all, charM_all)
 
         states_dict = OrderedDict()
         for sigi in sig_test_set:

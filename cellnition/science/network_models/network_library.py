@@ -821,6 +821,42 @@ class TrinodeCycleFullyConnected(LibNet):
 
         self.add_interactions = True
 
+class TrinodeCycleFullyConnected2(LibNet):
+
+    def __init__(self, activator_signals: bool=False):
+        '''
+
+        '''
+        # Initialize the superclass:
+        super().__init__()
+
+        self.name = 'TrinodeCycleFullyConnected2'
+
+        self.N_nodes = 6
+        self.edges = [('H0', 'H1'), ('H1', 'H2'), ('H2', 'H0'),
+                      ('H1', 'H0'), ('H2', 'H1'), ('H0', 'H2'),
+                      ('H0', 'H0'), ('H2', 'H2'), ('H1', 'H1'),
+                     ('S0', 'H0'), ('S1', 'H1'), ('S2', 'H2')
+                     ]
+
+        if activator_signals:
+            self.edge_types = [EdgeType.A, EdgeType.A, EdgeType.A,
+                               EdgeType.A, EdgeType.A, EdgeType.A,
+                               EdgeType.A, EdgeType.A, EdgeType.A,
+                          EdgeType.I, EdgeType.A, EdgeType.A,
+                          ]
+        else:
+            self.edge_types = [EdgeType.I, EdgeType.I, EdgeType.I,
+                               EdgeType.I, EdgeType.I, EdgeType.I,
+                               EdgeType.A, EdgeType.A, EdgeType.A,
+                          EdgeType.I, EdgeType.A, EdgeType.A,
+                          ]
+
+        self.node_type_dict = {'S': NodeType.signal}
+        # self.node_type_dict = None
+
+        self.add_interactions = True
+
 class TrinodeCyclesConnected(LibNet):
 
     def __init__(self, activator_signals: bool=False):
@@ -1294,7 +1330,7 @@ class StemCellNet(LibNet):
 
         self.name = 'StemCellNet'
 
-        self.N_nodes = 8
+        self.N_nodes = 6
         self.edges = [
                       ('NANOG', 'OCT4'),
                       ('OCT4', 'NANOG'),
@@ -1310,43 +1346,32 @@ class StemCellNet(LibNet):
 
                  ]
 
-        # self.edge_types = [EdgeType.I,
-        #                    EdgeType.A,
-        #                    EdgeType.A,
-        #                    EdgeType.I,
-        #                    EdgeType.A,
-        #                    EdgeType.A,
-        #                    EdgeType.A,
-        #                    EdgeType.A,
-        #                    EdgeType.I,
-        #                    EdgeType.I,
-        #                    EdgeType.I,
-        #               ]
-
-        # self.edge_types = [EdgeType.A,
-        #                    EdgeType.A,
-        #                    EdgeType.A,
-        #                    EdgeType.A,
-        #                    EdgeType.A,
-        #                    EdgeType.A,
-        #                    EdgeType.A,
-        #                    EdgeType.A,
-        #                    EdgeType.I,
-        #                    EdgeType.I,
-        #                    EdgeType.I,
-        #               ]
-
-        self.edge_types = [EdgeType.I,
-                            EdgeType.I,
-                            EdgeType.I,
-                            EdgeType.I,
-                            EdgeType.I,
-                            EdgeType.A,
-                            EdgeType.A,
-                            EdgeType.A,
-                            EdgeType.A,
-                            EdgeType.A,
-                            EdgeType.A]
+        if activator_signals:
+            self.edge_types = [EdgeType.A,
+                               EdgeType.A,
+                               EdgeType.A,
+                               EdgeType.A,
+                               EdgeType.A,
+                               EdgeType.A,
+                               EdgeType.A,
+                               EdgeType.A,
+                               EdgeType.I,
+                               EdgeType.I,
+                               EdgeType.I,
+                          ]
+        else:
+            self.edge_types = [EdgeType.I,
+                               EdgeType.I,
+                               EdgeType.I,
+                               EdgeType.I,
+                               EdgeType.I,
+                               EdgeType.I,
+                               EdgeType.A,
+                               EdgeType.A,
+                               EdgeType.A,
+                               EdgeType.A,
+                               EdgeType.A,
+                          ]
 
         self.node_type_dict = None
 
@@ -1673,7 +1698,7 @@ class hESC_9a(LibNet):
 
     '''
 
-    def __init__(self, activator_signals: bool=True):
+    def __init__(self, activator_signals: bool=True, use_special_edges: bool=True):
         '''
         Works from the DNase Footprint derived TF networks to generate
         more structure around the classic SOX2-OCT4-NANOG triad.
@@ -1704,7 +1729,6 @@ class hESC_9a(LibNet):
             (EGR2, SP1),
             (EGR2, SP2),
             (EGR2, SP3),
-            (KLF15, KLF15),
             (KLF15, KLF4),
             (KLF15, POU5F1),
             (KLF15, SOX2),
@@ -1725,7 +1749,6 @@ class hESC_9a(LibNet):
             (POU5F1, SOX2),
             (SOX2, NANOG),
             (SOX2, POU5F1),
-            (SOX2, SOX2),
             (SP1, EGR2),
             (SP1, KLF15),
             (SP1, KLF4),
@@ -1740,7 +1763,6 @@ class hESC_9a(LibNet):
             (SP2, POU5F1),
             (SP2, SOX2),
             (SP2, SP1),
-            (SP2, SP2),
             (SP2, SP3),
             (SP3, EGR2),
             (SP3, KLF15),
@@ -1749,72 +1771,84 @@ class hESC_9a(LibNet):
             (SP3, SOX2),
             (SP3, SP1),
             (SP3, SP2),
+            (SOX2, SOX2),
             (SP3, SP3),
+            (SP2, SP2),
+            (KLF15, KLF15),
             ("S0", NANOG),
             ("S1", SOX2),
             ("S2", KLF4)
                  ]
 
-        # self.edge_types = [EdgeType.A for i in self.edges]
-        # self.edge_types[-3:] = [EdgeType.I, EdgeType.I, EdgeType.I]
 
-        self.edge_types= [EdgeType.A,
-                            EdgeType.A,
-                            EdgeType.A,
-                            EdgeType.I,
-                            EdgeType.A,
-                            EdgeType.I,
-                            EdgeType.A,
-                            EdgeType.A,
-                            EdgeType.A,
-                            EdgeType.I,
-                            EdgeType.A,
-                            EdgeType.I,
-                            EdgeType.A,
-                            EdgeType.I,
-                            EdgeType.I,
-                            EdgeType.A,
-                            EdgeType.I,
-                            EdgeType.A,
-                            EdgeType.I,
-                            EdgeType.I,
-                            EdgeType.I,
-                            EdgeType.I,
-                            EdgeType.I,
-                            EdgeType.A,
-                            EdgeType.A,
-                            EdgeType.A,
-                            EdgeType.I,
-                            EdgeType.A,
-                            EdgeType.A,
-                            EdgeType.I,
-                            EdgeType.I,
-                            EdgeType.I,
-                            EdgeType.I,
-                            EdgeType.I,
-                            EdgeType.A,
-                            EdgeType.I,
-                            EdgeType.A,
-                            EdgeType.I,
-                            EdgeType.A,
-                            EdgeType.I,
-                            EdgeType.I,
-                            EdgeType.A,
-                            EdgeType.I,
-                            EdgeType.A,
-                            EdgeType.I,
-                            EdgeType.A,
-                            EdgeType.I,
-                            EdgeType.A,
-                            EdgeType.I,
-                            EdgeType.I,
-                            EdgeType.A,
-                            EdgeType.I,
-                            EdgeType.A,
-                            EdgeType.I,
-                            EdgeType.I,
-                            EdgeType.I
-        ]
+        if use_special_edges is False:
+
+            if activator_signals:
+                self.edge_types = [EdgeType.I for i in self.edges]
+                self.edge_types[-7:] = [EdgeType.A, EdgeType.A, EdgeType.A]
+
+            else:
+                self.edge_types = [EdgeType.A for i in self.edges]
+                self.edge_types[-3:] = [EdgeType.I, EdgeType.I, EdgeType.I]
+
+        else:
+
+            self.edge_types = [EdgeType.A,
+                                EdgeType.A,
+                                EdgeType.I,
+                                EdgeType.A,
+                                EdgeType.A,
+                                EdgeType.I,
+                                EdgeType.A,
+                                EdgeType.I,
+                                EdgeType.A,
+                                EdgeType.A,
+                                EdgeType.I,
+                                EdgeType.I,
+                                EdgeType.I,
+                                EdgeType.I,
+                                EdgeType.A,
+                                EdgeType.I,
+                                EdgeType.A,
+                                EdgeType.I,
+                                EdgeType.A,
+                                EdgeType.A,
+                                EdgeType.I,
+                                EdgeType.I,
+                                EdgeType.A,
+                                EdgeType.A,
+                                EdgeType.A,
+                                EdgeType.I,
+                                EdgeType.A,
+                                EdgeType.I,
+                                EdgeType.A,
+                                EdgeType.I,
+                                EdgeType.I,
+                                EdgeType.I,
+                                EdgeType.A,
+                                EdgeType.A,
+                                EdgeType.I,
+                                EdgeType.I,
+                                EdgeType.I,
+                                EdgeType.A,
+                                EdgeType.A,
+                                EdgeType.I,
+                                EdgeType.A,
+                                EdgeType.I,
+                                EdgeType.I,
+                                EdgeType.A,
+                                EdgeType.A,
+                                EdgeType.I,
+                                EdgeType.A,
+                                EdgeType.A,
+                                EdgeType.I,
+                                EdgeType.A,
+                                EdgeType.A,
+                                EdgeType.A,
+                                EdgeType.A,
+                                EdgeType.I,
+                                EdgeType.I,
+                                EdgeType.I]
 
         self.node_type_dict = None
 
