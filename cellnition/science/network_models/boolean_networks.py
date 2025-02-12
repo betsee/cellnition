@@ -12,6 +12,7 @@ interaction edges are +1 for activation, -1 for inhibition, and 0 for no connect
 '''
 from abc import ABCMeta, abstractmethod
 import csv
+import itertools
 from collections.abc import Callable
 import numpy as np
 from numpy import ndarray
@@ -548,11 +549,19 @@ class BooleanNet():
             unconstrained_inds = np.setdiff1d(self.nodes_index, constrained_inds).tolist()
 
         if search_main_nodes_only is False:
-            M_pstates, _, _ = self.generate_state_space(unconstrained_inds)
+            if len(unconstrained_inds) < 30:
+                # If the number of nodes is less than 30, use the faster numpy-based method:
+                M_pstates, _, _ = self.generate_state_space(unconstrained_inds)
+            else:
+                # if it's greater than 30, numpy can't work with this, therefore use python itertools method:
+                M_pstates = self.generate_bool_state_space(unconstrained_inds)
 
         else:
             if len(self.main_nodes):
-                M_pstates, _, _ = self.generate_state_space(self.main_nodes)
+                if len(self.main_nodes) < 30:
+                    M_pstates, _, _ = self.generate_state_space(self.main_nodes)
+                else:
+                    M_pstates = self.generate_bool_state_space(self.main_nodes)
 
             else:
                 raise Exception("No main nodes; cannot perform state search with "
@@ -610,6 +619,20 @@ class BooleanNet():
             cM[:, i] = cGrid.ravel()
 
         return cM, c_lins, cGrid
+
+    def generate_bool_state_space(self,
+                             c_inds: list,
+                             ) -> ndarray:
+        '''
+        Generate a discrete state space over the range of probabilities of
+        each individual gene in the network.
+        '''
+
+        c_lins = list(itertools.product([0,1], repeat=len(c_inds)))
+        cM = np.zeros((len(c_lins), self.N_nodes), dtype=int)
+        cM[:, self.main_nodes] = c_lins
+
+        return cM
 
     def _handle_constrained_nodes(self,
                                   constr_inds: list | None,
@@ -672,6 +695,9 @@ class BooleanNet():
 
         # The outward flow of interaction at each node of the graph:
         self.node_divergence = np.asarray(self.out_degree_sequence) - np.asarray(self.in_degree_sequence)
+
+        # Get the indices of nodes that have zero divergence, which are linker nodes in a chain:
+        self.linker_node_inds = list((self.node_divergence == 0).nonzero()[0])
 
         self.out_dmax = np.max(self.out_degree_sequence)
         self.in_dmax = np.max(self.in_degree_sequence)
@@ -951,8 +977,9 @@ class BooleanNet():
 
         self.factor_node_inds = self.node_type_inds[NodeType.factor.name]
 
-        # also determine the "main nodes", which are nodes that are not input and also are not effectors:
-        self.main_nodes = np.setdiff1d(self.noninput_node_inds, self.effector_node_inds).tolist()
+        # also determine the "main nodes", which are nodes that are not input, not output, and not linkers:
+        main_nodes_o = np.setdiff1d(self.noninput_node_inds, self.output_node_inds)
+        self.main_nodes = np.setdiff1d(main_nodes_o, self.linker_node_inds).tolist()
 
         # compute the edges that connect input nodes to the graph:
         self.input_edge_inds = []
