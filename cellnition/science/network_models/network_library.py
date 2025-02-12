@@ -9,6 +9,8 @@ This module defines several types of study networks.
 from abc import ABCMeta
 import numpy as np
 from cellnition.science.network_models.network_enums import EdgeType, NodeType
+from cellnition._util.path.utilpathmake import FileRelative
+from cellnition._util.path.utilpathself import get_data_csv_dir
 
 
 class LibNet(object, metaclass=ABCMeta):
@@ -2258,3 +2260,98 @@ class inference_A(LibNet):
         self.node_type_dict = None
 
         self.add_interactions = True
+
+
+class MAPK_net(LibNet):
+
+    def __init__(self):
+        '''
+        This method imports the MAPK cancer cell fate network developed by Grieco et al. "Integrative Modelling of the
+        Influence of MAPK Network on Cancer Cell Fate Decision." PLoS Comp. Bio. 9(10): e1003286. 2013
+        https://doi.org/10.1371/journal.pcbi.1003286
+
+        '''
+        super().__init__()
+
+        self.name = 'MAPK_Cancer'
+
+        # nodes from the reference:
+        self.nodes_list = ['AKT',
+                            'AP1',
+                            'Apoptosis',
+                            'ATF2',
+                            'ATM',
+                            'BCL2',
+                            'CREB',
+                            'DNA_damage',
+                            'DUSP1',
+                            'EGFR',
+                            'EGFR_stimulus',
+                            'ELK1',
+                            'ERK',
+                            'FGFR3',
+                            'FGFR3_stimulus',
+                            'FOS',
+                            'FOXO3',
+                            'FRS2',
+                            'GAB1',
+                            'GADD45',
+                            'GRB2',
+                            'Growth_Arrest',
+                            'JNK',
+                            'JUN',
+                            'MAP3K1_3',
+                            'MAX',
+                            'MDM2',
+                            'MEK1_2',
+                            'MSK',
+                            'MTK1',
+                            'MYC',
+                            'p14',
+                            'p21',
+                            'p38',
+                            'p53',
+                            'p70',
+                            'PDK1',
+                            'PI3K',
+                            'PKC',
+                            'PLCG',
+                            'PPP2CA',
+                            'Proliferation',
+                            'PTEN',
+                            'RAF',
+                            'RAS',
+                            'RSK',
+                            'SMAD',
+                            'SOS',
+                            'SPRY',
+                            'TAK1',
+                            'TAOK',
+                            'TGFBR',
+                            'TGFBR_stimulus']
+
+        self.N_nodes = len(self.nodes_list)
+        self.node_type_dict = None
+
+        # As this network is very large, here we create the edges and edge types using a
+        # signed adjacency matrix acquired from Cell Collective.
+
+        # Path to load the signed adjacency matrix:
+        CSV_DIR = get_data_csv_dir()
+        csv_fname = FileRelative(CSV_DIR, 'MAPK_Cancer_Mo.csv')
+
+        # Load the csv file as a numpy matrix:
+        self._A_o = np.genfromtxt(csv_fname, delimiter=',', dtype=np.int32)
+
+        # Generate edges and edge types using a signed adjacency matrix:
+        self.edges = []
+        self.edge_types = []
+        for nde_i, nme_i in enumerate(self.nodes_list):
+            for nde_j, nme_j in enumerate(self.nodes_list):
+                a_ij = self._A_o[nde_i, nde_j]
+                if a_ij != 0:
+                    self.edges.append((nme_j, nme_i))
+                    if a_ij == 1:
+                        self.edge_types.append(EdgeType.A)
+                    elif a_ij == -1:
+                        self.edge_types.append(EdgeType.I)
