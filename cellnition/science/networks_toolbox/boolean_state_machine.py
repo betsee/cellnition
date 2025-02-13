@@ -8,8 +8,6 @@ This module builds and plots a state transition diagram from a solution
 set and corresponding network model based on a Boolean network formalism.
 '''
 
-import os
-import itertools
 import copy
 import numpy as np
 import networkx as nx
@@ -20,14 +18,10 @@ from cellnition._util.path.utilpathmake import FileRelative
 from cellnition._util.path.utilpathself import get_data_png_glyph_stability_dir
 from collections import OrderedDict
 from numpy import ndarray
-from cellnition.types import NumpyTrue
 import matplotlib.pyplot as plt
 from matplotlib import colors
 from matplotlib import colormaps
-import matplotlib.image as image
-from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 from networkx import MultiDiGraph
-from pygraphviz import AGraph
 
 class BoolStateMachine(object):
     '''
