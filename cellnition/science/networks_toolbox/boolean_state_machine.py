@@ -172,8 +172,9 @@ class BoolStateMachine(object):
     def steady_state_solutions_search(self,
                                       verbose: bool=True,
                                       search_main_nodes_only: bool = False,
-                                      n_max_steps: int = 10,
-                                      order_by_distance: bool=False
+                                      n_max_steps: int = 20,
+                                      order_by_distance: bool=False,
+                                      node_num_max: int | None = None
                                       ):
         '''
         Search through all possible combinations of signal node values
@@ -214,6 +215,7 @@ class BoolStateMachine(object):
                                                         search_main_nodes_only=search_main_nodes_only,
                                                         n_max_steps=n_max_steps,
                                                         verbose=False,
+                                                        node_num_max=node_num_max
                                                         )
             if solsM_allo is None:
                 solsM_allo = sols_M

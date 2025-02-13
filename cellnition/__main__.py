@@ -12,94 +12,191 @@ from anywhere within this codebase).
 This submodule is implicitly run by the active Python interpreter when the
 fully-qualified name of the top-level package directly containing this
 submodule is passed as the value of the ``--m`` option to this interpreter on
-the command line (e.g., ``python3 -m ionyouapp``).
+the command line (e.g., ``python3 -m cellnition``).
 
-Caveats
-----------
-Streamlit does *not* support running high-level submodules contained in Python
-packages as Streamlit-based web apps. Currently, Streamlit *only* supports
-running low-level Python scripts agnostic of Python packaging. The latter
-approach reduces the barrier to entry (which is Streamlit's entire raison
-d'être) while significantly complicating real-world logistics like packaging,
-distribution, and execution.
-
-Thankfully, intrepid StackOverflowers have already reverse-engineered
-Streamlit's invocation mechanism to easily "unlock" support for the former
-approach as well. This submodule is architected ala this StackOverflow answer:
-    https://stackoverflow.com/a/62775219/2809027
 '''
 
-# ....................{ TODO                               }....................
-#FIXME: Unsurprisingly, we ended up *NOT* using this file. Streamlit is
-#incredibly particular about startup execution. We finally relented and now
-#simply launch this app in the standard (albeit non-ideal) Streamlit way.
-
-#FIXME: Consider submitting an answer to this StackOverflow thread:
-#    https://stackoverflow.com/a/62775219/2809027
-#
-#The approach performed below is genuinely novel and useful enough to see a
-#wider audience. The currently top-upvoted answer assumes that the script to be
-#run resides in the current working directory -- inviting catastrophe in the
-#general deployment case. Instead, the approach below dynamically obtains the
-#absolute filename of an entry-point submodule residing in a full-blown Python
-#package to be run. \o/
-
-#FIXME: An alternative to the approach employed below would be to manually
-#inject the top-level "cellnition" directory into "sys.path". Of course, someone
-#has already thought of that as well. See also:
-#    https://www.isticktoit.net/?p=2499
 
 # ....................{ IMPORTS                            }....................
-#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-# CAUTION: Avoid importing anything at module scope *EXCEPT* from official
-# Python modules in the standard library guaranteed to exist. Subsequent logic
-# in the _main() function called below validates third-party runtime
-# dependencies of this package to be safely importable, Before performing that
-# validation, *NO* other modules are safely importable from.
-#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 import sys
-from cellnition import main
-from streamlit.web import cli
+import os
+import csv
+import copy
+import itertools
+from collections import OrderedDict
+import sympy as sp
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib import cm
+from matplotlib import colors
+from matplotlib import colormaps
+import matplotlib.image as image
+from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+from matplotlib.patches import Circle
+import pandas as pd
+from scipy.cluster.hierarchy import fclusterdata
+import networkx as nx
+
+from cellnition.science.network_models.basic_network import BasicNet
+from cellnition.science.network_models.network_enums import (EdgeType,
+                                                             GraphType,
+                                                             NodeType,
+                                                             InterFuncType,
+                                                             CouplingType,
+                                                             EquilibriumType
+                                                            )
+from cellnition.science.network_workflow import NetworkWorkflow
+from cellnition.science.networks_toolbox.netplot import plot_network
+
+from cellnition.science.network_models.network_library import (StemCellNet,
+                                                               StemCellTriad,
+                                                               hESC_9a,
+                                                               TrinodeCycle,
+                                                               TrinodeCycleFullyConnected,
+                                                               TrinodeCycleFullyConnected2,
+                                                               StemCellTriadChain,
+                                                              AKTNet,
+                                                              BinodeCycle,
+                                                              MAPK_net)
+
+from cellnition.science.network_models.boolean_networks import BooleanNet
+from cellnition.science.networks_toolbox.boolean_state_machine import BoolStateMachine
+from cellnition.science.networks_toolbox.state_machine import StateMachine
 
 # ....................{ MAIN                               }....................
 # If this submodule is directly invoked by Python as the main module to be run
 # (e.g., by being passed as the argument to the "-m" option), run this
 # Streamlit-based web app.
-if __name__ == '__main__':
-    # Absolute filename of the "cellnition.main" submodule serving as the
-    # entry-point for this web app.
-    core_filename = main.__file__
+# if __name__ == '__main__':
 
-    #FIXME: Non-ideal. This assumes "streamlit" is in the current ${PATH}.
-    #Frankly, this entire approach is absurd. Let's inspect the
-    #"streamlit.web.cli" submodule a bit more closely to see if we can't tease
-    #out a ${PATH}-agnostic approach. After all, Streamlit absolutely *MUST*
-    #know where it itself lives, right?
-    #
-    #Alternately, we could always simply run something resembling:
-    #    sys.argv = [python_filename, '-m', 'streamlit', 'run', main_filename]
-    #FIXME: *OKAY.* Click is fundamentally insane. That's not necessarily
-    #Streamlit's fault, of course. But see this ridiculous StackOverflow answer
-    #on this exact subject of how to programmatically call an otherwise trivial
-    #Click-decorated function:
-    #    https://stackoverflow.com/a/48727139/2809027
-    #
-    #Thankfully, it turns out that you can just "call" a Click-decorated
-    #function by passing that function a POSIX-compliant argument list rather
-    #standard Python parameters. See also this StackOverflow answer:
-    #    https://stackoverflow.com/a/54259095/2809027
-    #
-    #The approach below *MIGHT* actually be fine. Might. Let's test whether
-    #Click requires that "streamlit" be in the current ${PATH} (e.g., by
-    #temporarily moving our "/usr/bin/streamlit" binary aside). If it does, we
-    #might still be able to work around this by calling the lower-level
-    #streamlit.web.cli.main_run() rather than main() function. *shrug*
 
-    # Dynamically monkey-patch the list of one or more command-line arguments
-    # with which the active Python process was invoked with a list instead
-    # invoking the Streamlit-specific "run" subcommand against this entry-point.
-    sys.argv = ['streamlit', 'run', core_filename]
+# ....................{ MAIN                               }....................
+def main() -> None:
+    '''
+    Core function running this app: **Cellnition.**
+    '''
 
-    # Run this web app, returning the exit code returned by that function as the
-    # exit code of the active Python process.
-    sys.exit(cli.main())
+    print("Starting the program")
+
+    SMALL_SIZE = 14
+    MEDIUM_SIZE = 14
+    BIGGER_SIZE = 16
+
+    plt.rc('font', size=SMALL_SIZE)  # controls default text sizes
+    plt.rc('axes', titlesize=SMALL_SIZE)  # fontsize of the axes title
+    plt.rc('axes', labelsize=MEDIUM_SIZE)  # fontsize of the x and y labels
+    plt.rc('xtick', labelsize=SMALL_SIZE)  # fontsize of the tick labels
+    plt.rc('ytick', labelsize=SMALL_SIZE)  # fontsize of the tick labels
+    plt.rc('legend', fontsize=SMALL_SIZE)  # legend fontsize
+    plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
+
+    mono_edge = False
+    fimg = '.png'
+
+    # Save path for images and graphs:
+    save_path_base = '/home/pietakio/Dropbox/Levin_2024/BooleanNetworks'
+    save_path_date = os.path.join(save_path_base, 'Feb12_2025')
+    if not os.path.isdir(save_path_date):
+        os.makedirs(save_path_date)
+
+    libg = MAPK_net()
+    # libg = hESC_9a()
+
+    # Specify how multiple interactions should combine:
+    multi_coupling_type = CouplingType.mix1  # activators combine as "OR" and inhibitors "AND"
+    # multi_coupling_type = CouplingType.additive # everything "OR"
+    # multi_coupling_type = CouplingType.multiplicative # everything "AND"
+    # multi_coupling_type = CouplingType.mix2  # activators combine "AND" and inhibitors "OR"
+
+    constitutive_express = False  # activators present "AND" inhibitors absent for expression, when "False"
+
+    verbose = False
+    main_nodes_only = True
+
+    graph_layout = 'dot'
+    # graph_layout = 'neato'
+    # graph_layout = 'circo'
+
+    run_ind = 0
+
+    print("Creating the Boolean model...")
+
+    bn = BooleanNet()  # instantiate bool net solver
+    bn.build_network_from_edges(libg.edges)  # build basic graph
+    bn.characterize_graph()  # characterize the graph and set key params
+    bn.set_node_types()
+
+    bn.set_edge_types(libg.edge_types)  # set the edge types to the network
+
+    # Save a plot of the graph:
+    save_path_net = os.path.join(save_path_date, f'{libg.name}_{run_ind}')
+    if not os.path.isdir(save_path_net):
+        os.makedirs(save_path_net)
+
+    graph_net_c = f'hier_graph_{libg.name}{fimg}'
+    save_graph_net_hier = os.path.join(save_path_net, graph_net_c)
+
+    cycle_tags = np.zeros(bn.N_nodes)
+    cycle_tags[bn.nodes_in_cycles] = 1.0
+
+    print("plotting networks")
+
+    gp = plot_network(bn.nodes_list,
+                      bn.edges_list,
+                      bn.node_types,
+                      bn.edge_types,
+                      node_vals=bn.hier_node_level,
+                      val_cmap='magma_r',
+                      save_path=save_graph_net_hier,
+                      layout='dot',
+                      rev_font_color=False,
+                      vminmax=(0.0, 1.0),
+                      label_edges=False
+                      )
+
+    # Save a plot of the graph
+    graph_net_c = f'circ_graph_{libg.name}{fimg}'
+    save_graph_net_circo = os.path.join(save_path_net,
+                                        graph_net_c)
+
+    cycle_tags = np.zeros(bn.N_nodes)
+    cycle_tags[bn.nodes_in_cycles] = 1.0
+
+    gp = plot_network(bn.nodes_list,
+                      bn.edges_list,
+                      bn.node_types,
+                      bn.edge_types,
+                      node_vals=bn.hier_node_level,
+                      val_cmap='magma_r',
+                      save_path=save_graph_net_circo,
+                      layout='circo',
+                      rev_font_color=False,
+                      vminmax=(0.0, 1.0),
+                      label_edges=False
+                      )
+
+    # Save path for boolean net results:
+    save_path_bool = os.path.join(save_path_net, f'bool_{multi_coupling_type.name[0:4]}')
+    if not os.path.isdir(save_path_bool):
+        os.makedirs(save_path_bool)
+
+    c_vect_s, A_bool_s, A_bool_f = bn.build_boolean_model(use_node_name=True,
+                                                          multi_coupling_type=multi_coupling_type,
+                                                          constitutive_express=constitutive_express)
+
+    sol_M, sol_char = bn.solve_system_equms(A_bool_f,
+                                            constraint_inds=None,
+                                            constraint_vals=None,
+                                            signal_constr_vals=[0, 0, 1],
+                                            search_main_nodes_only=True,
+                                            n_max_steps=len(bn.main_nodes),
+                                            verbose=False
+                                            )
+
+    # Save the solution states to a csv file:
+    save_sols_data = os.path.join(save_path_bool, f'BoolSolM_{libg.name}.csv')
+    np.savetxt(save_sols_data, sol_M[bn.noninput_node_inds, :], delimiter=',', header='')
+
+# ....................{ MAIN ~ run                         }....................
+# Run this app.
+main()

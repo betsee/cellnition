@@ -529,7 +529,8 @@ class BooleanNet():
                            signal_constr_vals: list|None = None,
                            search_main_nodes_only: bool=False,
                            n_max_steps: int = 20,
-                           verbose: bool=False
+                           verbose: bool=False,
+                           node_num_max: int|None=None
                            ):
         '''
         Solve for the equilibrium states of gene product in
@@ -543,25 +544,35 @@ class BooleanNet():
                                                                             constraint_vals,
                                                                             signal_constr_vals=signal_constr_vals)
 
+        sort_hier_inds = np.argsort(self.hier_node_level[self.noninput_node_inds])
+        self.influence_node_inds = list(np.asarray(self.noninput_node_inds)[sort_hier_inds][0:node_num_max])
+
         if constrained_inds is None or constrained_vals is None:
             unconstrained_inds = self.nodes_index
         else:
             unconstrained_inds = np.setdiff1d(self.nodes_index, constrained_inds).tolist()
 
         if search_main_nodes_only is False:
-            if len(unconstrained_inds) < 30:
-                # If the number of nodes is less than 30, use the faster numpy-based method:
+            if len(unconstrained_inds) < node_num_max:
+                # If the number of nodes is less than 32, use the faster numpy-based method:
+                # NOTE: 32 is a number that is hard-coded into Numpy
                 M_pstates, _, _ = self.generate_state_space(unconstrained_inds)
-            else:
-                # if it's greater than 30, numpy can't work with this, therefore use python itertools method:
+
+            elif node_num_max is None:
+                # if it's greater than 32, numpy can't work with this, therefore use python itertools method:
                 M_pstates = self.generate_bool_state_space(unconstrained_inds)
+
+            else:
+                M_pstates = self.generate_bool_state_space(self.influence_node_inds)
 
         else:
             if len(self.main_nodes):
-                if len(self.main_nodes) < 30:
-                    M_pstates, _, _ = self.generate_state_space(self.main_nodes)
-                else:
+                if len(self.main_nodes) < node_num_max:
+                    M_pstates, _, _ = self.generate_state_space(self.main_nodes.tolist())
+                elif node_num_max is None:
                     M_pstates = self.generate_bool_state_space(self.main_nodes)
+                else:
+                    M_pstates = self.generate_bool_state_space(self.influence_node_inds)
 
             else:
                 raise Exception("No main nodes; cannot perform state search with "
@@ -628,9 +639,10 @@ class BooleanNet():
         each individual gene in the network.
         '''
 
+        # FIXME: this should not be expanded but code should be redeveloped to use only the iterator...
         c_lins = list(itertools.product([0,1], repeat=len(c_inds)))
         cM = np.zeros((len(c_lins), self.N_nodes), dtype=int)
-        cM[:, self.main_nodes] = c_lins
+        cM[:, c_inds] = c_lins
 
         return cM
 
@@ -696,8 +708,9 @@ class BooleanNet():
         # The outward flow of interaction at each node of the graph:
         self.node_divergence = np.asarray(self.out_degree_sequence) - np.asarray(self.in_degree_sequence)
 
+        # FIXME: this isn't right...should be some other way to do this
         # Get the indices of nodes that have zero divergence, which are linker nodes in a chain:
-        self.linker_node_inds = list((self.node_divergence == 0).nonzero()[0])
+        # self.linker_node_inds = list((self.node_divergence == 0).nonzero()[0])
 
         self.out_dmax = np.max(self.out_degree_sequence)
         self.in_dmax = np.max(self.in_degree_sequence)
@@ -978,8 +991,8 @@ class BooleanNet():
         self.factor_node_inds = self.node_type_inds[NodeType.factor.name]
 
         # also determine the "main nodes", which are nodes that are not input, not output, and not linkers:
-        main_nodes_o = np.setdiff1d(self.noninput_node_inds, self.output_node_inds)
-        self.main_nodes = np.setdiff1d(main_nodes_o, self.linker_node_inds).tolist()
+        self.main_nodes = np.setdiff1d(self.noninput_node_inds, self.output_node_inds)
+        # self.main_nodes = np.setdiff1d(main_nodes_o, self.linker_node_inds).tolist()
 
         # compute the edges that connect input nodes to the graph:
         self.input_edge_inds = []

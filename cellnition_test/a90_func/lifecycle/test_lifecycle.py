@@ -46,7 +46,7 @@ def test_app_lifecycle(capsys) -> None:
         # * Attempting to run this app via the "streamlit run" subcommand does
         #   *NOT* halt as expected, as that subcommand understandably runs the
         #   passed app indefinitely.
-        from cellnition import main
+        from cellnition import main_streamlit
 
         # Immediately return after doing so.
         return
