@@ -530,7 +530,7 @@ class BooleanNet():
                            search_main_nodes_only: bool=False,
                            n_max_steps: int = 20,
                            verbose: bool=False,
-                           node_num_max: int|None=None
+                           node_num_max: int|None=None,
                            ):
         '''
         Solve for the equilibrium states of gene product in
@@ -581,6 +581,7 @@ class BooleanNet():
         sol_Mo = []
         sol_char = []
 
+        # FIXME
         for cvecto in M_pstates: # for each test vector:
             # Need to modify the cvect vector to hold the value of the input nodes:
             if constrained_inds is not None and constrained_vals is not None:
@@ -595,6 +596,7 @@ class BooleanNet():
                                                    constraint_vals = constrained_vals
                                                    )
 
+            # FIXME: this could get really big here, should probably seek another method to avoid duplicates right away
             sol_Mo.append(sol_i)
             sol_char.append(char_i)
 

@@ -168,7 +168,8 @@ class BoolStateMachine(object):
                                       search_main_nodes_only: bool = False,
                                       n_max_steps: int = 20,
                                       order_by_distance: bool=False,
-                                      node_num_max: int | None = None
+                                      node_num_max: int | None = None,
+                                      output_nodes_only: bool = False
                                       ):
         '''
         Search through all possible combinations of signal node values
@@ -221,11 +222,17 @@ class BoolStateMachine(object):
                 print(sols_M)
                 print('----')
 
+        # If desired, states can be defined as "unique" with respect to the output nodes only:
+        if output_nodes_only is True and len(self._bnet.output_node_inds):
+            state_node_inds = self._bnet.output_node_inds
+        else:
+            state_node_inds = self._bnet.noninput_node_inds
+
         # Eliminate duplicate states, but stack on strings of the eqm char
         # so we don't lose states with the same values but with different eq'm:
-        chrm = [eqt.name for eqt in charM_allo]
-        checkM = np.vstack((solsM_allo[self._bnet.noninput_node_inds, :], chrm))
-        _, inds_solsM_all_unique = np.unique(checkM, return_index=True, axis=1)
+        # chrm = [eqt.name for eqt in charM_allo]
+        # checkM = np.vstack((solsM_allo[state_node_inds, :], chrm))
+        _, inds_solsM_all_unique = np.unique(solsM_allo[state_node_inds, :], return_index=True, axis=1)
         solsM_all = solsM_allo[:, inds_solsM_all_unique]
         charM_all = np.asarray(charM_allo)[inds_solsM_all_unique]
 
@@ -238,9 +245,9 @@ class BoolStateMachine(object):
             states_dict[tuple(sigi)] = {'States': [], 'Stability': []}
 
         for sigi, state_subseto in zip(sig_test_set, sols_list):
-            state_subset = state_subseto[self._bnet.noninput_node_inds, :]
+            state_subset = state_subseto[state_node_inds, :]
             for target_state in state_subset.T.tolist():
-                state_match_index, err_match = self._find_state_match(solsM_all[self._bnet.noninput_node_inds, :],
+                state_match_index, err_match = self._find_state_match(solsM_all[state_node_inds, :],
                                                                       target_state)
                 if state_match_index not in states_dict[tuple(sigi)]['States']:
                     states_dict[tuple(sigi)]['States'].append(state_match_index)
@@ -256,6 +263,7 @@ class BoolStateMachine(object):
                                   remove_inaccessible_states: bool=False,
                                   save_graph_file: str|None = None,
                                   n_max_steps: int=10,
+                                  output_nodes_only: bool = False
                                   ) -> tuple[set, set, MultiDiGraph]:
         '''
         Build a state transition matrix/diagram by starting the system
@@ -309,6 +317,12 @@ class BoolStateMachine(object):
         # charM_extras:
         charM_ext = []
 
+        # If desired, states can be defined as "unique" with respect to the output nodes only:
+        if output_nodes_only is True and len(self._bnet.output_node_inds):
+            state_node_inds = self._bnet.output_node_inds
+        else:
+            state_node_inds = self._bnet.noninput_node_inds
+
         # States for perturbation of the zero state inputs
         # Let's start the system off in the zero vector, then
         # temporarily perturb the system with each signal set and see what the final state is after
@@ -349,8 +363,8 @@ class BoolStateMachine(object):
                                                                constraint_vals=list(sig_base_set),
                                                                )
 
-                initial_state, match_error_initial = self._find_state_match(solsM_all[self._bnet.noninput_node_inds, :],
-                                                                      cvect_c[self._bnet.noninput_node_inds])
+                initial_state, match_error_initial = self._find_state_match(solsM_all[state_node_inds, :],
+                                                                      cvect_c[state_node_inds])
 
                 if match_error_initial > 0.01:  # if held state is unmatched, flag it with a nan
                     solsM_all = np.column_stack((solsM_all, cvect_c))
@@ -382,8 +396,8 @@ class BoolStateMachine(object):
 
                     # FIXME: the find_state_match method should use the equm' char as well as the state values!
                     # match the network state to one that only involves the hub nodes:
-                    held_state, match_error_held = self._find_state_match(solsM_all[self._bnet.noninput_node_inds, :],
-                                                                                cvect_h[self._bnet.noninput_node_inds])
+                    held_state, match_error_held = self._find_state_match(solsM_all[state_node_inds, :],
+                                                                                cvect_h[state_node_inds])
 
                     if match_error_held > 0.01: # if held state is unmatched, flag it with a nan
                         solsM_all = np.column_stack((solsM_all, cvect_h))
@@ -411,8 +425,8 @@ class BoolStateMachine(object):
                                                                constraint_vals=list(sig_base_set),
                                                                )
 
-                    final_state, match_error_final = self._find_state_match(solsM_all[self._bnet.noninput_node_inds, :],
-                                                                          cvect_f[self._bnet.noninput_node_inds])
+                    final_state, match_error_final = self._find_state_match(solsM_all[state_node_inds, :],
+                                                                          cvect_f[state_node_inds])
                     # held_state, match_error_held = self._find_state_match(solsM_all, c_held)
 
                     if match_error_final > 0.01: # if state is unmatched, flag it
