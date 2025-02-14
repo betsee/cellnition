@@ -366,7 +366,7 @@ class BoolStateMachine(object):
                 initial_state, match_error_initial = self._find_state_match(solsM_all[state_node_inds, :],
                                                                       cvect_c[state_node_inds])
 
-                if match_error_initial > 0.01:  # if held state is unmatched, flag it with a nan
+                if match_error_initial > 0.01:  # if held state is unmatched, send warning...
                     solsM_all = np.column_stack((solsM_all, cvect_c))
                     charM_ext.append(char_c)
                     initial_state = solsM_all.shape[1] - 1
@@ -379,12 +379,13 @@ class BoolStateMachine(object):
                 transition_edges_set.add((si, initial_state, base_input_label))
 
                 # We then step through all possible perturbation signals that act on the state in the set:
-                for pert_input_label, sig_pert_set in enumerate(sig_test_set):
+                cvect_ho = cvect_c.copy()
+                for pert_input_label, (sig_pert_set, _) in enumerate(states_dict.items()):
                     if verbose:
                         print(f"--- Step: {num_step} ---")
                         print(f'...State {si} to {initial_state} via I{base_input_label}...')
 
-                    cvect_ho = cvect_c.copy()
+
                     cvect_ho[sig_inds] = sig_pert_set # apply the perturbation to the state
                     cvect_h, char_h = self._bnet.net_state_compute(cvect_ho,
                                                                self._bnet._A_bool_f,
@@ -413,11 +414,10 @@ class BoolStateMachine(object):
                         print(f'...State {initial_state} to {held_state} via I{pert_input_label}...')
 
                     # Next, re-apply the initial context input state to the held state and see what final state results:
-                    cvect_fo = cvect_h.copy()
-                    cvect_fo[sig_inds] = sig_base_set
+                    cvect_h[sig_inds] = sig_base_set
 
                     # find the stable state that results from re-applying the context input state to the held state:
-                    cvect_f, char_f = self._bnet.net_state_compute(cvect_fo,
+                    cvect_f, char_f = self._bnet.net_state_compute(cvect_h,
                                                                self._bnet._A_bool_f,
                                                                n_max_steps=n_max_steps,
                                                                verbose=False,

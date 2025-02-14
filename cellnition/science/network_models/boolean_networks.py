@@ -504,20 +504,20 @@ class BooleanNet():
                 si = solvr[-1, :] # try selecting the last state to check for repetition...
                 matched_inds = [i for i, x in enumerate(solvr.tolist()) if x == si.tolist()] # look for repetition
                 if len(matched_inds) > 1: # if there's more than one incidence of the state
-                    motif_period = matched_inds[-1] - matched_inds[-2]
+                    # motif_period = matched_inds[-1] - matched_inds[-2]
                     # solvrr = solvr[3:, :] # remove the first three states...
-                    solvrr = solvr
-                    test_repeat = np.roll(solvrr, motif_period - 1, axis=1) - solvrr # roll to make the arrays equivalent
+                    # solvrr = solvr
+                    # test_repeat = np.roll(solvrr, motif_period - 1, axis=1) - solvrr # roll to make the arrays equivalent
 
-                    if (np.sum(test_repeat) == 0):
-                        motif = np.asarray(solsv)[matched_inds[-2]:matched_inds[-1], :] # extract a motif from the full array
-                        cc_i = np.mean(motif, axis=0) # solution becomes the (non-integer!) mean of the motif
-                        if len(motif) > 2:
-                            sol_char = EquilibriumType.limit_cycle
-                        else: # otherwise the motif is a saddle (metabstable point):
-                            sol_char = EquilibriumType.saddle
+                    # if (np.sum(test_repeat) == 0):
+                    motif = np.asarray(solsv)[matched_inds[-2]:matched_inds[-1], :] # extract a motif from the full array
+                    cc_i = np.mean(motif, axis=0) # solution becomes the (non-integer!) mean of the motif
+                    if len(motif) > 2:
+                        sol_char = EquilibriumType.limit_cycle
+                    else: # otherwise the motif is a saddle (metabstable point):
+                        sol_char = EquilibriumType.saddle
 
-        self._solsv = solsv # save this so we can investigate the solution
+        # self._solsv = solsv # save this so we can investigate the solution
 
         return cc_i, sol_char
 
@@ -580,6 +580,37 @@ class BooleanNet():
                                 sol_char = EquilibriumType.saddle
 
         return solsv, cc_i, sol_char, motif
+
+    def net_multisequence_compute(self,
+                                  cc_o: ndarray|list,
+                                  sigs_vect: ndarray|list,
+                                  sigs_vect_inds: ndarray|list,
+                                  A_bool_f: Callable,
+                                  n_max_steps: int=20,
+                                  constraint_inds: list|None=None,
+                                  verbose: bool=False):
+        '''
+
+        '''
+        sequence_results = []
+        sol_results = []
+        sol_char_results = []
+        for s_lab, sig_vals in zip(sigs_vect_inds, sigs_vect):
+            cc_o[constraint_inds] = sig_vals
+            solsv, cc_o, sol_char, motif = self.net_sequence_compute(cc_o,
+                                                                     A_bool_f,
+                                                                     n_max_steps=n_max_steps,
+                                                                     constraint_inds=constraint_inds,
+                                                                     constraint_vals=sig_vals,
+                                                                     verbose=verbose
+                                                                     )
+            sequence_results.append(solsv)
+            sol_results.append(cc_o)
+            sol_char_results.append(sol_char)
+
+        return sequence_results, sol_results, sol_char_results
+
+
 
 
     def solve_system_equms(self,
