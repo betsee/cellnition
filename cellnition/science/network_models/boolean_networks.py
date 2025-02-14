@@ -521,6 +521,66 @@ class BooleanNet():
 
         return cc_i, sol_char
 
+    def net_sequence_compute(self,
+                              cc_o: ndarray|list,
+                              A_bool_f: Callable,
+                              n_max_steps: int=20,
+                              constraint_inds: list|None=None,
+                              constraint_vals: list|None=None,
+                              verbose: bool=False
+                              ):
+        '''
+        Returns the sequence of states occuring after an initial state, cc_o.
+        '''
+        cc_i = cc_o  # initialize the function values (node values)
+        solsv = [np.asarray(cc_o)]  # holds a list of transient solutions
+        sol_char = EquilibriumType.undetermined # initialize to undetermined
+
+        motif = None
+
+        for i in range(n_max_steps):
+
+            if verbose:
+                print(solsv[-1])
+            # A true "OR" function will return the maximum of the list of booleans. This can
+            # be achieved by using the "ceiling" function. If cooperative interaction is
+            # desired, then rounding is better
+
+            cc_i = np.sign(A_bool_f(cc_i)[0])  # calculate new state values
+
+            # If there are constraints on some node vals, force them to the constraint:
+            if constraint_inds is not None and constraint_vals is not None:
+                cc_i[constraint_inds] = constraint_vals
+
+            solsv.append(cc_i)
+
+            if i == n_max_steps -1: # ready to characterize the array
+                # Detect whether we're at a steady-state:
+                if (solsv[i] == solsv[i - 1]).all() is NumpyTrue:
+                    sol_char = EquilibriumType.attractor
+                    motif = solsv[i]
+
+                else:
+                    # test to see if we have a more complicated repetition motif:
+                    solvr = np.asarray(solsv)[:, self.noninput_node_inds] # get the reduced array
+                    si = solvr[-1, :] # try selecting the last state to check for repetition...
+                    matched_inds = [i for i, x in enumerate(solvr.tolist()) if x == si.tolist()] # look for repetition
+                    if len(matched_inds) > 1: # if there's more than one incidence of the state
+                        motif_period = matched_inds[-1] - matched_inds[-2]
+                        # solvrr = solvr[3:, :] # remove the first three states...
+                        solvrr = solvr
+                        test_repeat = np.roll(solvrr, motif_period - 1, axis=1) - solvrr # roll to make the arrays equivalent
+
+                        if (np.sum(test_repeat) == 0):
+                            motif = np.asarray(solsv)[matched_inds[-2]:matched_inds[-1], :] # extract a motif from the full array
+                            cc_i = np.mean(motif, axis=0) # solution becomes the (non-integer!) mean of the motif
+                            if len(motif) > 2:
+                                sol_char = EquilibriumType.limit_cycle
+                            else: # otherwise the motif is a saddle (metabstable point):
+                                sol_char = EquilibriumType.saddle
+
+        return solsv, cc_i, sol_char, motif
+
 
     def solve_system_equms(self,
                            A_bool_f: Callable,
@@ -570,7 +630,7 @@ class BooleanNet():
                 if len(self.main_nodes) < node_num_max:
                     M_pstates, _, _ = self.generate_state_space(self.main_nodes.tolist())
                 elif node_num_max is None:
-                    M_pstates = self.generate_bool_state_space(self.main_nodes)
+                    M_pstates = self.generate_bool_state_space(self.main_nodes.tolist())
                 else:
                     M_pstates = self.generate_bool_state_space(self.influence_node_inds)
 
@@ -1085,6 +1145,8 @@ class BooleanNet():
                          signal_constr_vals: list | None = None,
                          search_main_nodes_only: bool = False,
                          n_max_steps: int = 20,
+                         node_num_max: int|None = None,
+                         nde_label_str: bool=False,
                          verbose: bool = False):
         '''
 
@@ -1094,17 +1156,35 @@ class BooleanNet():
                                                                             constraint_vals,
                                                                             signal_constr_vals=signal_constr_vals)
 
+        sort_hier_inds = np.argsort(self.hier_node_level[self.noninput_node_inds])
+        self.influence_node_inds = list(np.asarray(self.noninput_node_inds)[sort_hier_inds][0:node_num_max])
+
         if constrained_inds is None or constrained_vals is None:
             unconstrained_inds = self.nodes_index
         else:
             unconstrained_inds = np.setdiff1d(self.nodes_index, constrained_inds).tolist()
 
         if search_main_nodes_only is False:
-            M_pstates, _, _ = self.generate_state_space(unconstrained_inds)
+            if len(unconstrained_inds) < node_num_max:
+                # If the number of nodes is less than 32, use the faster numpy-based method:
+                # NOTE: 32 is a number that is hard-coded into Numpy
+                M_pstates, _, _ = self.generate_state_space(unconstrained_inds)
+
+            elif node_num_max is None:
+                # if it's greater than 32, numpy can't work with this, therefore use python itertools method:
+                M_pstates = self.generate_bool_state_space(unconstrained_inds)
+
+            else:
+                M_pstates = self.generate_bool_state_space(self.influence_node_inds)
 
         else:
             if len(self.main_nodes):
-                M_pstates, _, _ = self.generate_state_space(self.main_nodes)
+                if len(self.main_nodes) < node_num_max:
+                    M_pstates, _, _ = self.generate_state_space(self.main_nodes.tolist())
+                elif node_num_max is None:
+                    M_pstates = self.generate_bool_state_space(self.main_nodes.tolist())
+                else:
+                    M_pstates = self.generate_bool_state_space(self.influence_node_inds)
 
             else:
                 raise Exception("No main nodes; cannot perform state search with "
@@ -1113,7 +1193,8 @@ class BooleanNet():
         net_edges = set()  # store the edges of the boolean state diagram
         pos={} # Holds node state position on the state transition diagram
 
-        for cvecto in M_pstates: # for each test vector:
+        # FIXME: this should be an enumeration not a matrix of 1 gillion states in M_pstates!!
+        for ci, cvecto in enumerate(M_pstates): # for each test vector:
             # Need to modify the cvect vector to hold the value of the input nodes:
             if constrained_inds is not None and constrained_vals is not None:
                 cvecto[constrained_inds] = constrained_vals
@@ -1130,6 +1211,10 @@ class BooleanNet():
 
                 nde1 = str(tuple(cc_o[self.noninput_node_inds]))
                 nde2 = str(tuple(cc_i[self.noninput_node_inds]))
+
+                # nde1 = ''.join(str(int(i)) for i in cc_o[self.noninput_node_inds])
+                # nde2 = ''.join(str(int(i)) for i in cc_i[self.noninput_node_inds])
+
                 net_edges.add((nde1, nde2))
                 pos[nde1] = tuple(cc_o[self.noninput_node_inds])
                 pos[nde2] = tuple(cc_i[self.noninput_node_inds])
