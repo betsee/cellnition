@@ -1362,10 +1362,13 @@ class BooleanNet():
 
     def plot_pixel_matrix(self,
                           solsM: ndarray,
-                          gene_labels: list | ndarray,
+                          x_labels: list | ndarray|None,
+                          y_labels: list|ndarray|None,
                           figsave: str | None = None,
                           cmap: str | None = None,
-                          cbar_label: str = ''):
+                          cbar_label: str = '',
+                          figsize: tuple = (10, 10),
+                          fontsize: int=16):
         '''
         Plot a correlation or adjacency matrix for a subset of genes.
 
@@ -1374,11 +1377,11 @@ class BooleanNet():
         if cmap is None:
             cmap = 'magma'
 
-        fig, ax = plt.subplots()
+        fig, ax = plt.subplots(figsize=figsize)
         im = ax.imshow(solsM, cmap=cmap)
-        ax.set_xticks(np.arange(len(gene_labels)), labels=gene_labels)
-        ax.set_yticks(np.arange(len(gene_labels)), labels=gene_labels)
-        plt.setp(ax.get_xticklabels(), rotation=45, ha="right",
+        ax.set_xticks(np.arange(solsM.shape[1]), labels=x_labels, font='DejaVu Serif', fontsize=fontsize)
+        ax.set_yticks(np.arange(solsM.shape[0]), labels=y_labels, fontsize=fontsize)
+        plt.setp(ax.get_xticklabels(), rotation=0, ha="right",
                  rotation_mode="anchor")
         fig.colorbar(im, label=cbar_label)
 
