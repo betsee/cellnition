@@ -498,7 +498,9 @@ class BoolStateMachine(object):
                                       constraint: bool = False,
                                       concentrate: bool = True,
                                       fontsize: float = 18.0,
-                                      node_colors: list|None = None
+                                      node_colors: list|None = None,
+                                      cmap_str: str = 'rainbow_r',
+                                      transp_str: str = '80',
                                       ):
         '''
 
@@ -513,9 +515,9 @@ class BoolStateMachine(object):
         img_pos = 'bc'  # position of the glyph in the node
         subcluster_font = 'DejaVu Sans Bold'
         node_shape = 'ellipse'
-        clr_map = 'rainbow_r'
+        clr_map = cmap_str
         nde_font_color = 'Black'
-        hex_transparency = '80'
+        hex_transparency = transp_str
 
         # Try to make a nested graph:
         G = pgv.AGraph(strict=mono_edge,
@@ -581,7 +583,9 @@ class BoolStateMachine(object):
                                        constraint: bool=False,
                                        concentrate: bool=True,
                                        fontsize: float = 18.0,
-                                       node_colors: list | None = None
+                                       node_colors: list | None = None,
+                                        cmap_str: str = 'rainbow_r',
+                                        transp_str: str='80',
                                         ):
         '''
         This network plotting and generation function is based on the concept
@@ -622,9 +626,9 @@ class BoolStateMachine(object):
         img_pos = 'bc'  # position of the glyph in the node
         subcluster_font = 'DejaVu Sans Bold'
         node_shape = 'ellipse'
-        clr_map = 'rainbow_r'
+        clr_map = cmap_str
         nde_font_color = 'Black'
-        hex_transparency = '80'
+        hex_transparency = transp_str
 
         # Make a nested graph with compound=True keyword:
         G = pgv.AGraph(strict=mono_edge,
@@ -654,10 +658,13 @@ class BoolStateMachine(object):
 
             if node_colors is None:
                 nde_i_color = colors.rgb2hex(cmap(norm(st_i)))
+                nde_f_color = colors.rgb2hex(cmap(norm(st_f)))
             else:
                 nde_i_color = colors.rgb2hex(cmap(norm(node_colors[st_i])))
+                nde_f_color = colors.rgb2hex(cmap(norm(node_colors[st_f])))
 
             nde_i_color += hex_transparency  # add some transparency to the node
+            nde_f_color += hex_transparency  # add some transparency to the node
 
             chr_i = charM_all[st_i].name
 
@@ -675,8 +682,8 @@ class BoolStateMachine(object):
             # ...and for the final state:
             nde_f_name = f'{st_f}.{i_base}' # node name is in terms of the subgraph box index
             nde_f_lab = f'State {st_f}'
-            nde_f_color = colors.rgb2hex(cmap(norm(st_f)))
-            nde_f_color += hex_transparency  # add some transparency to the node
+
+
             chr_f = charM_all[st_f].name
 
             Gsub.add_node(nde_f_name,
