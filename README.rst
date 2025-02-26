@@ -16,17 +16,17 @@
 |cellnition-banner|
 ===================
 
-|app-badge| |ci-badge|
+|ci-badge|
 
-**Cellnition** is an `open-source cross-platform web-based simulator for
-intelligent strategies to cellular adaptation <cellnition app_>`__.
+**Cellnition** is an open-source simulator to create and analyze Network Finite State Machines
+from gene regulatory network models.
 
-Cellnition is `portably implemented <cellnition codebase_>`__ in Streamlit_ **×**
+Cellnition is `portably implemented <cellnition codebase_>`__ in 
 CPython_, `continuously stress-tested <cellnition tests_>`__ via
 `GitHub Actions`_ **×** tox_ **×** pytest_  **×** Codecov_, and
 `permissively distributed <cellnition license_>`__ under the `MIT license`_. For
 maintainability, cellnition officially supports *only* the most recently
-released versions of Streamlit_ and CPython_.
+released versions of CPython_.
 
 .. # ------------------( TABLE OF CONTENTS                   )------------------
 .. # Blank line. By default, Docutils appears to only separate the subsequent
@@ -48,7 +48,7 @@ released versions of Streamlit_ and CPython_.
 Install
 =======
 
-Cellnition currently lacks an official installer. *So it goes.*
+Cellnition currently lacks an official installer. 
 
 License
 =======
