@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # --------------------( LICENSE                            )--------------------
-# Copyright (c) 2023-2024 Alexis Pietak & Cecil Curry.
+# Copyright (c) 2023-2025 Alexis Pietak & Cecil Curry.
 # See "LICENSE" for further details.
 
 '''

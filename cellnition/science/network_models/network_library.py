@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-# --------------------( LICENSE                           )--------------------
-# Copyright (c) 2023-2024 Alexis Pietak.
+# --------------------( LICENSE                            )--------------------
+# Copyright (c) 2023-2025 Alexis Pietak.
 # See "LICENSE" for further details.
 
 '''
@@ -2266,11 +2266,12 @@ class MAPK_net(LibNet):
 
     def __init__(self):
         '''
-        This method imports the MAPK cancer cell fate network developed by Grieco et al. "Integrative Modelling of the
-        Influence of MAPK Network on Cancer Cell Fate Decision." PLoS Comp. Bio. 9(10): e1003286. 2013
+        This method imports the MAPK cancer cell fate network developed by
+        Grieco et al. "Integrative Modelling of the Influence of MAPK Network on
+        Cancer Cell Fate Decision." PLoS Comp. Bio. 9(10): e1003286. 2013
         https://doi.org/10.1371/journal.pcbi.1003286
-
         '''
+
         super().__init__()
 
         self.name = 'MAPK_Cancer'

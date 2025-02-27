@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # --------------------( LICENSE                            )--------------------
-# Copyright (c) 2023-2024 Alexis Pietak & Cecil Curry.
+# Copyright (c) 2023-2025 Alexis Pietak & Cecil Curry.
 # See "LICENSE" for further details.
 
 '''
@@ -92,6 +92,19 @@ def get_main_readme_file() -> Path:
     # Perverse pomposity!
     return FileRelative(get_main_dir(), 'README.rst')
 
+# ....................{ GETTERS ~ data : file : csv        }....................
+@callable_cached
+def get_data_csv_dir() -> Path:
+    '''
+    :mod:`Path` encapsulating the absolute dirname of the **project-wide
+    comma-separated value (CSV) subdirectory** (i.e., directory containing
+    ``.csv``-suffixed files describing plaintext data in a columnar format) if
+    found *or* raise an exception otherwise.
+    '''
+
+    # Perverse pomposity!
+    return DirRelative(get_data_dir(), 'csv')
+
 # ....................{ GETTERS ~ data : dir               }....................
 @callable_cached
 def get_data_dir() -> Path:
@@ -121,18 +134,6 @@ def get_data_png_glyph_stability_dir() -> Path:
 
 
 @callable_cached
-def get_data_svg_dir() -> Path:
-    '''
-    :mod:`Path` encapsulating the absolute dirname of the **project-wide
-    scalable vector graphics (SVG) subdirectory** (i.e., directory containing
-    ``.svg``-suffixed files describing losslessly scalable images) if found *or*
-    raise an exception otherwise.
-    '''
-
-    # Perverse pomposity!
-    return DirRelative(get_data_dir(), 'svg')
-
-@callable_cached
 def get_data_png_dir() -> Path:
     '''
     :mod:`Path` encapsulating the absolute dirname of the **project-wide
@@ -143,17 +144,3 @@ def get_data_png_dir() -> Path:
 
     # Perverse pomposity!
     return DirRelative(get_data_dir(), 'png')
-
-# ....................{ GETTERS ~ data : file : png        }....................
-
-@callable_cached
-def get_data_csv_dir() -> Path:
-    '''
-    :mod:`Path` encapsulating the absolute dirname of the **project-wide
-    scalable vector graphics (SVG) subdirectory** (i.e., directory containing
-    ``.svg``-suffixed files describing losslessly scalable images) if found *or*
-    raise an exception otherwise.
-    '''
-
-    # Perverse pomposity!
-    return DirRelative(get_data_dir(), 'csv')

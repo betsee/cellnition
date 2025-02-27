@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # --------------------( LICENSE                            )--------------------
-# Copyright (c) 2021-2022 Ionovate.
+# Copyright (c) 2023-2025 Alexis Pietak & Cecil Curry.
 # See "LICENSE" for further details.
 
 '''
@@ -29,8 +29,8 @@ def test_utilpathself() -> None:
         get_main_dir,
         get_main_readme_file,
         get_data_dir,
+        get_data_csv_dir,
         get_data_png_dir,
-        get_data_svg_dir,
     )
 
     # Assert each public getter published by the
@@ -40,5 +40,5 @@ def test_utilpathself() -> None:
     get_main_dir()
     get_main_readme_file()
     get_data_dir()
+    get_data_csv_dir()
     get_data_png_dir()
-    get_data_svg_dir()
