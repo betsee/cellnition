@@ -71,26 +71,13 @@ env:
   _PIP_PACKAGE_NAMES: |
     tox
 
-  #FIXME: Preserved for posterity. We *MIGHT* need this in the future to install
-  #external non-trivial dependencies (e.g., GraphViz).
-  # # Whitespace-delimited list of the names of all Debian-based non-Pythonic
-  # # mandatory dependencies to be installed by APT below. These include:
-  # #
-  # # * Python packager dependencies (e.g., "pip", "setuptools", "wheel"). Since
-  # #   "pip" comes pre-installed in this environment, installing these
-  # #   dependencies with "pip" is technically feasible. However, since doing so
-  # #   would erroneously shadow existing system-wide Python packager
-  # #   dependencies managed by APT, the latter is strongly preferred. Indeed,
-  # #   attempting to install these dependencies with "pip" explicitly warns
-  # #   about this exact edge case:
-  # #       Attempting uninstall: pip
-  # #         Found existing installation: pip 20.0.2
-  # #         Not uninstalling pip at /usr/lib/python3/dist-packages, outside environment /usr
-  # #         Can't uninstall 'pip'. No files were found to uninstall.
-  # _APT_PACKAGE_NAMES: |
-  #   python3-pip
-  #   python3-setuptools
-  #   python3-wheel
+  # Whitespace-delimited list of the names of all Debian-based non-Pythonic
+  # mandatory dependencies to be installed by APT below. These include:
+  # * GraphViz, a mandatory C-based dependency of the "pygraphviz" Python
+  #   package required as a mandatory runtime dependency of this package.
+  _APT_PACKAGE_NAMES: |
+    graphviz
+    graphviz-dev
 
 # ....................{ MAIN                               }....................
 jobs:
@@ -280,28 +267,26 @@ jobs:
       #     # prepopulate "${{ env.pythonLocation }}" with the contents of a
       #     # previously installed Python version on Python version updates.
 
-      #FIXME: Preserved for posterity. We *MIGHT* need this in the future to
-      #install external non-trivial dependencies (e.g., GraphViz).
-      # # Note that we intentionally update APT *BEFORE* all remaining system
-      # # dependencies (e.g., "xvfb"), as the latter requires the package cache
-      # # created by the former. If omitted, the first such attempt fails with a
-      # # fatal error resembling:
-      # #     $ sudo apt-get install -y graphviz
-      # #     Reading package lists...
-      # #     Building dependency tree...
-      # #     Reading state information...
-      # #     E: Unable to locate package graphviz
-      # #
-      # # Note that we intentionally prefer the antiquated "apt-get" command to
-      # # the modern "apt" command, as the latter complains about an unstable
-      # # command-line API:
-      # #     WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
-      # - name: 'Upgrading system packager dependencies...'
-      #   run: |
-      #     sudo apt-get update --quiet --quiet --yes
-      # - name: 'Installing system package dependencies...'
-      #   run: |
-      #     sudo apt-get install --quiet --quiet --yes ${_APT_PACKAGE_NAMES}
+      # Note that:
+      # * We intentionally update APT *BEFORE* all remaining dependencies, as
+      #   the latter requires the package cache created by the former. If
+      #   omitted, the first such attempt fails with a fatal error resembling:
+      #     $ sudo apt-get install -y graphviz
+      #     Reading package lists...
+      #     Building dependency tree...
+      #     Reading state information...
+      #     E: Unable to locate package graphviz
+      #
+      # Note that we intentionally prefer the antiquated "apt-get" command to
+      # the modern "apt" command, as the latter complains about an unstable
+      # command-line API:
+      #     WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+      - name: 'Upgrading system packager dependencies...'
+        run: |
+          sudo apt-get update --quiet --quiet --yes
+      - name: 'Installing system package dependencies...'
+        run: |
+          sudo apt-get install --quiet --quiet --yes ${_APT_PACKAGE_NAMES}
 
       # Note that:
       # * This command *MUST* be platform-agnostic by running under both:
