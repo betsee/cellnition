@@ -10,6 +10,7 @@ The model is built analytically, on a fully-connected domain of nodes, where
 interaction edges are +1 for activation, -1 for inhibition, and 0 for no connection.
 
 '''
+import os
 import csv
 import itertools
 from collections.abc import Callable
@@ -773,13 +774,24 @@ class BooleanNet(NetworkABC):
         _c_vect_s = self._c_vect_s
 
         c_name = sp.Matrix([ci for ci in _c_vect_s])
-        eqn_net = sp.Eq(c_name, self._A_bool_s)
+        # eqn_net = sp.Eq(c_name, self._A_bool_s)
 
-        sp.preview(eqn_net,
-                   viewer='file',
-                   filename=save_eqn_image,
-                   euler=False,
-                   dvioptions=["-T", "tight", "-z", "0", "--truecolor", "-D 600", "-bg", "Transparent"])
+        for ii, (cnme, beqn) in enumerate(zip(c_name, self._A_bool_s)):
+            eqn_net = sp.Eq(cnme, beqn)
+
+            save_eqn_image_i = save_eqn_image + f'_{cnme}_.png'
+
+            sp.preview(eqn_net,
+                       viewer='file',
+                       filename=save_eqn_image_i,
+                       euler=False,
+                       dvioptions=["-T",
+                                   "tight",
+                                   "-z", "0",
+                                   "--truecolor",
+                                   "-D 600",
+                                   "-bg",
+                                   "Transparent"])
 
         # Save the equations for the graph to a file:
         header = ['Concentrations', 'Formula']
