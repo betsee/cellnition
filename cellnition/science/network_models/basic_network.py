@@ -15,8 +15,7 @@ class BasicNet(NetworkABC):
 
     '''
 
-    def __init__(self,
-):
+    def __init__(self):
         '''
 
         '''

@@ -21,8 +21,6 @@ def plot_network(nodes_list: list|ndarray,
                  label_edges: bool=False,
                  net_font_name='DejaVu Sans Bold',
                  node_font_size: int=48,
-                 tit_font_size: int=32,
-                 net_layout: str='TB',
                  edge_width: float=8.0,
                  nde_outline: str='Black',
                  arrowsize: float=4.0

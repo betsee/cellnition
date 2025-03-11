@@ -161,9 +161,6 @@ local_settings.py
 # Ignore all "trace"-specific output files.
 *.cover
 
-# Ignore all data interchange files.
-*.csv
-
 # Ignore all Jupyter Notebook-specific checkpoint files.
 .ipynb_checkpoints
 

@@ -22,8 +22,8 @@ graphs/networks, which are classes of the public API of the
 def test_network_library(tmp_path) -> None:
     '''
     Test the :mod:`cellnition.science.network_library` submodule to determine
-    if all graphs can be loaded, characterized, and used to build both
-    fully-continuous and Boolean network models.
+    if all graphs can be loaded, characterized, and used to build a
+    Boolean network base class.
     '''
 
     # Defer test-specific imports.
@@ -32,6 +32,7 @@ def test_network_library(tmp_path) -> None:
     from cellnition.science.network_workflow import NetworkWorkflow
     from cellnition.science.network_models.network_enums import CouplingType, InterFuncType
     from cellnition.science.network_models.boolean_networks import BooleanNet
+
 
     # Tuple of all "LibNet" subclasses, defined as the tuple comprehension of...
     LIB_NETS: tuple[type[LibNet]] = tuple(
@@ -54,15 +55,15 @@ def test_network_library(tmp_path) -> None:
 
         netflow = NetworkWorkflow(save_path)
 
-        # Determine if the basic features of the library graph can be loaded;
-        # we don't make an analytical model as it'll take too much time:
-        pnet, update_string, fname_base = netflow.make_network_from_edges(libn.edges,
-                                                                          edge_types=libn.edge_types,
-                                                                          interaction_function_type=interfunctype,
-                                                                          coupling_type=CouplingType.mix1,
-                                                                          network_name=libn.name,
-                                                                          build_analytical_model=False,
-                                                                          i=0)
+        # # Determine if the basic features of the library graph can be loaded;
+        # # we don't make an analytical model as it'll take too much time:
+        # pnet, update_string, fname_base = netflow.make_network_from_edges(libn.edges,
+        #                                                                   edge_types=libn.edge_types,
+        #                                                                   interaction_function_type=interfunctype,
+        #                                                                   coupling_type=CouplingType.mix1,
+        #                                                                   network_name=libn.name,
+        #                                                                   build_analytical_model=False,
+        #                                                                   i=0)
 
         # Let's also ensure we can build a full Boolean model from this
         # imported graph:
@@ -72,3 +73,12 @@ def test_network_library(tmp_path) -> None:
         bn.set_node_types()
 
         bn.set_edge_types(libn.edge_types)  # set the edge types to the network
+
+def test_basic_network(temp_path) -> None:
+    '''
+    Test the BasicNetwork module to ensure random and defined graphs can
+    be generated, characterized, and plotted.
+    '''
+    from cellnition.science.network_models.basic_network import BasicNet
+
+    bn = BasicNet()

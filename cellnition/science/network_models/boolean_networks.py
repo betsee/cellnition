@@ -4,13 +4,11 @@
 # See "LICENSE" for further details.
 
 '''
-This module builds a probability network onto a graph model. The probability
-network is based on the concept of the probability of seeing a gene product c_i.
-The model is built analytically, on a fully-connected domain of nodes, where
-interaction edges are +1 for activation, -1 for inhibition, and 0 for no connection.
+This module builds a Boolean network model from a directed graph. The
+module is founded on the baseclass NetworkABC, so can generate random
+directed graphs, load them from edges, and perform graph analysis.
 
 '''
-import os
 import csv
 import itertools
 from collections.abc import Callable

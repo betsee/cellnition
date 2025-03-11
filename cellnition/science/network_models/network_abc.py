@@ -100,6 +100,7 @@ class NetworkABC(object, metaclass=ABCMeta):
         self._make_node_edge_indices()
 
     def randomly_generate_special_network(self,
+                                          N_nodes: int,
                                           b_param: float=0.15,
                                           g_param: float=0.8,
                                           delta_in: float=0.0,
@@ -139,6 +140,7 @@ class NetworkABC(object, metaclass=ABCMeta):
 
         '''
         # Save all the construction parameters to file:
+        self.N_nodes = N_nodes
         self._beta = b_param
         self._gamma = g_param
         self._delta_in = delta_in
@@ -185,6 +187,8 @@ class NetworkABC(object, metaclass=ABCMeta):
         self.edges_index = self.edges_list
         self.nodes_index = self.nodes_list
 
+        self._make_node_edge_indices()
+
     #----Graph Building & Characterizing Methods ------
     def _make_node_edge_indices(self):
         '''
@@ -217,7 +221,8 @@ class NetworkABC(object, metaclass=ABCMeta):
 
         # print('Degree sequences...')
         # Indices of edges with selfloops:
-        self.selfloop_edge_inds = [self.edges_list.index(ei) for ei in list(nx.selfloop_edges(self.GG))]
+        self.selfloop_edge_inds = [self.edges_list.index(ei)
+                                   for ei in list(nx.selfloop_edges(self.GG))]
 
         # Degree analysis:
         self.in_degree_sequence = [deg_i for nde_i, deg_i in
