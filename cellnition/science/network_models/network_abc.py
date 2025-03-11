@@ -6,20 +6,17 @@
 '''
 This module is an abstract base class for network models.
 '''
-from abc import ABCMeta, abstractmethod
-import csv
+from abc import ABCMeta
 import numpy as np
 from numpy import ndarray
 import matplotlib.pyplot as plt
 import networkx as nx
 import sympy as sp
-from sympy.core.symbol import Symbol
-from sympy.tensor.indexed import Indexed
 from cellnition.science.network_models.network_enums import (EdgeType,
                                                              GraphType,
                                                              NodeType,
                                                              InterFuncType)
-from cellnition.science.network_models.interaction_functions import (f_neut_s)
+
 import pygraphviz as pgv
 
 # TODO: Add in stochasticity
@@ -46,7 +43,7 @@ class NetworkABC(object, metaclass=ABCMeta):
     edges_list
     '''
 
-    def __init__(self, N_Nodes: int
+    def __init__(self
                  ):
         '''
         Initialize the class and build and characterize a network.
@@ -87,21 +84,7 @@ class NetworkABC(object, metaclass=ABCMeta):
             an edge. As p_edge increases, the number of network edges increases drammatically.
         '''
         # Set some basic features of the network that may be overridden later:
-        self.N_nodes = N_Nodes
-        self._nodes_index = [i for i in range(self.N_nodes)]
-        self.regular_node_inds = self._nodes_index
-        self.nodes_list = [f'G{i}' for i in range(self.N_nodes)]
 
-        # Initialize some object state variables:
-        self._reduced_dims = False # Indicate that model is full dimensions
-        self._solved_analytically = False # Indicate that the model does not have an analytical solution
-        self._dcdt_vect_reduced_s = None # Initialize this to None
-        self.process_params_s = []  # initialize this to be an empty list
-        self.edge_types = None
-        self.edges_index = None
-
-        self.p_min = 1.0e-6 # small nonzero element for working with Hill versions
-        self._push_away_from_zero = self.p_min # smallish constant to push initial guess of fsolve away from zero
 
     def build_network_from_edges(self, edges: list[tuple]):
         '''
@@ -893,24 +876,6 @@ class NetworkABC(object, metaclass=ABCMeta):
 
         return tvect, tvectr
 
-    # @abstractmethod
-    def run_time_sim(self,
-                     tvect: ndarray|list,
-                     tvectr: ndarray|list,
-                     cvecti: ndarray|list,
-                     sig_inds: ndarray|list|None = None,
-                     sig_vals: list | ndarray | None = None,
-                     constrained_inds: list | None = None,
-                     constrained_vals: list | None = None,
-                     d_base: float = 1.0,
-                     n_base: float = 15.0,
-                     beta_base: float = 0.25
-                     ):
-        '''
-
-        '''
-        pass
-
     #----Plots and Data Export----------------
     def save_network(self, filename: str):
         '''
@@ -1015,10 +980,13 @@ class NetworkABC(object, metaclass=ABCMeta):
 
     def plot_pixel_matrix(self,
                           solsM: ndarray,
-                          gene_labels: list|ndarray,
-                          figsave: str|None = None,
-                          cmap: str|None =None,
-                          cbar_label: str=''):
+                          x_labels: list | ndarray|None,
+                          y_labels: list|ndarray|None,
+                          figsave: str | None = None,
+                          cmap: str | None = None,
+                          cbar_label: str = '',
+                          figsize: tuple = (10, 10),
+                          fontsize: int=16):
         '''
         Plot a correlation or adjacency matrix for a subset of genes.
 
@@ -1027,11 +995,11 @@ class NetworkABC(object, metaclass=ABCMeta):
         if cmap is None:
             cmap = 'magma'
 
-        fig, ax = plt.subplots()
+        fig, ax = plt.subplots(figsize=figsize)
         im = ax.imshow(solsM, cmap=cmap)
-        ax.set_xticks(np.arange(len(gene_labels)), labels=gene_labels)
-        ax.set_yticks(np.arange(len(gene_labels)), labels=gene_labels)
-        plt.setp(ax.get_xticklabels(), rotation=45, ha="right",
+        ax.set_xticks(np.arange(solsM.shape[1]), labels=x_labels, font='DejaVu Serif', fontsize=fontsize)
+        ax.set_yticks(np.arange(solsM.shape[0]), labels=y_labels, fontsize=fontsize)
+        plt.setp(ax.get_xticklabels(), rotation=0, ha="right",
                  rotation_mode="anchor")
         fig.colorbar(im, label=cbar_label)
 
@@ -1039,261 +1007,6 @@ class NetworkABC(object, metaclass=ABCMeta):
             plt.savefig(figsave, dpi=300, transparent=True, format='png')
 
         return fig, ax
-
-    def _get_visual_equations(self):
-        '''
-
-        '''
-        subs_list = []
-        self._subs_syms_list = []
-        for pi, nde_lab in zip(self._c_vect_s, self.nodes_list):
-            nde_sym = sp.symbols(str(nde_lab))
-            subs_list.append((pi, nde_sym))
-            self._subs_syms_list.append(nde_sym)
-
-        for ei, (nij, bij) in enumerate(zip(self._n_vect_s, self._beta_vect_s)):
-            b_sym = sp.symbols(f'beta_{ei}')
-            n_sym = sp.symbols(f'n_{ei}')
-            subs_list.append((bij, b_sym))
-            subs_list.append((nij, n_sym))
-            self._subs_syms_list.append(b_sym)
-            self._subs_syms_list.append(n_sym)
-
-        for ndei, di in enumerate(self._d_vect_s):
-            d_sym = sp.symbols(f'd_{ndei}')
-            subs_list.append((di, d_sym))
-            self._subs_syms_list.append(d_sym)
-
-        dcdt_vect_s_viz = sp.Matrix(self._dcdt_vect_s).subs(subs_list)
-
-        return dcdt_vect_s_viz
-
-
-    def save_model_equations(self,
-                             save_eqn_image: str,
-                             save_reduced_eqn_image: str|None = None,
-                             save_eqn_csv: str|None = None,
-                             substitute_node_labels: bool = True
-                             ):
-        '''
-        Save images of the model equations, as well as a csv file that has
-        model equations written in LaTeX format.
-
-        Parameters
-        -----------
-        save_eqn_image : str
-            The path and filename to save the main model equations as an image.
-
-        save_reduced_eqn_image : str|None = None
-            The path and filename to save the reduced main model equations as an image (if model is reduced).
-
-        save_eqn_csv : str|None = None
-            The path and filename to save the main and reduced model equations as LaTex in a csv file.
-
-        '''
-
-        if substitute_node_labels:
-            subs_list = []
-            for pi, nde_lab in zip(self._c_vect_s, self.nodes_list):
-                nde_sym = sp.symbols(nde_lab)
-                subs_list.append((pi, nde_sym))
-
-            for ei, (nij, bij) in enumerate(zip(self._n_vect_s, self._beta_vect_s)):
-                b_sym = sp.symbols(f'beta_{ei}')
-                n_sym = sp.symbols(f'n_{ei}')
-                subs_list.append((bij, b_sym))
-                subs_list.append((nij, n_sym))
-
-            for ndei, di in enumerate(self._d_vect_s):
-                d_sym = sp.symbols(f'd_{ndei}')
-                subs_list.append((di, d_sym))
-
-            _dcdt_vect_s = list(sp.Matrix(self._dcdt_vect_s).subs(subs_list))
-            _c_vect_s = list(sp.Matrix(self._c_vect_s).subs(subs_list))
-
-            if self._dcdt_vect_reduced_s is not None:
-                _dcdt_vect_reduced_s = list(sp.Matrix(self._dcdt_vect_reduced_s).subs(subs_list))
-                _c_vect_reduced_s = list(sp.Matrix(self._c_vect_reduced_s).subs(subs_list))
-
-        else:
-            _dcdt_vect_s = self._dcdt_vect_s
-            _c_vect_s = self._c_vect_s
-
-            if self._dcdt_vect_reduced_s is not None:
-                _dcdt_vect_reduced_s = self._dcdt_vect_reduced_s
-                _c_vect_reduced_s = self._c_vect_reduced_s
-
-
-        t_s = sp.symbols('t')
-        c_change = sp.Matrix([sp.Derivative(ci, t_s) for ci in _c_vect_s])
-        eqn_net = sp.Eq(c_change, sp.Matrix(_dcdt_vect_s))
-
-        sp.preview(eqn_net,
-                   viewer='file',
-                   filename=save_eqn_image,
-                   euler=False,
-                   dvioptions=["-T", "tight", "-z", "0", "--truecolor", "-D 600", "-bg", "Transparent"])
-
-        # Save the equations for the graph to a file:
-        header = ['Concentrations', 'Change Vector']
-        eqns_to_write = [[sp.latex(_c_vect_s), sp.latex(_dcdt_vect_s)]]
-
-        if self._dcdt_vect_reduced_s is not None and save_reduced_eqn_image is not None:
-            c_change_reduced = sp.Matrix([sp.Derivative(ci, t_s) for ci in _c_vect_reduced_s])
-            eqn_net_reduced = sp.Eq(c_change_reduced, _dcdt_vect_reduced_s)
-
-            sp.preview(eqn_net_reduced,
-                       viewer='file',
-                       filename=save_reduced_eqn_image,
-                       euler=False,
-                       dvioptions=["-T", "tight", "-z", "0", "--truecolor", "-D 600", "-bg", "Transparent"])
-
-            eqns_to_write.append(sp.latex(_c_vect_reduced_s))
-            eqns_to_write.append(sp.latex(_dcdt_vect_reduced_s))
-            header.extend(['Reduced Concentations', 'Reduced Change Vector'])
-
-        if save_eqn_csv is not None:
-            with open(save_eqn_csv, 'w', newline="") as file:
-                csvwriter = csv.writer(file)  # 2. create a csvwriter object
-                csvwriter.writerow(header)  # 4. write the header
-                csvwriter.writerows(eqns_to_write)  # 5. write the rest of the data
-
-    #----Heterogeneous Networks Methods -------
-    def osmotic_process(self,
-                        c_effector: Symbol | Indexed,
-                        c_process: Symbol | Indexed,
-                        c_factor: Symbol | Indexed,
-                        c_channel: Symbol | Indexed | None = None):
-        '''
-        This method generates the symbolic and numerical equations required to define an
-        osmotic process, whereby differences in osmolyte concentrations on either side of
-        the membrane generate circumferential strains in a cell due to volume shrinkage
-        (case where c_effector < c_factor; c_process will be negative reflecting shrinkage
-        strain) or volume expansion (case where c_effector > c_factor; c_process will be
-        positive reflecting expansive strain). The functions return the strain rate for the
-        system, which is substituted into the system change vector.  In these expresions, all
-        parameters are normalized so that their values lay between 0 and 1 under most
-        circumstances.
-
-        gmod : GeneNetworkModel
-            An instance of gene network model in which to add the osmotic process equations.
-
-        c_effector : Symbol
-            Symbolic concentration from a node in the GRN network that represents the moles of
-            osmolyte inside the cell. This should correspond with an 'Effector' type node.
-
-        c_process : Symbol
-            Symbolic concentration from a node in the GRN network that represents the circumferential
-            strain of the cell membrane. Note when c_process < 0, the cell has shrunk and when
-            c_process is > 0, the cell has expanded from its equilibrium volume state.
-            This should correspond with a 'Process' type node.
-
-        c_factor : Symbol
-            Symbolic concentration from a node in the GRN network that represents the moles of
-            osmolyte outside the cell. This should correspond with a 'Factor' type node.
-
-        c_channel : Symbol|Indexed|None = None
-            Optional parameter allowing for use of a second effector, which controls the
-            expression of water channels.
-
-        '''
-        # FIXME: we need to put in the c_factors here for the environmental osmolytes
-
-        # Defining analytic equations for an osmotic cell volume change process:
-        A_s, R_s, T_s, ni_s, m_s, V_s, Vc_s, dm_s, mu_s, Y_s, r_s = sp.symbols('A, R, T, ni, m, V, V_c, d_m, mu, Y, r',
-                                                                               real=True)
-        # Normalized parameters:
-        Ap_s, mp_s, Ac_s, nc_s, epsilon_s = sp.symbols('A_p, m_p, A_c, n_c, epsilon', real=True)
-        if c_channel is not None:
-            # if c_channel is not None, then redefine the Normalized channel parameter so it
-            # corresponds with the supplied symbol:
-            Ap_s = c_channel
-
-        dVdt_0_s = A_s ** 2 * R_s * T_s * (ni_s - m_s * V_s) / (8 * dm_s * mu_s * V_s)
-        dVdt_1_s = (A_s ** 2 / (8 * dm_s * mu_s)) * (
-                R_s * T_s * ((ni_s / V_s) - m_s) - sp.Rational(4, 3) * ((Y_s * dm_s * (V_s - Vc_s) / (r_s * Vc_s))))
-
-        # Rate of change of Vp with respect to time for Vp < 1.0 is:
-        dVpdt_0_s = (dVdt_0_s.subs(
-            [(V_s, (c_process + 1) * Vc_s),
-             (A_s, Ap_s * Ac_s),
-             (ni_s, nc_s * c_effector), (m_s, c_factor * mp_s)]) / Vc_s).simplify()
-
-        # Rate of change of Vp with respect to time for Vp >= 1.0
-        dVpdt_1_s = (dVdt_1_s.subs(
-            [(V_s, (c_process + 1) * Vc_s), (A_s, Ap_s * Ac_s), (ni_s, nc_s * c_effector),
-             (m_s, c_factor * mp_s)]) / Vc_s).simplify()
-
-        # Volume change rates (which are the input into the sensor node) are:
-        dEdt_0_s = dVpdt_0_s
-        dEdt_1_s = dVpdt_1_s
-
-        # Piecewise function that defines this normalized-parameter osmotic cell volume change problem
-        # as a strain rate:
-        self.dEdt_s = sp.Piecewise((dEdt_0_s, c_process < 0.0), (dEdt_1_s, True))
-
-        # Go ahead and initialize some parameters for this process function: # FIXME these need to be
-        # made easier to input, vary and change:
-        # self.m_f = 0.8  # Normalized environmental osmolyte concentration (high)
-        self.A_f = 1.0  # Normalized water/glycerol channel area
-        self.R_f = 8.3145  # Ideal Gas constant
-        self.T_f = 310.0  # System temperature in K
-        self.Y_f = 100e6  # Young's modulus for membrane or wall
-        self.dm_f = 1.0e-6  # membrane or wall thickness
-        self.mu_f = 1.0e-3  # water viscosity
-        self.r_f = 10.0e-6  # Undeformed cell radius
-        self.Vc_f = 2 * np.pi * self.r_f ** 2  # undeformed cell volume
-        self.nc_f = 1000.0 * self.Vc_f  # osmolyte moles in the cell (near max)
-        self.mc_f = 1000.0  # osmolyte concentration in the environment (near max)
-        self.Ac_f = 0.12e6 * np.pi * 1.0e-9 ** 2  # normalizing total water channel area (near max)
-
-        self.Vp_min = 0.2  # minimum relative volume that can be achieved
-        self.Vp_max = 2.0  # maximum relative volume that can be achieved
-
-        # As strains (which is the format of the process parameter):
-        self.strain_min = self.Vp_min - 1.0
-        self.strain_max = self.Vp_max - 1.0
-
-
-        # symbolic parameters for the dV/dt process (these must be augmented onto the GRN parameters
-        # when lambdifying):
-
-        if c_channel is None:
-            self.process_params_s = (Ap_s, Vc_s, nc_s, mp_s, Ac_s, R_s, T_s, Y_s, dm_s, mu_s, r_s)
-            self.dEdt_f = sp.lambdify([c_process, c_effector, c_factor, self.process_params_s], self.dEdt_s)
-
-            # Numeric parameters for the dV/dt process (these must be augmented onto the GRN parameters
-            # when using numerical network equations):
-            self.process_params_f = (
-                self.A_f,
-                self.Vc_f,
-                self.nc_f,
-                self.mc_f,
-                self.Ac_f,
-                self.R_f,
-                self.T_f,
-                self.Y_f,
-                self.dm_f,
-                self.mu_f,
-                self.r_f)
-
-        else:
-            self.process_params_s = (Vc_s, nc_s, mp_s, Ac_s, R_s, T_s, Y_s, dm_s, mu_s, r_s)
-            self.dEdt_f = sp.lambdify([c_process, c_effector, c_channel, c_factor, self.process_params_s], self.dEdt_s)
-
-            # Numeric parameters for the dV/dt process (these must be augmented onto the GRN parameters
-            # when using numerical network equations):
-            self.process_params_f = (
-                self.Vc_f,
-                self.nc_f,
-                self.mc_f,
-                self.Ac_f,
-                self.R_f,
-                self.T_f,
-                self.Y_f,
-                self.dm_f,
-                self.mu_f,
-                self.r_f)
 
 
 

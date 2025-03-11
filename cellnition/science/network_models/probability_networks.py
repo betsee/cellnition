@@ -39,9 +39,24 @@ class ProbabilityNet(NetworkABC):
 
         '''
 
-        super().__init__(N_nodes)  # Initialize the base class
-
         self.N_nodes = N_nodes
+        self._nodes_index = [i for i in range(self.N_nodes)]
+        self.regular_node_inds = self._nodes_index
+        self.nodes_list = [f'G{i}' for i in range(self.N_nodes)]
+
+        # Initialize some object state variables:
+        self._reduced_dims = False # Indicate that model is full dimensions
+        self._solved_analytically = False # Indicate that the model does not have an analytical solution
+        self._dcdt_vect_reduced_s = None # Initialize this to None
+        self.process_params_s = []  # initialize this to be an empty list
+        self.edge_types = None
+        self.edges_index = None
+
+        self.p_min = 1.0e-6 # small nonzero element for working with Hill versions
+        self._push_away_from_zero = self.p_min # smallish constant to push initial guess of fsolve away from zero
+
+        super().__init__()  # Initialize the base class
+
         self._inter_fun_type = interaction_function_type
 
 
@@ -763,5 +778,123 @@ class ProbabilityNet(NetworkABC):
         concs_time = np.asarray(concs_time)
 
         return concs_time
+
+    def _get_visual_equations(self):
+        '''
+
+        '''
+        subs_list = []
+        self._subs_syms_list = []
+        for pi, nde_lab in zip(self._c_vect_s, self.nodes_list):
+            nde_sym = sp.symbols(str(nde_lab))
+            subs_list.append((pi, nde_sym))
+            self._subs_syms_list.append(nde_sym)
+
+        for ei, (nij, bij) in enumerate(zip(self._n_vect_s, self._beta_vect_s)):
+            b_sym = sp.symbols(f'beta_{ei}')
+            n_sym = sp.symbols(f'n_{ei}')
+            subs_list.append((bij, b_sym))
+            subs_list.append((nij, n_sym))
+            self._subs_syms_list.append(b_sym)
+            self._subs_syms_list.append(n_sym)
+
+        for ndei, di in enumerate(self._d_vect_s):
+            d_sym = sp.symbols(f'd_{ndei}')
+            subs_list.append((di, d_sym))
+            self._subs_syms_list.append(d_sym)
+
+        dcdt_vect_s_viz = sp.Matrix(self._dcdt_vect_s).subs(subs_list)
+
+        return dcdt_vect_s_viz
+
+
+    def save_model_equations(self,
+                             save_eqn_image: str,
+                             save_reduced_eqn_image: str|None = None,
+                             save_eqn_csv: str|None = None,
+                             substitute_node_labels: bool = True
+                             ):
+        '''
+        Save images of the model equations, as well as a csv file that has
+        model equations written in LaTeX format.
+
+        Parameters
+        -----------
+        save_eqn_image : str
+            The path and filename to save the main model equations as an image.
+
+        save_reduced_eqn_image : str|None = None
+            The path and filename to save the reduced main model equations as an image (if model is reduced).
+
+        save_eqn_csv : str|None = None
+            The path and filename to save the main and reduced model equations as LaTex in a csv file.
+
+        '''
+
+        if substitute_node_labels:
+            subs_list = []
+            for pi, nde_lab in zip(self._c_vect_s, self.nodes_list):
+                nde_sym = sp.symbols(nde_lab)
+                subs_list.append((pi, nde_sym))
+
+            for ei, (nij, bij) in enumerate(zip(self._n_vect_s, self._beta_vect_s)):
+                b_sym = sp.symbols(f'beta_{ei}')
+                n_sym = sp.symbols(f'n_{ei}')
+                subs_list.append((bij, b_sym))
+                subs_list.append((nij, n_sym))
+
+            for ndei, di in enumerate(self._d_vect_s):
+                d_sym = sp.symbols(f'd_{ndei}')
+                subs_list.append((di, d_sym))
+
+            _dcdt_vect_s = list(sp.Matrix(self._dcdt_vect_s).subs(subs_list))
+            _c_vect_s = list(sp.Matrix(self._c_vect_s).subs(subs_list))
+
+            if self._dcdt_vect_reduced_s is not None:
+                _dcdt_vect_reduced_s = list(sp.Matrix(self._dcdt_vect_reduced_s).subs(subs_list))
+                _c_vect_reduced_s = list(sp.Matrix(self._c_vect_reduced_s).subs(subs_list))
+
+        else:
+            _dcdt_vect_s = self._dcdt_vect_s
+            _c_vect_s = self._c_vect_s
+
+            if self._dcdt_vect_reduced_s is not None:
+                _dcdt_vect_reduced_s = self._dcdt_vect_reduced_s
+                _c_vect_reduced_s = self._c_vect_reduced_s
+
+
+        t_s = sp.symbols('t')
+        c_change = sp.Matrix([sp.Derivative(ci, t_s) for ci in _c_vect_s])
+        eqn_net = sp.Eq(c_change, sp.Matrix(_dcdt_vect_s))
+
+        sp.preview(eqn_net,
+                   viewer='file',
+                   filename=save_eqn_image,
+                   euler=False,
+                   dvioptions=["-T", "tight", "-z", "0", "--truecolor", "-D 600", "-bg", "Transparent"])
+
+        # Save the equations for the graph to a file:
+        header = ['Concentrations', 'Change Vector']
+        eqns_to_write = [[sp.latex(_c_vect_s), sp.latex(_dcdt_vect_s)]]
+
+        if self._dcdt_vect_reduced_s is not None and save_reduced_eqn_image is not None:
+            c_change_reduced = sp.Matrix([sp.Derivative(ci, t_s) for ci in _c_vect_reduced_s])
+            eqn_net_reduced = sp.Eq(c_change_reduced, _dcdt_vect_reduced_s)
+
+            sp.preview(eqn_net_reduced,
+                       viewer='file',
+                       filename=save_reduced_eqn_image,
+                       euler=False,
+                       dvioptions=["-T", "tight", "-z", "0", "--truecolor", "-D 600", "-bg", "Transparent"])
+
+            eqns_to_write.append(sp.latex(_c_vect_reduced_s))
+            eqns_to_write.append(sp.latex(_dcdt_vect_reduced_s))
+            header.extend(['Reduced Concentations', 'Reduced Change Vector'])
+
+        if save_eqn_csv is not None:
+            with open(save_eqn_csv, 'w', newline="") as file:
+                csvwriter = csv.writer(file)  # 2. create a csvwriter object
+                csvwriter.writerow(header)  # 4. write the header
+                csvwriter.writerows(eqns_to_write)  # 5. write the rest of the data
 
 

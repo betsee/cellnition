@@ -377,44 +377,7 @@ def test_state_machine(tmp_path) -> None:
 #     gmod, updatestr, fnbase = netflow.read_graph_from_file(filename, interaction_function_type=interfunctype,
 #                              coupling_type=couplingtype, i=0)
 #
-# def test_network_library(tmp_path) -> None:
-#     '''
-#     Test the :mod:`cellnition.science.network_library` submodule.
-#     '''
-#
-#     # Defer test-specific imports.
-#     from cellnition.science.network_models import network_library
-#     from cellnition.science.network_models.network_library import LibNet
-#     from cellnition.science.network_workflow import NetworkWorkflow
-#     from cellnition.science.network_models.network_enums import CouplingType, InterFuncType
-#
-#     # Tuple of all "LibNet" subclasses, defined as the tuple comprehension of...
-#     LIB_NETS: tuple[type[LibNet]] = tuple(
-#         attr_value
-#         # For the value of each attribute defined by this submodule...
-#         for attr_value in network_library.__dict__.values()
-#         # If this attribute that is a "LibNet" subclass.
-#         if (
-#             isinstance(attr_value, type) and
-#             issubclass(attr_value, LibNet) and
-#             attr_value is not LibNet
-#         )
-#     )
-#
-#     for lib_net in LIB_NETS:
-#         libn = lib_net()
-#         interfunctype = InterFuncType.logistic
-#
-#         save_path = str(tmp_path)
-#
-#         netflow = NetworkWorkflow(save_path)
-#
-#         pnet, update_string, fname_base = netflow.make_network_from_edges(libn.edges,
-#                                                                           edge_types=libn.edge_types,
-#                                                                           interaction_function_type=interfunctype,
-#                                                                           coupling_type=CouplingType.mixed,
-#                                                                           network_name=libn.name,
-#                                                                           i=0)
+
 #
 # def test_time_sim(tmp_path) -> None:
 #     '''
