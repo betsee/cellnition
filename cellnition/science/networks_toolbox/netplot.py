@@ -10,6 +10,7 @@ def plot_network(nodes_list: list|ndarray,
                  nodes_type: list|ndarray,
                  edges_type: list|ndarray,
                  node_vals: list|ndarray|None = None,
+                 node_shape: str='ellipse',
                  val_cmap: str|None = None,
                  path_plot_edges: list|ndarray|None = None,
                  dpi: int|float=300,
@@ -17,7 +18,15 @@ def plot_network(nodes_list: list|ndarray,
                  layout: str='dot',
                  vminmax: tuple|None = None,
                  rev_font_color: bool=False,
-                 label_edges: bool=False):
+                 label_edges: bool=False,
+                 net_font_name='DejaVu Sans Bold',
+                 node_font_size: int=48,
+                 tit_font_size: int=32,
+                 net_layout: str='TB',
+                 edge_width: float=8.0,
+                 nde_outline: str='Black',
+                 arrowsize: float=4.0
+                ):
     '''
 
     layout options:
@@ -30,15 +39,7 @@ def plot_network(nodes_list: list|ndarray,
                    splines=True,
                    directed=True,
                    concentrate=False,
-                   # nodesep=0.1,
-                   # ranksep=0.3,
                    dpi=dpi)
-
-    net_font_name = 'DejaVu Sans'
-    node_font_size = 16
-    tit_font_size = 24
-    net_layout = 'TB'
-    edge_width = 2.0
 
     if node_vals is not None:
         if vminmax is None:
@@ -66,13 +67,13 @@ def plot_network(nodes_list: list|ndarray,
     low_clr = '#1F2024'
     nde_font_clr1 = 'White'
     nde_font_clr2 = 'Black'
-    node_shape_gen = 'circle'
+    node_shape_gen = node_shape
 
     node_dict_gene = {
         'node_font_color': 'Black',
         'node_color': 'GhostWhite',
         'node_shape': node_shape_gen,
-        'outline_color': 'Black'
+        'outline_color': nde_outline
     }
 
     node_dict_signal = {
@@ -149,13 +150,13 @@ def plot_network(nodes_list: list|ndarray,
             nde_outline = 'Black'
 
             if rev_font_color is False:
-                if norm(node_vals[ni]) <= 0.6:
+                if norm(node_vals[ni]) < 0.5:
                     nde_font_color = 'Black'
                 else:
                     nde_font_color = 'White'
 
             else:
-                if norm(node_vals[ni]) >= 0.6:
+                if norm(node_vals[ni]) >= 0.5:
                     nde_font_color = 'Black'
                 else:
                     nde_font_color = 'White'
@@ -183,6 +184,7 @@ def plot_network(nodes_list: list|ndarray,
                        label=edge_lab,
                        arrowhead='dot',
                        color='blue',
+                       arrowsize=arrowsize,
                        penwidth=edge_width)
 
         elif et is EdgeType.I or et is EdgeType.Is:
@@ -190,6 +192,7 @@ def plot_network(nodes_list: list|ndarray,
                        label=edge_lab,
                        arrowhead='tee',
                        color='red',
+                       arrowsize=arrowsize,
                        penwidth=edge_width)
 
         elif et is EdgeType.N:
@@ -197,6 +200,7 @@ def plot_network(nodes_list: list|ndarray,
                        label=edge_lab,
                        arrowhead='normal',
                        color='black',
+                       arrowsize=arrowsize,
                        penwidth=edge_width)
 
         else:
