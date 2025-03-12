@@ -28,6 +28,7 @@ def test_boolean_net(tmp_path) -> None:
     from cellnition.science.network_models.network_enums import CouplingType
     from cellnition.science.network_models.boolean_networks import BooleanNet
     from cellnition_test._util.pytci import is_ci_github_actions
+    from cellnition.science.networks_toolbox.boolean_state_machine import BoolStateMachine
 
     multi_coupling_type = CouplingType.mix1  # activators combine as "OR" and inhibitors "AND"
     constitutive_express = False  # activators present "AND" inhibitors absent for expression, when "False"
@@ -88,5 +89,94 @@ def test_boolean_net(tmp_path) -> None:
                                             node_num_max=bn.N_nodes,
                                             verbose=False
                                             )
+
+    # Next we build a Finite State Machine builder for the Boolean system:
+    bsm = BoolStateMachine(bn)
+
+    # Solve for the full equilibrium state matrix:
+    n_max_steps = len(bn.main_nodes) * 2
+
+    (solsM_all,
+     charM_all,
+     sols_list,
+     states_dict,
+     sig_test_set) = bsm.steady_state_solutions_search(verbose=False,
+                                                       search_main_nodes_only=False,
+                                                       n_max_steps=n_max_steps,
+                                                       order_by_distance=False,
+                                                       node_num_max=bn.N_nodes,
+                                                       output_nodes_only=False
+                                                       )
+
+    # Plot the sols array
+    bool_sols_a = f'bool_solM_{libg.name}.png'
+    save_bool_sols = os.path.join(tmp_path, bool_sols_a)
+
+    bn.plot_sols_array(solsM_all,
+                       gene_inds=bn.noninput_node_inds,
+                       figsave=save_bool_sols,
+                       cmap=None,
+                       save_format='png',
+                       figsize=(20, 20))
+
+    save_inputs_image = os.path.join(tmp_path, f'Bool_Inputs_{libg.name}_smach.png')
+    y_input_labels = [bn.nodes_list[ni] for ni in bn.input_node_inds]
+    x_input_labels = [f'I{ni}' for ni, _ in enumerate(sig_test_set)]
+
+    fig, ax = bn.plot_pixel_matrix(sig_test_set.T,
+                                   x_input_labels,
+                                   y_input_labels,
+                                   figsave=save_inputs_image,
+                                   cmap=None,
+                                   figsize=(10, 10),
+                                   fontsize=24
+                                   )
+
+    # Create the network finite state machines:
+    gNFSM_edges_set, eNFSM_edges_set, GG = bsm.create_transition_network(
+                                                            states_dict,
+                                                            sig_test_set,
+                                                            solsM_all,
+                                                            verbose=False,
+                                                            remove_inaccessible_states=False,
+                                                            save_graph_file=None,
+                                                            n_max_steps=n_max_steps,
+                                                            output_nodes_only=False
+                                                        )
+
+    # Save images of the NFSMs:
+    nodes_list = list(GG.nodes())
+    edges_list = list(GG.edges)
+
+    save_perturbation_net_image = os.path.join(tmp_path, f'Bool_Pert_Net_{libg.name}.png')
+    G_pert = bsm.plot_state_perturbation_network(eNFSM_edges_set,
+                                                 charM_all,
+                                                 nodes_listo=nodes_list,
+                                                 save_file=save_perturbation_net_image,
+                                                 graph_layout='dot',
+                                                 mono_edge=True,
+                                                 constraint=True,
+                                                 concentrate=False,
+                                                 node_colors=None,
+                                                 cmap_str='RdBu',
+                                                 transp_str='60',
+                                                 rank='same'
+                                                 )
+
+    save_transition_net_image = os.path.join(tmp_path, f'Bool_Trans_Net_{libg.name}.png')
+    G_gv = bsm.plot_state_transition_network(nodes_list,
+                                             edges_list,
+                                             charM_all,
+                                             save_file=save_transition_net_image,
+                                             graph_layout='dot',
+                                             mono_edge=True,
+                                             constraint=True,
+                                             concentrate=False,
+                                             node_colors=None,
+                                             rank='same',
+                                             cmap_str='RdBu',
+                                             transp_str='60'
+
+                                             )
 
 # def test_state_machine(tmp_path) -> None:
