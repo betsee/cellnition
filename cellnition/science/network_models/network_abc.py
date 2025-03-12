@@ -496,6 +496,7 @@ class NetworkABC(object, metaclass=ABCMeta):
         # self.input_node_inds = self.node_type_inds[NodeType.signal.name] + self.node_type_inds[NodeType.factor.name]
         self.input_node_inds = ((np.asarray(self.in_degree_sequence) == 0).nonzero()[0]).tolist()
 
+        self.output_node_inds = ((np.asarray(self.out_degree_sequence) == 0).nonzero()[0]).tolist()
         self.sensor_node_inds = self.node_type_inds[NodeType.sensor.name]
         self.process_node_inds = self.node_type_inds[NodeType.process.name]
 

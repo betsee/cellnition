@@ -536,9 +536,9 @@ class BooleanNet(NetworkABC):
         else:
             if len(self.main_nodes):
                 if len(self.main_nodes) < node_num_max:
-                    M_pstates, _, _ = self.generate_state_space(self.main_nodes.tolist())
+                    M_pstates, _, _ = self.generate_state_space(self.main_nodes)
                 elif node_num_max is None:
-                    M_pstates = self.generate_bool_state_space(self.main_nodes.tolist())
+                    M_pstates = self.generate_bool_state_space(self.main_nodes)
                 else:
                     M_pstates = self.generate_bool_state_space(self.influence_node_inds)
 
@@ -696,9 +696,9 @@ class BooleanNet(NetworkABC):
         else:
             if len(self.main_nodes):
                 if len(self.main_nodes) < node_num_max:
-                    M_pstates, _, _ = self.generate_state_space(self.main_nodes.tolist())
+                    M_pstates, _, _ = self.generate_state_space(self.main_nodes)
                 elif node_num_max is None:
-                    M_pstates = self.generate_bool_state_space(self.main_nodes.tolist())
+                    M_pstates = self.generate_bool_state_space(self.main_nodes)
                 else:
                     M_pstates = self.generate_bool_state_space(self.influence_node_inds)
 
