@@ -27,6 +27,7 @@ def test_boolean_net(tmp_path) -> None:
     from cellnition.science.network_models.network_library import TrinodeChain
     from cellnition.science.network_models.network_enums import CouplingType
     from cellnition.science.network_models.boolean_networks import BooleanNet
+    from cellnition_test._util.pytci import is_ci_github_actions
 
     multi_coupling_type = CouplingType.mix1  # activators combine as "OR" and inhibitors "AND"
     constitutive_express = False  # activators present "AND" inhibitors absent for expression, when "False"
@@ -44,10 +45,15 @@ def test_boolean_net(tmp_path) -> None:
                                                           multi_coupling_type=multi_coupling_type,
                                                           constitutive_express=constitutive_express)
 
-    # Save model equations:
-    # tmp_path = '/home/pietakio/Dropbox/Levin_2024/Tests'
-    save_eqns_img = os.path.join(tmp_path, f'eqns_{libg.name}')
-    bn.save_model_equations(save_eqns_img)
+    # If this test is *NOT* currently being run under a remote GitHub Actions-
+    # based continuous integration (CI) workflow, this test is running locally.
+    # In this case, save model equations. Doing so requires LaTeX and thus
+    # TeXLive -- a third-party dependency that is typically several gigabytes
+    # (GB) in size and thus infeasible to install in CI.
+    if not is_ci_github_actions():
+        # tmp_path = '/home/pietakio/Dropbox/Levin_2024/Tests'
+        save_eqns_img = os.path.join(tmp_path, f'eqns_{libg.name}')
+        bn.save_model_equations(save_eqns_img)
 
     # Create a state transition diagram for a single signal value of all zeros:
     sigs = [0 for i in bn.input_node_inds] # initial signal vals vector
