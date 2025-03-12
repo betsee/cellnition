@@ -53,7 +53,7 @@ def test_network_library(tmp_path) -> None:
 
         save_path = str(tmp_path)
 
-        netflow = NetworkWorkflow(save_path)
+        # netflow = NetworkWorkflow(save_path)
 
         # # Determine if the basic features of the library graph can be loaded;
         # # we don't make an analytical model as it'll take too much time:
@@ -65,7 +65,7 @@ def test_network_library(tmp_path) -> None:
         #                                                                   build_analytical_model=False,
         #                                                                   i=0)
 
-        # Let's also ensure we can build a full Boolean model from this
+        # Let's ensure we can build a Boolean model from this
         # imported graph:
         bn = BooleanNet()  # instantiate bool net solver
         bn.build_network_from_edges(libn.edges)  # build basic graph
@@ -74,11 +74,66 @@ def test_network_library(tmp_path) -> None:
 
         bn.set_edge_types(libn.edge_types)  # set the edge types to the network
 
-def test_basic_network(temp_path) -> None:
+def test_basic_network(tmp_path) -> None:
     '''
     Test the BasicNetwork module to ensure random and defined graphs can
     be generated, characterized, and plotted.
     '''
+    import os
+    import matplotlib.pyplot as plt
     from cellnition.science.network_models.basic_network import BasicNet
+    from cellnition.science.network_models.network_enums import GraphType
+    from cellnition.science.networks_toolbox.netplot import plot_network
 
-    bn = BasicNet()
+    graph_types = [GraphType.scale_free, GraphType.random]
+    N_nodes = 10  # make a network with 10 nodes
+
+    for gt in graph_types:
+
+        bn = BasicNet()
+
+        # Generate a randomly-created graph with scale free or random architecture:
+        bn.randomly_generate_special_network(N_nodes,
+                                             b_param=0.15,
+                                             g_param=0.8,
+                                             delta_in=0.0,
+                                             delta_out=0.0,
+                                             p_edge=0.5,
+                                             graph_type=gt
+                                             )
+        bn.characterize_graph()  # characterize the graph and set key params
+        bn.set_node_types() # set default node types
+        # obtain random activator or inhibitor edge types:
+        edge_types = bn.get_edge_types(p_acti=0.5, set_selfloops_acti=True)
+        bn.set_edge_types(edge_types) # set the edge types
+
+        # Save a plot of the graph:
+        graph_net_a = f'hier_graph_test_a.png'
+        save_graph_net_hier = os.path.join(tmp_path, graph_net_a)
+
+        # plot the network:
+        gp = plot_network(bn.nodes_list,
+                          bn.edges_list,
+                          bn.node_types,
+                          bn.edge_types,
+                          node_vals=bn.hier_node_level,
+                          val_cmap='viridis_r',
+                          save_path=save_graph_net_hier,
+                          layout='dot',
+                          rev_font_color=False,
+                          label_edges=False,
+                          net_font_name='DejaVu Sans Bold',
+                          node_font_size=24,
+                          edge_width=2.0,
+                          nde_outline='Black',
+                          arrowsize=2.0
+                          )
+
+        # Plot the graph's degree distributions:
+        fig, ax = bn.plot_degree_distributions()
+        plt.close(fig)
+
+        # Simpler type of graph plot:
+        graph_net_b = f'hier_graph_test_b.png'
+        save_graph_net = os.path.join(tmp_path, graph_net_b)
+        bn.save_network_image(save_graph_net, use_dot_layout=False)
