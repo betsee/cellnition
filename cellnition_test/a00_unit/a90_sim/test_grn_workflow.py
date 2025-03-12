@@ -18,106 +18,158 @@ subpackage.
 
 # ....................{ TESTS                              }....................
 
-def test_state_machine(tmp_path) -> None:
+def test_continuous_net(tmp_path) -> None:
     '''
     Test the input space search and state transition network inference module
     with a library network.
     '''
 
     import os
+    from cellnition.science.network_models.probability_networks import ProbabilityNet
+    from cellnition.science.network_models.network_library import TrinodeChain
+    import matplotlib.pyplot as plt
+    from cellnition.science.networks_toolbox.state_machine import StateMachine
+    from cellnition.science.network_models.network_enums import (
+                                                                 InterFuncType,
+                                                                 CouplingType
+                                                                 )
 
-    #FIXME: Resurrect everything below from its early grave, please. None of
-    #these imports even exist anymore. It is sad. Cats are crying!
-#     from cellnition.science.network_models.network_library import BinodeNet
-#     from cellnition.science.network_workflow import NetworkWorkflow
-#     from cellnition.science.networks_toolbox.state_machine import StateMachine
-#     from cellnition.science.network_models.network_enums import (
-#         InterFuncType, CouplingType)
-#
-#     libg = BinodeNet() # generate the library-derived network
-#
-#     save_path = str(tmp_path) # temporary directory to write to
-#     netflow = NetworkWorkflow(save_path) # instantiate network work flow object
-#
-#     interfunctype = InterFuncType.logistic
-#
-#     pnet, update_string, fname_base = netflow.make_network_from_edges(libg.edges,
-#                                                                       edge_types=libg.edge_types,
-#                                                                       interaction_function_type=interfunctype,
-#                                                                       coupling_type=CouplingType.mixed,
-#                                                                       network_name=libg.name,
-#                                                                       i=0)
-#
-#     if interfunctype is InterFuncType.logistic:
-#         d_base = 1.0
-#         n_base = 15.0
-#         beta_base = 0.25
-#     else:
-#         d_base = 1.0
-#         n_base = 3.0
-#         beta_base = 5.0
-#
-#     save_graph_file = os.path.join(save_path, f'graph_{fname_base}.gml')
-#     save_file = os.path.join(save_path, f'transnet_{fname_base}.png')
-#     save_file_pert = os.path.join(save_path, f'pertnet_{fname_base}.png')
-#
-#     smach = StateMachine(pnet) # Instantiate a state machine
-#
-#     G = smach.run_state_machine(beta_base=beta_base,
-#                                 n_base=n_base,
-#                                 d_base=d_base,
-#                                 verbose=False,
-#                                 return_saddles=True,
-#                                 N_space=2,
-#                                 search_tol=1.0e-15,
-#                                 sol_tol=1.0e-2,
-#                                 N_round_sol=1,
-#                                 dt=5.0e-3,
-#                                 space_sig=25.0,
-#                                 delta_sig=25.0,
-#                                 t_relax=10.0,
-#                                 dt_samp=0.15,
-#                                 match_tol=0.05,
-#                                 save_graph_file=save_graph_file,
-#                                 save_transition_net_image=save_file,
-#                                 save_perturbation_net_image=save_file_pert,
-#                                 graph_layout='dot',
-#                                 unique_sol_index=True
-#                                 )
-#
-#     dist_M = smach.get_state_distance_matrix(smach.solsM_all)
-#
-#     input_list = ['I0', 'I1', 'I2', 'I0', 'I3']
-#     starting_state = 0
-#     tvectr, c_time, matched_states, phase_inds = smach.sim_time_trajectory(starting_state,
-#                                                               smach.solsM_all,
-#                                                               input_list,
-#                                                               smach.sig_test_set,
-#                                                               dt=1.0e-3,
-#                                                               dt_samp=0.1,
-#                                                               input_hold_duration=30.0,
-#                                                               t_wait=10.0,
-#                                                               verbose=True,
-#                                                               match_tol=0.05,
-#                                                               d_base=d_base,
-#                                                               n_base=n_base,
-#                                                               beta_base=beta_base,
-#                                                               match_to_unique_states=True
-#                                                               )
-#
-#     savefig = os.path.join(save_path, 'time_traj.png')
-#     fig, ax = smach.plot_time_trajectory(c_time, tvectr, phase_inds,
-#                                          matched_states,
-#                                          smach.solsM_all,
-#                                          smach.charM_all,
-#                                          figsize=(10, 4),
-#                                          state_label_offset=0.01,
-#                                          glyph_zoom=0.1,
-#                                          glyph_alignment=(-0.3, -0.4),
-#                                          fontsize='medium',
-#                                          save_file=savefig,
-#                                          matched_to_unique_states=True,
-#                                          match_tol=0.05)
+    # Study network:
+    libg = TrinodeChain()
+
+    # Study parameters:
+    # Small value taken for zero:
+    pmin = 1.0e-6
+
+    # Number of linear points to search in state space:
+    N_space = 2
+
+    # Specify how the nodes should interact:
+    multi_coupling_type = CouplingType.mix1
+
+    # interaction_function_type = InterFuncType.hill
+    interaction_function_type = InterFuncType.logistic
+
+    N_round_sol = 2
+    return_saddles = True
+    node_express_levels = 5
+
+    # Set parameters for the network:
+    dd = 1.0  # decay rate
+
+    if interaction_function_type is InterFuncType.logistic:
+        n_base = 50.0  # standard is 30.0, slope
+        bb = 0.5  # standard is 0.5, centre
+
+    else:
+        n_base = 3.0  # standard is 3.0, slope
+        bb = 2.0  # standard is 2.0, reciprocal centre
+
+    net_name = libg.name
+    save_path = os.path.join(tmp_path, f'{net_name}')
+    if not os.path.isdir(save_path):
+        os.makedirs(save_path)
+
+    # Create the continuous differential-equation based model:
+    pnet = ProbabilityNet(libg.N_nodes, interaction_function_type=interaction_function_type)
+
+    pnet.build_network_from_edges(libg.edges)
+    pnet.characterize_graph()  # characterize the graph and set key params
+    pnet.set_node_types()  # set the node types
+    pnet.set_edge_types(libg.edge_types)  # set the edge types to the network
+
+    # Get the adjacency matrices for this model:
+    A_add_s, A_mul_s, A_full_s = pnet.build_adjacency_from_edge_type_list(libg.edge_types,
+                                                                          pnet.edges_index,
+                                                                          coupling_type=multi_coupling_type)
+    pnet.build_analytical_model(A_add_s, A_mul_s)
+
+    # Create the Finite State Machine solver for this system:
+    smach = StateMachine(pnet)
+
+    solsM_all, charM_all, sols_list, states_dict, sig_test_set = smach.steady_state_solutions_search(beta_base=bb,
+                                                                                                     n_base=n_base,
+                                                                                                     d_base=dd,
+                                                                                                     verbose=True,
+                                                                                                     return_saddles=return_saddles,
+                                                                                                     N_space=N_space,
+                                                                                                     search_tol=1.0e-15,
+                                                                                                     sol_tol=1.0e-3,
+                                                                                                     N_round_sol=N_round_sol,
+                                                                                                     search_main_nodes_only=False,
+                                                                                                     node_expression_levels=node_express_levels,
+                                                                                                     order_by_distance=False
+                                                                                                     )
+    # test plotting the solution array:
+    save_microarray_image = os.path.join(tmp_path, f'Microarray_{libg.name}.png')
+    fig, ax = pnet.plot_sols_array(solsM_all,
+                                   gene_inds=pnet.noninput_node_inds,
+                                   figsave=save_microarray_image,
+                                   cmap=None,
+                                   save_format='png'
+                                   )
+    plt.close(fig)
+
+    # Create the edges of the transition network:
+    dt = 5.0e-3
+    dt_samp = 0.1
+    delta_sig = 60.0
+    t_relax = 20.0  # originally 20
+    match_tol = 1.0e-3
+    remove_inaccessible_states = False
+
+    save_graph_file = os.path.join(tmp_path, f'network_{libg.name}.gml')
+
+    transition_edges_set, pert_edges_set, G_nx = smach.create_transition_network(states_dict,
+                                                                                 sig_test_set,
+                                                                                 solsM_all,
+                                                                                 dt=dt,
+                                                                                 delta_sig=delta_sig,
+                                                                                 t_relax=t_relax,
+                                                                                 dt_samp=dt_samp,
+                                                                                 verbose=False,
+                                                                                 match_tol=match_tol,
+                                                                                 d_base=dd,
+                                                                                 n_base=n_base,
+                                                                                 beta_base=bb,
+                                                                                 remove_inaccessible_states=remove_inaccessible_states,
+                                                                                 save_graph_file=save_graph_file,
+
+                                                                                 )
+
+    nodes_list = list(G_nx.nodes())
+    edges_list = list(G_nx.edges)
+
+    save_perturbation_net_image = os.path.join(tmp_path, f'Pert_Net_{libg.name}.png')
+    G_pert = smach.plot_state_perturbation_network(pert_edges_set,
+                                                   charM_all,
+                                                   nodes_listo=nodes_list,
+                                                   save_file=save_perturbation_net_image,
+                                                   graph_layout='dot',
+                                                   mono_edge=False,
+                                                   constraint=True,
+                                                   concentrate=False,
+                                                   rank='same'
+                                                   )
+
+    save_transition_net_image = os.path.join(tmp_path, f'Trans_Net_{libg.name}.png')
+    G_gv = smach.plot_state_transition_network(nodes_list,
+                                               edges_list,
+                                               charM_all,
+                                               save_file=save_transition_net_image,
+                                               graph_layout='dot',
+                                               mono_edge=False,
+                                               constraint=True,
+                                               concentrate=False,
+                                               rank='same'
+                                               )
+
+def test_direction_fields() -> None:
+    '''
+
+    '''
+    pass
+
 #
 # def test_osmo_model() -> None:
 #     '''
