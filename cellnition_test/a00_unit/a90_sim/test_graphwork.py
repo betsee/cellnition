@@ -29,8 +29,7 @@ def test_network_library(tmp_path) -> None:
     # Defer test-specific imports.
     from cellnition.science.network_models import network_library
     from cellnition.science.network_models.network_library import LibNet
-    from cellnition.science.network_workflow import NetworkWorkflow
-    from cellnition.science.network_models.network_enums import CouplingType, InterFuncType
+    from cellnition.science.network_models.network_enums import InterFuncType
     from cellnition.science.network_models.boolean_networks import BooleanNet
 
 
@@ -49,21 +48,6 @@ def test_network_library(tmp_path) -> None:
 
     for lib_net in LIB_NETS:
         libn = lib_net()
-        interfunctype = InterFuncType.logistic
-
-        save_path = str(tmp_path)
-
-        # netflow = NetworkWorkflow(save_path)
-
-        # # Determine if the basic features of the library graph can be loaded;
-        # # we don't make an analytical model as it'll take too much time:
-        # pnet, update_string, fname_base = netflow.make_network_from_edges(libn.edges,
-        #                                                                   edge_types=libn.edge_types,
-        #                                                                   interaction_function_type=interfunctype,
-        #                                                                   coupling_type=CouplingType.mix1,
-        #                                                                   network_name=libn.name,
-        #                                                                   build_analytical_model=False,
-        #                                                                   i=0)
 
         # Let's ensure we can build a Boolean model from this
         # imported graph:

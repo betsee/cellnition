@@ -29,6 +29,7 @@ def test_continuous_net(tmp_path) -> None:
     from cellnition.science.networks_toolbox.phase_space_viz import PhaseSpace
     from cellnition.science.network_models.network_library import TrinodeChain
     import matplotlib.pyplot as plt
+    from cellnition.science.networks_toolbox.gene_knockout import GeneKnockout
     from cellnition.science.networks_toolbox.state_machine import StateMachine
     from cellnition.science.network_models.network_enums import (
                                                                  InterFuncType,
@@ -84,6 +85,30 @@ def test_continuous_net(tmp_path) -> None:
                                                                           pnet.edges_index,
                                                                           coupling_type=multi_coupling_type)
     pnet.build_analytical_model(A_add_s, A_mul_s)
+
+    # Test out the gene knockout experiment:
+    sigs = [0.0 for ii in pnet.input_node_inds]
+
+    gko = GeneKnockout(pnet)
+    knockout_sol_set, knockout_matrix, ko_header_o = gko.gene_knockout_ss_solve(
+                                                                                Ns=2,
+                                                                                tol=1.0e-15,
+                                                                                d_base=dd,
+                                                                                n_base=n_base,
+                                                                                beta_base=bb,
+                                                                                round_unique_sol=1,
+                                                                                verbose=False,
+                                                                                sol_tol=1.0e-1,
+                                                                                save_file_basename=None,
+                                                                                constraint_vals=None,
+                                                                                constraint_inds=None,
+                                                                                signal_constr_vals=sigs,
+                                                                            )
+
+    ko_file = f'knockoutArrays{libg.name}.png'
+    save_ko = os.path.join(save_path, ko_file)
+    fig, ax = gko.plot_knockout_arrays(knockout_sol_set, figsave=save_ko)
+    plt.close(fig)
 
     # Create the Finite State Machine solver for this system:
     smach = StateMachine(pnet)
