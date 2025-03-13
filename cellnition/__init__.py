@@ -41,7 +41,7 @@ filterwarnings(
 # ....................{ GLOBALS                            }....................
 # Declare PEP 8-compliant version constants expected by external automation.
 
-__version__ = '0.0.1'
+__version__ = '0.0.2'
 '''
 Human-readable application version as a ``.``-delimited string.
 

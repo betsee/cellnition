@@ -47,7 +47,7 @@ officially supports *only* the most recently released version of CPython_.
 Install
 =======
 
-Cellnition is easily installable with _pip, the standard package installer
+Cellnition is easily installable with pip_, the standard package installer
 officially bundled with Python_:
 
 .. code-block:: bash
