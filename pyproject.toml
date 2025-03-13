@@ -82,10 +82,13 @@ name = "cellnition"
 
 # Human-readable single-line synopsis of this project.
 #
-# By PyPI design, this string must *NOT* span multiple lines or paragraphs.
+# Note that, by PyPI design, this string *MUST*:
+# * Prefix each newline in this string with a continuation character, which then
+#   forces line wrapping.
+# * Otherwise not span multiple lines or paragraphs.
 description = """\
-Cross-platform simulator for investigating cellular adaptation strategies via \
-gene regulatory networks (GRNs).
+Open-source cross-platform biology simulator analyzing \
+gene regulatory networks (GRNs) with Network Finite State Machines (NFSMs).
 """
 
 # Relative filename of the file of the license this project is licensed under.

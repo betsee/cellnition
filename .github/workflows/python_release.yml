@@ -44,7 +44,7 @@ jobs:
       - name: "Publishing GitHub release..."
         uses: 'ncipollo/release-action@v1'
         with:
-          name: "Beartype ${{ github.ref }}"
+          name: "Cellnition ${{ github.ref }}"
           body: ${{ github.event.commits[0].message }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -67,7 +67,7 @@ jobs:
     #   https://docs.github.com/en/actions/deployment/targeting-different-environments/using-environments-for-deployment#creating-an-environment
     environment:
       # Arbitrary name of this environment.
-      name: cellnition_den
+      name: cellnition_creche
 
       # Arbitrary URL associated with this environment.
       url: https://pypi.org/project/cellnition

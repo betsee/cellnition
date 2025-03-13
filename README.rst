@@ -18,15 +18,14 @@
 
 |ci-badge|
 
-**Cellnition** is an open-source simulator to create and analyze Network Finite State Machines
-from gene regulatory network models.
+**Cellnition** is an open-source simulator to create and analyze Network Finite
+State Machines (NFSMs) from gene regulatory network (GRN) models.
 
-Cellnition is `portably implemented <cellnition codebase_>`__ in 
-CPython_, `continuously stress-tested <cellnition tests_>`__ via
-`GitHub Actions`_ **×** tox_ **×** pytest_  **×** Codecov_, and
-`permissively distributed <cellnition license_>`__ under the `MIT license`_. For
-maintainability, cellnition officially supports *only* the most recently
-released versions of CPython_.
+Cellnition is `portably implemented <cellnition codebase_>`__ in Python_,
+`continuously stress-tested <cellnition tests_>`__ via `GitHub Actions`_ **×**
+tox_ **×** pytest_  **×** Codecov_, and `permissively distributed <cellnition
+license_>`__ under the `MIT license`_. For maintainability, cellnition
+officially supports *only* the most recently released version of CPython_.
 
 .. # ------------------( TABLE OF CONTENTS                   )------------------
 .. # Blank line. By default, Docutils appears to only separate the subsequent
@@ -48,7 +47,12 @@ released versions of CPython_.
 Install
 =======
 
-Cellnition currently lacks an official installer. 
+Cellnition is easily installable with _pip, the standard package installer
+officially bundled with Python_:
+
+.. code-block:: bash
+
+   pip3 install cellnition
 
 License
 =======
@@ -96,13 +100,11 @@ Cellnition is `open-source software released <cellnition license_>`__ under the
 .. _GitHub Actions:
    https://github.com/features/actions
 
-.. # ------------------( LINKS ~ hard                        )------------------
-
-.. # ------------------( LINKS ~ idea                        )------------------
-
-.. # ------------------( LINKS ~ math                        )------------------
-
-.. # ------------------( LINKS ~ meme                        )------------------
+.. # ------------------( LINKS ~ py                          )------------------
+.. _Python:
+   https://www.python.org
+.. _pip:
+   https://pip.pypa.io
 
 .. # ------------------( LINKS ~ py : interpreter            )------------------
 .. _CPython:
