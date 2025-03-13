@@ -26,6 +26,7 @@ def test_continuous_net(tmp_path) -> None:
 
     import os
     from cellnition.science.network_models.probability_networks import ProbabilityNet
+    from cellnition.science.networks_toolbox.phase_space_viz import PhaseSpace
     from cellnition.science.network_models.network_library import TrinodeChain
     import matplotlib.pyplot as plt
     from cellnition.science.networks_toolbox.state_machine import StateMachine
@@ -164,11 +165,21 @@ def test_continuous_net(tmp_path) -> None:
                                                rank='same'
                                                )
 
-def test_direction_fields() -> None:
-    '''
 
-    '''
-    pass
+
+    sigs = [0.0 for i in pnet.input_node_inds]
+
+    ps = PhaseSpace(pnet)
+    system_sols, dcdt_M_set, dcdt_dmag, c_lin_set, c_M_set = ps.brute_force_phase_space(N_pts=15,
+                                                                                        constrained_inds=pnet.input_node_inds,
+                                                                                        constrained_vals=sigs,
+                                                                                        beta_base=bb,
+                                                                                        n_base=n_base,
+                                                                                        d_base=dd,
+                                                                                        zer_thresh=0.01)
+    fig, ax = plt.subplots()
+    ax.quiver(c_M_set[0, 0], c_M_set[1, 0], dcdt_M_set[0, 0], dcdt_M_set[1, 0])
+    plt.close(fig)
 
 #
 # def test_osmo_model() -> None:

@@ -42,7 +42,6 @@ class PhaseSpace(object):
                                 n_base: float | list=3.0,
                                 d_base: float | list=1.0,
                                 zer_thresh: float=0.01,
-                                pmin: float=1.0e-8,
                                 ):
         '''
         Generate a sampling of the phase space of the system on multiple dimensions, and calculate
