@@ -12,7 +12,6 @@ import numpy as np
 from numpy import ndarray
 import matplotlib.pyplot as plt
 from cellnition.science.network_models.probability_networks import ProbabilityNet
-from scipy.cluster.hierarchy import fclusterdata
 
 # FIXME: DOCUMENT THROUGHOUT
 
@@ -39,7 +38,6 @@ class GeneKnockout(object):
     def gene_knockout_ss_solve(self,
                                Ns: int = 3,
                                tol: float = 1.0e-15,
-                               round_unique_sol: int = 2,
                                sol_tol: float = 1.0e-1,
                                d_base: float = 1.0,
                                n_base: float = 3.0,
@@ -50,8 +48,6 @@ class GeneKnockout(object):
                                constraint_inds: list[int]|None = None,
                                signal_constr_vals: list | None = None,
                                search_cycle_nodes_only: bool = False,
-                               cluster_threshhold: float = 0.1,
-                               cluster_method: str='distance'
                                ):
         '''
         Performs a sequential knockout of all genes in the network, computing all possible steady-state
@@ -88,7 +84,6 @@ class GeneKnockout(object):
                                                                         N_space=Ns,
                                                                         search_tol=tol,
                                                                         sol_tol=sol_tol,
-                                                                        N_round_sol=round_unique_sol,
                                                                         search_main_nodes_only=search_cycle_nodes_only
                                                                         )
 
@@ -98,9 +93,7 @@ class GeneKnockout(object):
         # print(f'size of solM before clustering: {solsM.shape}')
 
         # Cluster solutions to exclude those that are very similar
-        solsM = self.find_unique_sols(solsM,
-                                      cluster_threshhold=cluster_threshhold,
-                                      cluster_method=cluster_method)
+        solsM = self.find_unique_sols(solsM)
 
         # print(f'size of solM after clustering: {solsM.shape}')
 
@@ -144,7 +137,6 @@ class GeneKnockout(object):
                                                                             N_space=Ns,
                                                                             search_tol=tol,
                                                                             sol_tol=sol_tol,
-                                                                            N_round_sol=round_unique_sol,
                                                                             verbose=verbose,
                                                                             search_main_nodes_only=search_cycle_nodes_only
                                                                             )
@@ -155,9 +147,7 @@ class GeneKnockout(object):
             # print(f'size of solM {i} before clustering: {solsM.shape}')
 
             # Cluster solutions to exclude those that are very similar
-            solsM = self.find_unique_sols(solsM,
-                                          cluster_threshhold=cluster_threshhold,
-                                          cluster_method=cluster_method)
+            solsM = self.find_unique_sols(solsM)
 
             # print(f'size of solM {i} after clustering: {solsM.shape}')
 
@@ -219,34 +209,17 @@ class GeneKnockout(object):
             return fig, axes
 
     def find_unique_sols(self,
-                         solsM,
-                         cluster_threshhold: float=0.1,
-                         cluster_method: str='distance',
-                         N_round_sol: int=2):
+                         solsM
+                         ):
         '''
 
         '''
 
-        if solsM.shape[1] > 1:
-            unique_sol_clusters = fclusterdata(solsM.T, t=cluster_threshhold, criterion=cluster_method)
+        # redefine the solsM data structures:
+        solsM = self._pnet.multiround(solsM)
 
-            cluster_index = np.unique(unique_sol_clusters)
-
-            cluster_pool = [[] for i in cluster_index]
-            for i, clst_i in enumerate(unique_sol_clusters):
-                cluster_pool[int(clst_i) - 1].append(i)
-
-            solsM_all_unique = np.zeros((self._pnet.N_nodes, len(cluster_pool)))
-
-            for ii, sol_i in enumerate(cluster_pool):
-                if len(sol_i):
-                    solsM_all_unique[:, ii] = (np.mean(solsM[:, sol_i], 1))
-
-            # redefine the solsM data structures:
-            solsM = solsM_all_unique
-
-            # # # first use numpy unique on rounded set of solutions to exclude similar cases:
-            _, inds_solsM_all_unique = np.unique(np.round(solsM, N_round_sol), return_index=True, axis=1)
-            solsM = solsM[:, inds_solsM_all_unique]
+        # # # first use numpy unique on rounded set of solutions to exclude similar cases:
+        _, inds_solsM_all_unique = np.unique(solsM, return_index=True, axis=1)
+        solsM = solsM[:, inds_solsM_all_unique]
 
         return solsM

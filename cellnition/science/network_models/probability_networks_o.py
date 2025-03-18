@@ -26,14 +26,15 @@ from cellnition.science.network_models.network_enums import (EdgeType,
 # FIXME: I bet we can implement a node type via this same process
 # FIXME: This class should have a network-building start method so we get the external parameters needed
 # for use in different downstream tools (e.g. state_machine, network_workflow, etc)
+# FIXME: This needs to be able to solve steady-states only on a reduced node set (e.g. cycle nodes)
+# FIXME: make a equation viz method and use it in export equations
 
 class ProbabilityNet(NetworkABC):
     '''
     '''
     def __init__(self,
                  N_nodes: int,
-                 interaction_function_type: InterFuncType = InterFuncType.logistic,
-                 node_expression_levels: float=5.0):
+                 interaction_function_type: InterFuncType = InterFuncType.logistic):
         '''
 
         '''
@@ -58,9 +59,6 @@ class ProbabilityNet(NetworkABC):
 
         self._inter_fun_type = interaction_function_type
 
-        if node_expression_levels <= 1:
-            raise Exception("Node expression levels must be greater than 1!")
-        self._node_expression_levels = node_expression_levels
 
         # Matrix Equations:
         # Matrix symbols to construct matrix equation bases:
@@ -485,6 +483,7 @@ class ProbabilityNet(NetworkABC):
                                 N_space: int = 2,
                                 search_tol: float=1.0e-15,
                                 sol_tol: float=1.0e-1,
+                                N_round_sol: int = 1,
                                 verbose: bool=True,
                                 save_file: str|None = None,
                                 return_saddles: bool = False,
@@ -531,7 +530,7 @@ class ProbabilityNet(NetworkABC):
 
         self._function_args = function_args
 
-        for i, cvecto in enumerate(M_pstates): # for each test vector:
+        for cvecto in M_pstates: # for each test vector:
             # get values for the genes we're solving for...
             # Note: fsolve doesn't allow us to impose constraints so we need to push this initial guess
             # quite far away from zero with the added constant:
@@ -553,12 +552,9 @@ class ProbabilityNet(NetworkABC):
             if constrained_inds is not None and constrained_vals is not None:
                 c_eqms[constrained_inds] = constrained_vals
 
-            # c_eqms = self.multiround(c_eqms)
-
             sol_Mo.append(c_eqms)
 
-        # _, unique_inds = np.unique(np.round(sol_Mo, 2), axis=0, return_index=True)
-        _, unique_inds = np.unique(self.multiround(np.asarray(sol_Mo)), axis=0, return_index=True)
+        _, unique_inds = np.unique(np.round(sol_Mo, N_round_sol), axis=0, return_index=True)
 
         sol_M = np.asarray(sol_Mo)[unique_inds]
 
@@ -569,6 +565,7 @@ class ProbabilityNet(NetworkABC):
                                                              constrained_inds=constrained_inds,
                                                              tol= sol_tol,
                                                              verbose = verbose,
+                                                             sol_round = N_round_sol,
                                                              save_file = save_file,
                                                              return_saddles=return_saddles)
 
@@ -581,6 +578,7 @@ class ProbabilityNet(NetworkABC):
                              constrained_inds: list | None = None,
                              tol: float=1.0e-1,
                              verbose: bool=True,
+                             sol_round: int = 1,
                              save_file: str|None = None,
                              return_saddles: bool = False
                              ):
@@ -669,7 +667,7 @@ class ProbabilityNet(NetworkABC):
                 if char is not EquilibriumType.saddle.name and error <= tol:
                     i += 1
                     if verbose:
-                        print(f'Soln {i}, {char}, {np.round(sols, 2)}, {np.round(error, 4)}')
+                        print(f'Soln {i}, {char}, {np.round(sols, sol_round)}, {np.round(error, 4)}')
                     solsM.append(sols)
                     sol_char_list.append(char)
                     sol_char_error.append(error)
@@ -677,7 +675,7 @@ class ProbabilityNet(NetworkABC):
                 if error <= tol:
                     i += 1
                     if verbose:
-                        print(f'Soln {i}, {char}, {np.round(sols, 2)}, {np.round(error, 4)}')
+                        print(f'Soln {i}, {char}, {np.round(sols, sol_round)}, {np.round(error, 4)}')
                     solsM.append(sols)
                     sol_char_list.append(char)
                     sol_char_error.append(error)
@@ -1192,15 +1190,5 @@ class ProbabilityNet(NetworkABC):
         # dtv[self.sensor_node_inds] = 1.0
 
         return tvect, tvectr
-
-
-    def multiround(self, cc):
-        '''
-        Perform a rounding procedure to 1/(node_expression_levels - 1) level of resolution.
-        For example, if node_expression_levels = 5.0, then this will round values to 0.0, 0.25, 0.5, 0.75, and 1.0.
-        '''
-        cc = np.round(cc * (self._node_expression_levels - 1)) / (self._node_expression_levels - 1)
-
-        return cc
 
 

@@ -549,7 +549,8 @@ class BooleanNet(NetworkABC):
         sol_Mo = []
         sol_char = []
 
-        # FIXME
+        # i = 0
+
         for cvecto in M_pstates: # for each test vector:
             # Need to modify the cvect vector to hold the value of the input nodes:
             if constrained_inds is not None and constrained_vals is not None:
@@ -564,12 +565,22 @@ class BooleanNet(NetworkABC):
                                                    constraint_vals = constrained_vals
                                                    )
 
-            # FIXME: this could get really big here, should probably seek another method to avoid duplicates right away
             sol_Mo.append(sol_i)
             sol_char.append(char_i)
 
+            # if i == 0:
+            #     sol_Mo.append(sol_i)
+            #     sol_char.append(char_i)
+            #     i += 1
+            #
+            # else:
+            #     if sol_i not in np.asarray(sol_Mo):
+            #         sol_Mo.append(sol_i)
+            #         sol_char.append(char_i)
+
             if verbose:
                 print(cvecto, sol_i, char_i)
+
 
         _, unique_inds = np.unique(sol_Mo, axis=0, return_index=True)
 

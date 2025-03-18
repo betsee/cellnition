@@ -8,15 +8,11 @@ This module builds and plots a state transition diagram from a solution
 set and corresponding GeneNetworkModel.
 '''
 
-import os
-import itertools
 import copy
 import numpy as np
-from scipy.cluster.hierarchy import fclusterdata
 import networkx as nx
 import pygraphviz as pgv
-from cellnition.science.network_models.probability_networks import (
-    ProbabilityNet)
+from cellnition.science.network_models.probability_networks import ProbabilityNet
 from cellnition.science.network_models.network_enums import EquilibriumType
 from cellnition._util.path.utilpathmake import FileRelative
 from cellnition._util.path.utilpathself import get_data_png_glyph_stability_dir
@@ -28,7 +24,6 @@ from matplotlib import colormaps
 import matplotlib.image as image
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 from networkx import MultiDiGraph
-from pygraphviz import AGraph
 
 class StateMachine(object):
     '''
@@ -117,7 +112,6 @@ class StateMachine(object):
                           save_perturbation_net_image: str|None = None,
                           graph_layout: str = 'dot',
                           remove_inaccessible_states: bool = True,
-                          node_expression_levels: int|float = 4.0,
                           search_main_nodes_only: bool = False,
                           order_by_distance: bool = False
                           ) -> MultiDiGraph:
@@ -140,7 +134,6 @@ class StateMachine(object):
                                                             search_tol=search_tol,
                                                             sol_tol=sol_tol,
                                                             search_main_nodes_only=search_main_nodes_only,
-                                                            node_expression_levels=node_expression_levels,
                                                             order_by_distance=order_by_distance
                                                             )
 
@@ -201,12 +194,10 @@ class StateMachine(object):
                                       d_base: float | list,
                                       verbose: bool=True,
                                       return_saddles: bool=True,
-                                      N_space: int=3,
+                                      N_space: int=2,
                                       search_tol: float=1.0e-15,
                                       sol_tol: float=1.0e-2,
-                                      N_round_sol: int=1,
                                       search_main_nodes_only: bool = False,
-                                      node_expression_levels: int|float = 4.0,
                                       sig_lino: list|None = None,
                                       order_by_distance: bool = False
                                       ):
@@ -215,9 +206,6 @@ class StateMachine(object):
         and collect and identify all equilibrium points of the system.
 
         '''
-
-        if node_expression_levels <= 1:
-            raise Exception("Node expression levels must be greater than 1!")
 
         if sig_lino is None:
             sig_lin = [1.0e-6, 1.0]
@@ -250,7 +238,6 @@ class StateMachine(object):
                                                                           N_space=N_space,
                                                                           search_tol=search_tol,
                                                                           sol_tol=sol_tol,
-                                                                          N_round_sol=N_round_sol,
                                                                           verbose=verbose,
                                                                           return_saddles=return_saddles,
                                                                           search_main_nodes_only=search_main_nodes_only
@@ -281,25 +268,25 @@ class StateMachine(object):
 
 
         # Use numpy unique on specially-rounded set of solutions to exclude similar state cases:
-        solsM_all = np.round(solsM_all*(node_expression_levels -1))/(node_expression_levels -1)
-        self._node_expression_levels = node_expression_levels # need to save this for later
+        # solsM_all = np.round(solsM_all*(self._pnet.node_expression_levels -1))/(self._pnet.node_expression_levels -1)
+        solsM_all = self._pnet.multiround(solsM_all)
 
-        # Next, append all attractor types as an integer value as a way to
-        # further distinguish states by their dynamics:
-        charM_all_vals = []
-        for ci in charM_all:
-            attr_type = getattr(EquilibriumType, ci, None)
-            if attr_type is not None:
-                charM_all_vals.append(attr_type.value)
-
-        select_inds = []
-        select_inds.extend(self._pnet.noninput_node_inds)
-        select_inds.append(-1)
-
-        solsM_all_char = np.vstack((solsM_all, charM_all_vals))
+        # # Next, append all attractor types as an integer value as a way to
+        # # further distinguish states by their dynamics:
+        # charM_all_vals = []
+        # for ci in charM_all:
+        #     attr_type = getattr(EquilibriumType, ci, None)
+        #     if attr_type is not None:
+        #         charM_all_vals.append(attr_type.value)
+        #
+        # select_inds = []
+        # select_inds.extend(self._pnet.noninput_node_inds)
+        # select_inds.append(-1)
+        #
+        # solsM_all_char = np.vstack((solsM_all, charM_all_vals))
 
         # Indices of unique solutions:
-        _, inds_solsM_all_unique = np.unique(solsM_all_char[select_inds, :], return_index=True, axis=1)
+        _, inds_solsM_all_unique = np.unique(solsM_all[self._pnet.noninput_node_inds, :], return_index=True, axis=1)
 
         solsM_all = solsM_all[:, inds_solsM_all_unique]
         charM_all = np.asarray(charM_all)[inds_solsM_all_unique]
@@ -463,7 +450,7 @@ class StateMachine(object):
 
                     c_initial = np.mean(ctime[inds_win1[0]:inds_win1[1], :], axis=0)
                     # round c_initial so we can match it in solsM_all:
-                    c_initial = np.round(c_initial*(self._node_expression_levels-1))/(self._node_expression_levels-1)
+                    c_initial = self._pnet.multiround(c_initial)
 
 
                     # match the network state to one that only involves the hub nodes:
@@ -491,7 +478,7 @@ class StateMachine(object):
                     c_held = np.mean(ctime[inds_win2[0]:inds_win2[1], :], axis=0)
                     # var_c_held = np.sum(np.std(ctime[inds_win2[0]:inds_win2[1], :], axis=0))
                     # round c_held so that we can match it in solsM_all:
-                    c_held = np.round(c_held*(self._node_expression_levels-1))/(self._node_expression_levels -1)
+                    c_held = self._pnet.multiround(c_held)
 
                     held_state, match_error_held = self._find_state_match(solsM_all[self._pnet.noninput_node_inds, :],
                                                                     c_held[self._pnet.noninput_node_inds])
@@ -515,7 +502,7 @@ class StateMachine(object):
 
                     c_final = np.mean(ctime[inds_win3[0]:inds_win3[1], :], axis=0)
                     # round c_final so that we can match it in solsM_all:
-                    c_final = np.round(c_final * (self._node_expression_levels-1)) / (self._node_expression_levels -1)
+                    c_final = self._pnet.multiround(c_final)
 
                     final_state, match_error_final = self._find_state_match(solsM_all[self._pnet.noninput_node_inds, :],
                                                                       c_final[self._pnet.noninput_node_inds])

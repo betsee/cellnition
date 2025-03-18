@@ -52,9 +52,8 @@ def test_continuous_net(tmp_path) -> None:
     # interaction_function_type = InterFuncType.hill
     interaction_function_type = InterFuncType.logistic
 
-    N_round_sol = 2
     return_saddles = True
-    node_express_levels = 5
+    node_express_levels = 5.0
 
     # Set parameters for the network:
     dd = 1.0  # decay rate
@@ -73,7 +72,9 @@ def test_continuous_net(tmp_path) -> None:
         os.makedirs(save_path)
 
     # Create the continuous differential-equation based model:
-    pnet = ProbabilityNet(libg.N_nodes, interaction_function_type=interaction_function_type)
+    pnet = ProbabilityNet(libg.N_nodes,
+                          interaction_function_type=interaction_function_type,
+                          node_expression_levels=node_express_levels)
 
     pnet.build_network_from_edges(libg.edges)
     pnet.characterize_graph()  # characterize the graph and set key params
@@ -96,7 +97,6 @@ def test_continuous_net(tmp_path) -> None:
                                                                                 d_base=dd,
                                                                                 n_base=n_base,
                                                                                 beta_base=bb,
-                                                                                round_unique_sol=1,
                                                                                 verbose=False,
                                                                                 sol_tol=1.0e-1,
                                                                                 save_file_basename=None,
@@ -121,9 +121,7 @@ def test_continuous_net(tmp_path) -> None:
                                                                                                      N_space=N_space,
                                                                                                      search_tol=1.0e-15,
                                                                                                      sol_tol=1.0e-3,
-                                                                                                     N_round_sol=N_round_sol,
                                                                                                      search_main_nodes_only=False,
-                                                                                                     node_expression_levels=node_express_levels,
                                                                                                      order_by_distance=False
                                                                                                      )
     # test plotting the solution array:
@@ -241,74 +239,6 @@ def test_continuous_net(tmp_path) -> None:
 #     # Need to calculate solutions over the full domain first, then find solutinos that match the region criteria:
 #     Vss_vect = ocell.osmo_vol_steady_state(MM.ravel(), NN.ravel(), p.Y_wall, p.d_wall, p)
 #
-# def test_grn_workflow_libgraph(tmp_path) -> None:
-#     '''
-#     Test a network (GRN) workflow on a graph loaded
-#     from the network library.
-#
-#     Parameters
-#     ----------
-#     tmp_path : pathlib.Path
-#         Abstract path encapsulating a temporary directory unique to this unit
-#         test, created in the base temporary directory.
-#     '''
-#     from cellnition.science.network_models.network_enums import CouplingType, InterFuncType
-#     from cellnition.science.network_models.network_library import TrinodeNet
-#     from cellnition.science.network_workflow import NetworkWorkflow
-#
-#     # Absolute or relative dirname of a test-specific temporary directory to
-#     # which "NetworkWorkflow" will emit GraphML and other files.
-#     save_path = str(tmp_path)
-#
-#     libg = TrinodeNet()
-#
-#     netflow = NetworkWorkflow(save_path)
-#
-#     interfunctype = InterFuncType.logistic
-#
-#     if interfunctype is InterFuncType.logistic:
-#         d_base = 1.0
-#         n_base = 15.0
-#         beta_base = 0.25
-#     else:
-#         d_base = 1.0
-#         n_base = 3.0
-#         beta_base = 5.0
-#
-#     pnet, update_string, fname_base = netflow.make_network_from_edges(libg.edges,
-#                                                                       edge_types=libg.edge_types,
-#                                                                       interaction_function_type=interfunctype,
-#                                                                       coupling_type=CouplingType.mixed,
-#                                                                       network_name=libg.name,
-#                                                                       i=0)
-#
-#     graph_dat = netflow.work_frame(pnet,
-#                                    save_path,
-#                                    fname_base,
-#                                    i_frame=0,
-#                                    verbose=False,
-#                                    reduce_dims=False,
-#                                    beta_base=beta_base,
-#                                    n_base=n_base,
-#                                    d_base=d_base,
-#                                    edge_types=libg.edge_types,
-#                                    edge_type_search=True,
-#                                    edge_type_search_iterations=3,
-#                                    find_solutions=True,
-#                                    knockout_experiments=True,
-#                                    sol_search_tol=1.0e-15,
-#                                    N_search_space=3,
-#                                    N_round_unique_sol=1,
-#                                    sol_unique_tol=1.0e-1,
-#                                    sol_ko_tol=1.0e-1,
-#                                    constraint_vals=None,
-#                                    constraint_inds=None,
-#                                    signal_constr_vals=None,
-#                                    update_string=update_string,
-#                                    node_type_dict=None,
-#                                    extra_verbose=False,
-#                                    coupling_type=CouplingType.mixed
-#                                    )
 #
 # def test_grn_workflow_sfgraph(tmp_path) -> None:
 #     '''
@@ -446,7 +376,6 @@ def test_continuous_net(tmp_path) -> None:
 #                                    knockout_experiments=False,
 #                                    sol_search_tol=1.0e-15,
 #                                    N_search_space=3,
-#                                    N_round_unique_sol=1,
 #                                    sol_unique_tol=1.0e-1,
 #                                    sol_ko_tol=1.0e-1,
 #                                    constraint_vals=None,

@@ -24,6 +24,18 @@ class LibNet(object, metaclass=ABCMeta):
 
         pass
 
+    def count_nodes(self):
+
+        # count the nodes based on the edges, just in case there's an error:
+        nodes = []
+        for ei, ej in self.edges:
+            if ei not in nodes:
+                nodes.append(ei)
+            if ej not in nodes:
+                nodes.append(ej)
+
+        self.N_nodes = len(nodes)
+
 class ActivatorExample(LibNet):
 
     def __init__(self, activator_signals: bool=True, one_input: bool=False):
