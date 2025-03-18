@@ -113,7 +113,8 @@ class StateMachine(object):
                           graph_layout: str = 'dot',
                           remove_inaccessible_states: bool = True,
                           search_main_nodes_only: bool = False,
-                          order_by_distance: bool = False
+                          order_by_distance: bool = False,
+                          node_num_max: int | None = None
                           ) -> MultiDiGraph:
         '''
         Run all steps to generate a state transition network and associated
@@ -134,7 +135,8 @@ class StateMachine(object):
                                                             search_tol=search_tol,
                                                             sol_tol=sol_tol,
                                                             search_main_nodes_only=search_main_nodes_only,
-                                                            order_by_distance=order_by_distance
+                                                            order_by_distance=order_by_distance,
+                                                            node_num_max=node_num_max
                                                             )
 
         # save entities to the object:
@@ -199,7 +201,8 @@ class StateMachine(object):
                                       sol_tol: float=1.0e-2,
                                       search_main_nodes_only: bool = False,
                                       sig_lino: list|None = None,
-                                      order_by_distance: bool = False
+                                      order_by_distance: bool = False,
+                                      node_num_max: int | None = None,
                                       ):
         '''
         Search through all possible combinations of signal node values
@@ -240,7 +243,8 @@ class StateMachine(object):
                                                                           sol_tol=sol_tol,
                                                                           verbose=verbose,
                                                                           return_saddles=return_saddles,
-                                                                          search_main_nodes_only=search_main_nodes_only
+                                                                          search_main_nodes_only=search_main_nodes_only,
+                                                                          node_num_max=node_num_max
                                                                           )
 
 

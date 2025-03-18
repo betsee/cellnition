@@ -488,7 +488,8 @@ class ProbabilityNet(NetworkABC):
                                 verbose: bool=True,
                                 save_file: str|None = None,
                                 return_saddles: bool = False,
-                                search_main_nodes_only: bool=False
+                                search_main_nodes_only: bool=False,
+                                node_num_max: int|None = None
                                 ):
         '''
         Solve for the equilibrium points of gene product probabilities in
@@ -505,6 +506,10 @@ class ProbabilityNet(NetworkABC):
         dcdt_vect_f, dcdt_jac_f = self.create_numerical_dcdt(constrained_inds=constrained_inds,
                                                              constrained_vals=constrained_vals)
 
+        if node_num_max is not None:
+            sort_hier_inds = np.argsort(self.hier_node_level[self.noninput_node_inds])
+            self.influence_node_inds = list(np.asarray(self.noninput_node_inds)[sort_hier_inds][0:node_num_max])
+
 
         if constrained_inds is None or constrained_vals is None:
             unconstrained_inds = self._nodes_index
@@ -516,7 +521,12 @@ class ProbabilityNet(NetworkABC):
 
         else:
             if len(self.main_nodes):
-                M_pstates, _, _ = self.generate_state_space(self.main_nodes, N_space)
+                if node_num_max is None:
+                    M_pstates, _, _ = self.generate_state_space(self.main_nodes, N_space)
+                elif len(self.main_nodes) < node_num_max:
+                    M_pstates, _, _ = self.generate_state_space(self.main_nodes, N_space)
+                else:
+                    M_pstates, _, _ = self.generate_state_space(self.influence_node_inds, N_space)
 
             else:
                 raise Exception("No main nodes; cannot perform state search with "

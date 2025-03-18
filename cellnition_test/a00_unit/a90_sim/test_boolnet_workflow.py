@@ -68,7 +68,7 @@ def test_boolean_net(tmp_path) -> None:
                                             search_main_nodes_only=True,
                                             n_max_steps=2*len(bn.main_nodes),
                                             node_num_max=bn.N_nodes,
-                                            verbose=True)
+                                            )
 
     # Compute a pseudo-time sequence:
     solsv, cc_i, sol_char, motif = bn.net_sequence_compute(cc_o,

@@ -512,8 +512,9 @@ class BooleanNet(NetworkABC):
                                                                             constraint_vals,
                                                                             signal_constr_vals=signal_constr_vals)
 
-        sort_hier_inds = np.argsort(self.hier_node_level[self.noninput_node_inds])
-        self.influence_node_inds = list(np.asarray(self.noninput_node_inds)[sort_hier_inds][0:node_num_max])
+        if node_num_max is not None:
+            sort_hier_inds = np.argsort(self.hier_node_level[self.noninput_node_inds])
+            self.influence_node_inds = list(np.asarray(self.noninput_node_inds)[sort_hier_inds][0:node_num_max])
 
         if constrained_inds is None or constrained_vals is None:
             unconstrained_inds = self.nodes_index
@@ -521,24 +522,20 @@ class BooleanNet(NetworkABC):
             unconstrained_inds = np.setdiff1d(self.nodes_index, constrained_inds).tolist()
 
         if search_main_nodes_only is False:
-            if len(unconstrained_inds) < node_num_max:
+            if len(unconstrained_inds) <= 31:
                 # If the number of nodes is less than 32, use the faster numpy-based method:
                 # NOTE: 32 is a number that is hard-coded into Numpy
                 M_pstates, _, _ = self.generate_state_space(unconstrained_inds)
 
-            elif node_num_max is None:
-                # if it's greater than 32, numpy can't work with this, therefore use python itertools method:
-                M_pstates = self.generate_bool_state_space(unconstrained_inds)
-
             else:
-                M_pstates = self.generate_bool_state_space(self.influence_node_inds)
+                M_pstates = self.generate_bool_state_space(unconstrained_inds)
 
         else:
             if len(self.main_nodes):
-                if len(self.main_nodes) < node_num_max:
-                    M_pstates, _, _ = self.generate_state_space(self.main_nodes)
-                elif node_num_max is None:
+                if node_num_max is None:
                     M_pstates = self.generate_bool_state_space(self.main_nodes)
+                elif len(self.main_nodes) < node_num_max:
+                    M_pstates, _, _ = self.generate_state_space(self.main_nodes)
                 else:
                     M_pstates = self.generate_bool_state_space(self.influence_node_inds)
 
@@ -548,8 +545,6 @@ class BooleanNet(NetworkABC):
 
         sol_Mo = []
         sol_char = []
-
-        # i = 0
 
         for cvecto in M_pstates: # for each test vector:
             # Need to modify the cvect vector to hold the value of the input nodes:
@@ -672,9 +667,8 @@ class BooleanNet(NetworkABC):
                          signal_constr_vals: list | None = None,
                          search_main_nodes_only: bool = False,
                          n_max_steps: int = 20,
-                         node_num_max: int|None = None,
-                         nde_label_str: bool=False,
-                         verbose: bool = False):
+                         node_num_max: int|None = None
+                         ):
         '''
 
         '''
