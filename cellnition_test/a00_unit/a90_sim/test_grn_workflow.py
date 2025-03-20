@@ -87,6 +87,17 @@ def test_continuous_net(tmp_path) -> None:
                                                                           coupling_type=multi_coupling_type)
     pnet.build_analytical_model(A_add_s, A_mul_s)
 
+    # Save the model equations:
+    eqn_img = f'Eqn_{libg.name}.png'
+    save_eqn_image = os.path.join(save_path, eqn_img)
+
+    eqn_net_file = f'Eqns_{libg.name}.csv'
+    save_eqn_csv = os.path.join(save_path, eqn_net_file)
+
+    pnet.save_model_equations(save_eqn_image,
+                              save_eqn_csv=save_eqn_csv,
+                              substitute_node_labels=True)
+
     # Test out the gene knockout experiment:
     sigs = [0.0 for ii in pnet.input_node_inds]
 
@@ -147,6 +158,7 @@ def test_continuous_net(tmp_path) -> None:
     transition_edges_set, pert_edges_set, G_nx = smach.create_transition_network(states_dict,
                                                                                  sig_test_set,
                                                                                  solsM_all,
+                                                                                 charM_all,
                                                                                  dt=dt,
                                                                                  delta_sig=delta_sig,
                                                                                  t_relax=t_relax,

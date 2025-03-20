@@ -348,7 +348,7 @@ class ProbabilityNet(NetworkABC):
 
         self._dcdt_vect_s = list(sp.Matrix(self._dcdt_vect_s).subs(subs_list))
 
-        self._dcdt_vect_s_viz = self._get_visual_equations()
+        self.c_vect_s_viz, self.dcdt_vect_s_viz = self.get_visual_equations()
 
     def make_numerical_params(self,
                        d_base: float|list[float]=1.0,
@@ -791,14 +791,16 @@ class ProbabilityNet(NetworkABC):
 
         return concs_time
 
-    def _get_visual_equations(self):
+    def get_visual_equations(self):
         '''
 
         '''
+        c_vect_viz = []
         subs_list = []
         self._subs_syms_list = []
         for pi, nde_lab in zip(self._c_vect_s, self.nodes_list):
             nde_sym = sp.symbols(str(nde_lab))
+            c_vect_viz.append(nde_sym)
             subs_list.append((pi, nde_sym))
             self._subs_syms_list.append(nde_sym)
 
@@ -817,7 +819,7 @@ class ProbabilityNet(NetworkABC):
 
         dcdt_vect_s_viz = sp.Matrix(self._dcdt_vect_s).subs(subs_list)
 
-        return dcdt_vect_s_viz
+        return c_vect_viz, dcdt_vect_s_viz
 
 
     def save_model_equations(self,

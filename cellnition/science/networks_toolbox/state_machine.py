@@ -326,6 +326,7 @@ class StateMachine(object):
                                   states_dict: dict,
                                   sig_test_set: list|ndarray,
                                   solsM_allo: ndarray,
+                                  charM_allo: ndarray,
                                   dt: float = 5.0e-3,
                                   delta_sig: float = 40.0,
                                   t_relax: float = 10.0,
@@ -384,6 +385,7 @@ class StateMachine(object):
 
         # make a copy of solsM_all:
         solsM_all = solsM_allo.copy()
+        charM_all = charM_allo.copy()
 
         # make a copy of the states dict that's only used for modifications:
         states_dict_2 = copy.deepcopy(states_dict)
@@ -474,6 +476,7 @@ class StateMachine(object):
                         if verbose:
                             print(f'WARNING: Initial state not found; adding new state {initial_state} to the solution set...')
                         solsM_all = np.column_stack((solsM_all, c_initial))
+                        charM_all = np.hstack((charM_all, EquilibriumType.undetermined.name))
                         initial_state = solsM_all.shape[1] - 1
 
                         # Update the states listing for this input state set
@@ -498,6 +501,7 @@ class StateMachine(object):
 
                     if match_error_held > match_tol: # if state is unmatched, flag it
                         solsM_all = np.column_stack((solsM_all, c_held))
+                        charM_all = np.hstack((charM_all, EquilibriumType.undetermined.name))
                         held_state = solsM_all.shape[1] -1
 
                         # Update the states listing for this input state set
@@ -523,6 +527,7 @@ class StateMachine(object):
                     if match_error_final > match_tol: # if state is unmatched, add it to the system
 
                         solsM_all = np.column_stack((solsM_all, c_final))
+                        charM_all = np.hstack((charM_all, EquilibriumType.undetermined.name))
                         final_state = solsM_all.shape[1] -1
 
                         # Update the states listing for this input state set
@@ -560,6 +565,7 @@ class StateMachine(object):
             self._all_time_runs = None
 
         self._solsM_all = solsM_all
+        self._charM_all = charM_all
         self._states_dict = states_dict_2
         self._sig_test_set = sig_test_set
 
