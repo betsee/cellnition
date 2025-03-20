@@ -114,7 +114,8 @@ class StateMachine(object):
                           remove_inaccessible_states: bool = True,
                           search_main_nodes_only: bool = False,
                           order_by_distance: bool = False,
-                          node_num_max: int | None = None
+                          node_num_max: int | None = None,
+                          output_nodes_only: bool = False
                           ) -> MultiDiGraph:
         '''
         Run all steps to generate a state transition network and associated
@@ -136,7 +137,8 @@ class StateMachine(object):
                                                             sol_tol=sol_tol,
                                                             search_main_nodes_only=search_main_nodes_only,
                                                             order_by_distance=order_by_distance,
-                                                            node_num_max=node_num_max
+                                                            node_num_max=node_num_max,
+                                                            output_nodes_only=output_nodes_only
                                                             )
 
         # save entities to the object:
@@ -203,6 +205,7 @@ class StateMachine(object):
                                       sig_lino: list|None = None,
                                       order_by_distance: bool = False,
                                       node_num_max: int | None = None,
+                                      output_nodes_only: bool = False
                                       ):
         '''
         Search through all possible combinations of signal node values
@@ -272,7 +275,6 @@ class StateMachine(object):
 
 
         # Use numpy unique on specially-rounded set of solutions to exclude similar state cases:
-        # solsM_all = np.round(solsM_all*(self._pnet.node_expression_levels -1))/(self._pnet.node_expression_levels -1)
         solsM_all = self._pnet.multiround(solsM_all)
 
         # # Next, append all attractor types as an integer value as a way to
@@ -289,8 +291,14 @@ class StateMachine(object):
         #
         # solsM_all_char = np.vstack((solsM_all, charM_all_vals))
 
+        # If desired, states can be defined as "unique" with respect to the output nodes only:
+        if output_nodes_only is True and len(self._pnet.output_node_inds):
+            state_node_inds = self._pnet.output_node_inds
+        else:
+            state_node_inds = self._pnet.noninput_node_inds
+
         # Indices of unique solutions:
-        _, inds_solsM_all_unique = np.unique(solsM_all[self._pnet.noninput_node_inds, :], return_index=True, axis=1)
+        _, inds_solsM_all_unique = np.unique(solsM_all[state_node_inds, :], return_index=True, axis=1)
 
         solsM_all = solsM_all[:, inds_solsM_all_unique]
         charM_all = np.asarray(charM_all)[inds_solsM_all_unique]
