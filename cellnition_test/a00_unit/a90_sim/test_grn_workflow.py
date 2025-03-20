@@ -31,6 +31,7 @@ def test_continuous_net(tmp_path) -> None:
     import matplotlib.pyplot as plt
     from cellnition.science.networks_toolbox.gene_knockout import GeneKnockout
     from cellnition.science.networks_toolbox.state_machine import StateMachine
+    from cellnition_test._util.pytci import is_ci_github_actions
     from cellnition.science.network_models.network_enums import (
                                                                  InterFuncType,
                                                                  CouplingType
@@ -94,9 +95,15 @@ def test_continuous_net(tmp_path) -> None:
     eqn_net_file = f'Eqns_{libg.name}.csv'
     save_eqn_csv = os.path.join(save_path, eqn_net_file)
 
-    pnet.save_model_equations(save_eqn_image,
-                              save_eqn_csv=save_eqn_csv,
-                              substitute_node_labels=True)
+    # If this test is *NOT* currently being run under a remote GitHub Actions-
+    # based continuous integration (CI) workflow, this test is running locally.
+    # In this case, save model equations. Doing so requires LaTeX and thus
+    # TeXLive -- a third-party dependency that is typically several gigabytes
+    # (GB) in size and thus infeasible to install in CI.
+    if not is_ci_github_actions():
+        pnet.save_model_equations(save_eqn_image,
+                                  save_eqn_csv=save_eqn_csv,
+                                  substitute_node_labels=True)
 
     # Test out the gene knockout experiment:
     sigs = [0.0 for ii in pnet.input_node_inds]
