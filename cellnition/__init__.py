@@ -16,26 +16,41 @@ from warnings import filterwarnings
 beartype_this_package()
 
 # ....................{ WARNINGS                           }....................
-# Unconditionally ignore all non-fatal warnings emitted by the
+# Unconditionally ignore all non-fatal warnings emitted by the third-party
 # scipy.optimize.fsolve() function of the forms:
 #     ../conda/envs/ionyou_dev/lib/python3.11/site-packages/scipy/optimize/_minpack_py.py:177:
 #     RuntimeWarning: The iteration is not making good progress, as measured by the
 #     improvement from the last five Jacobian evaluations.
-#     warnings.warn(msg, RuntimeWarning)
+#       warnings.warn(msg, RuntimeWarning)
 #
 #     ../py/conda/envs/ionyou_dev/lib/python3.11/site-packages/scipy/optimize/_minpack_py.py:177:
 #     RuntimeWarning: xtol=0.000000 is too small, no further improvement in the approximate
 #     solution is possible.
-#     warnings.warn(msg, RuntimeWarning)
+#       warnings.warn(msg, RuntimeWarning)
 filterwarnings(
     action='ignore',
+    module='^scipy\..*',
     category=RuntimeWarning,
-    message='The iteration is not making good progress',
+    message='^The iteration is not making good progress',
 )
 filterwarnings(
     action='ignore',
+    module='^scipy\..*',
     category=RuntimeWarning,
-    message='xtol=0.000000 is too small',
+    message='^xtol=0.000000 is too small',
+)
+
+# Unconditionally ignore all non-fatal warnings emitted by the third-party
+# "pygraphviz.agraph" submodule of the forms:
+#     ../py/conda/envs/ionyou_dev/lib/python3.13/site-packages/pygraphviz/agraph.py:1403:
+#     RuntimeWarning: Warning: some nodes with margin (3.20,3.20) touch -
+#     falling back to straight line edges
+#       warnings.warn(b"".join(errors).decode(self.encoding), RuntimeWarning)
+filterwarnings(
+    action='ignore',
+    module='^pygraphviz\..*',
+    category=RuntimeWarning,
+    message='^Warning: some nodes with margin',
 )
 
 # ....................{ GLOBALS                            }....................
