@@ -1523,10 +1523,10 @@ class StemCellTriadChain(LibNet):
         self.name = 'StemCellTriadChain'
 
         self.N_nodes = 6
-        self.edges = [('H0', 'H1'), ('H1', 'H2'),
-                      ('H1', 'H0'), ('H2', 'H1'),
-                      ('H0', 'H0'), ('H2', 'H2'),
-                      ('S0', 'H0'), ('S1', 'H1'), ('S2', 'H2')
+        self.edges = [('OCT4', 'NANOG'), ('NANOG', 'SOX2'),
+                      ('NANOG', 'OCT4'), ('SOX2', 'NANOG'),
+                      ('OCT4', 'OCT4'), ('SOX2', 'SOX2'),
+                      ('S0', 'OCT4'), ('S1', 'NANOG'), ('S2', 'SOX2')
                       ]
 
         if activator_signals:

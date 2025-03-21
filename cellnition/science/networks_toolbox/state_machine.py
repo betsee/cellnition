@@ -695,12 +695,7 @@ class StateMachine(object):
         '''
 
         '''
-        # FIXME: we probably also want the option to just plot a subset of the state dict?
-        # FIXME: Should these be options in the method?
-
         # Convert nodes from string to int
-
-        self._charM_all = charM_all
         nodes_list = [int(ni) for ni in nodes_listo]
         img_pos = 'bc'  # position of the glyph in the node
         subcluster_font = 'DejaVu Sans Bold'
@@ -926,7 +921,8 @@ class StateMachine(object):
 
         fig, axes = plt.subplots(N_plot_genes, 1, figsize=figsize, sharex=True, sharey=True)
         for ii, cc in enumerate(main_c.T):
-            gene_lab = f'Gene {ii}'
+            # gene_lab = f'Gene {ii}'
+            gene_lab = self._pnet.nodes_list[gene_plot_inds[ii]]
             lineplt = axes[ii].plot(tvectr, cc, linewidth=2.0, label=gene_lab, color=cmap(ii))  # plot the time series
             # annotate the plot with the matched state:
             for (pi, pj), stateio in zip(phase_inds, matched_states):
