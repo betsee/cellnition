@@ -664,6 +664,7 @@ class StateMachine(object):
         matched_states = []
         for i, (si, ei) in enumerate(c_ave_phase_inds):
             c_ave = np.mean(ctime[si:ei, :], axis=0)
+            c_ave = self._pnet.multiround(c_ave) # we need to round it to the same level as sols in solsM_all
             state_matcho, match_error = self._find_state_match(solsM_all[self._pnet.noninput_node_inds,:],
                                                                c_ave[self._pnet.noninput_node_inds])
             if match_error < match_tol:

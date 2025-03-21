@@ -1547,6 +1547,45 @@ class StemCellTriadChain(LibNet):
 
         self.add_interactions = True
 
+class StemCellTriadChain0(LibNet):
+    '''
+    Example of the lowest hierarchically incoherent network
+    for a 3-node network.
+    '''
+    # Initialize the superclass:
+
+    def __init__(self, activator_signals: bool = False):
+
+        # Initialize the superclass:
+        super().__init__()
+
+        self.name = 'StemCellTriadChain0'
+
+        self.N_nodes = 6
+        self.edges = [('H0', 'H1'), ('H1', 'H2'),
+                      ('H1', 'H0'), ('H2', 'H1'),
+                      ('H0', 'H0'), ('H2', 'H2'),
+                      ('S0', 'H0'), ('S1', 'H1'), ('S2', 'H2')
+                      ]
+
+        if activator_signals:
+            self.edge_types = [EdgeType.A, EdgeType.A,
+                               EdgeType.A, EdgeType.A,
+                               EdgeType.A, EdgeType.A,
+                               EdgeType.A, EdgeType.A, EdgeType.A,
+                               ]
+        else:
+            self.edge_types = [EdgeType.A, EdgeType.A,
+                               EdgeType.A, EdgeType.A,
+                               EdgeType.A, EdgeType.A,
+                               EdgeType.I, EdgeType.I, EdgeType.I,
+                               ]
+
+        self.node_type_dict = {'S': NodeType.signal}
+        # self.node_type_dict = None
+
+        self.add_interactions = True
+
 class StemCellTriadChain2(LibNet):
     '''
     Example of the lowest hierarchically incoherent network

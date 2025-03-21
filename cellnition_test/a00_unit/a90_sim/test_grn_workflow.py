@@ -207,6 +207,61 @@ def test_continuous_net(tmp_path) -> None:
                                                rank='same'
                                                )
 
+    # Simulate a time trajectory for the monostable system.
+    # Note that the follow requires one to have knowledge of the NFSM, specifically how inputs are expected to
+    # drive the system from one state to another, and also the dynamics of the state.
+    # The following are for the StemCellTriadChain model
+
+    starting_state = 3  # State to start the system off in
+    input_list = ['I4', 'I6', 'I4']  # Input states that will be applied in time, each held for a period of delta_sig
+    dt = 5.0e-3  # Time step used in the simulations
+    dt_samp = 0.1  # Time at which samples are taken (must be larger than dt)
+    delta_sig = 60.0  # Time period representing how long each phase of the temporal test sequence is applied
+    t_relax = 20.0  # Time period to omit when sampling the phase to determine the state (must be shorter than delta_sig)
+    match_tol = 1.0e-3  # Match tolerance for the found state to a state in solsM_all
+    verbose = True  # Recieve output from the method while it's still solving (True)?
+    time_wobble = 0.0  # Add a random amount of time sampled from 0.0 to time_wobble to the delta_sig value
+
+    tvectr, c_time, matched_states, phase_inds = smach.sim_time_trajectory(starting_state,
+                                                                           smach._solsM_all,
+                                                                           input_list,
+                                                                           smach._sig_test_set,
+                                                                           dt=dt,
+                                                                           dt_samp=dt_samp,
+                                                                           input_hold_duration=delta_sig,
+                                                                           t_wait=t_relax,
+                                                                           verbose=verbose,
+                                                                           match_tol=match_tol,
+                                                                           d_base=dd,
+                                                                           n_base=n_base,
+                                                                           beta_base=bb,
+                                                                           time_wobble=time_wobble
+                                                                           )
+
+    gene_plot_inds = [0, 1, 5]
+    figsize = (8, 4)
+    state_label_offset = 0.02
+    glyph_zoom = 0.15
+    glyph_alignment = (-0.0, -0.15)
+    fontsize = 'large'
+
+    savefig = os.path.join(tmp_path, f'time_traj_{libg.name}.png')
+
+    fig, ax = smach.plot_time_trajectory(c_time,
+                                         tvectr,
+                                         phase_inds,
+                                         matched_states,
+                                         smach._charM_all,
+                                         gene_plot_inds=gene_plot_inds,
+                                         figsize=figsize,
+                                         state_label_offset=state_label_offset,
+                                         glyph_zoom=glyph_zoom,
+                                         glyph_alignment=glyph_alignment,
+                                         fontsize=fontsize,
+                                         save_file=savefig)
+
+    plt.savefig(savefig, dpi=300, transparent=True, format='png')
+
 
 
     sigs = [0.0 for i in pnet.input_node_inds]
