@@ -137,6 +137,7 @@ def test_boolean_net(tmp_path) -> None:
                                                             states_dict,
                                                             sig_test_set,
                                                             solsM_all,
+                                                            charM_all,
                                                             verbose=False,
                                                             remove_inaccessible_states=False,
                                                             save_graph_file=None,

@@ -92,76 +92,6 @@ class BoolStateMachine(object):
             EquilibriumType.hidden.name: str(hidden_fname)
         }
 
-    def run_state_machine(self,
-                          verbose: bool=True,
-                          save_graph_file: str|None =None,
-                          save_transition_net_image: str | None = None,
-                          save_perturbation_net_image: str|None = None,
-                          graph_layout: str = 'dot',
-                          remove_inaccessible_states: bool = True,
-                          search_main_nodes_only: bool = False,
-                          order_by_distance: bool = False
-                          ) -> MultiDiGraph:
-        '''
-        Run all steps to generate a state transition network and associated
-        network image.
-        '''
-
-        # Run a search through input space to obtain all unique steady states and their equ'm characterization:
-        (solsM_all,
-         charM_all,
-         sols_list,
-         states_dict,
-         sig_test_set) = self.steady_state_solutions_search(verbose=verbose,
-                                                            search_main_nodes_only=search_main_nodes_only,
-                                                            order_by_distance=order_by_distance
-                                                            )
-
-        # save entities to the object:
-        self.solsM_all = solsM_all
-        self.charM_all = charM_all
-        self.sols_list = sols_list
-        self.states_dict = states_dict
-        self.sig_test_set = sig_test_set # should be called "input space states"
-
-        # Create the edges of the transition network:
-        transition_edges_set, pert_edges_set, G_nx = self.create_transition_network(states_dict,
-                                                                                    sig_test_set,
-                                                                                    solsM_all,
-                                                                     verbose=verbose,
-                                                                     remove_inaccessible_states=remove_inaccessible_states,
-                                                                     save_graph_file=save_graph_file,
-                                                                     )
-
-        self.transition_edges_set = transition_edges_set
-        self.pert_edges_set = pert_edges_set
-        self.G_nx = G_nx
-
-        if save_perturbation_net_image:
-            nodes_list = sorted(G_nx.nodes())
-            # Generate a perturbation network plot
-            G_pert = self.plot_state_perturbation_network(self.pert_edges_set,
-                                                           self.states_dict,
-                                                          solsM_all,
-                                                           save_file=save_perturbation_net_image,
-                                                          graph_layout=graph_layout,
-                                                        )
-
-        if save_transition_net_image is not None: # save an image of the network to file:
-            # get nodes and edges list:
-            nodes_list = sorted(G_nx.nodes())
-            edges_list = list(G_nx.edges)
-
-            G_gv = self.plot_state_transition_network(nodes_list,
-                                                      edges_list,
-                                                      solsM_all,
-                                                      charM_all,
-                                                      save_file=save_transition_net_image,
-                                                      graph_layout=graph_layout
-                                                      )
-
-        return G_nx
-
 
     def steady_state_solutions_search(self,
                                       verbose: bool=True,
@@ -259,6 +189,7 @@ class BoolStateMachine(object):
                                   states_dict: dict,
                                   sig_test_set: list|ndarray,
                                   solsM_allo: ndarray,
+                                  charM_allo: ndarray,
                                   verbose: bool = True,
                                   remove_inaccessible_states: bool=False,
                                   save_graph_file: str|None = None,
@@ -310,12 +241,10 @@ class BoolStateMachine(object):
 
         # make a copy of solsM_all:
         solsM_all = solsM_allo.copy()
+        charM_all = charM_allo.copy()
 
         # make a copy of the states dict that's only used for modifications:
         states_dict_2 = copy.deepcopy(states_dict)
-
-        # charM_extras:
-        charM_ext = []
 
         # If desired, states can be defined as "unique" with respect to the output nodes only:
         if output_nodes_only is True and len(self._bnet.output_node_inds):
@@ -368,8 +297,13 @@ class BoolStateMachine(object):
 
                 if match_error_initial > 0.01:  # if held state is unmatched, send warning...
                     solsM_all = np.column_stack((solsM_all, cvect_c))
-                    charM_ext.append(char_c)
+                    charM_all = np.hstack((charM_all, char_c))
                     initial_state = solsM_all.shape[1] - 1
+
+                    # Update the states listing for this input state set
+                    sc_dict2 = states_dict_2[sig_base_set]['States']
+                    sc_dict2.append(initial_state)
+                    states_dict_2[sig_base_set]['States'] = sc_dict2
 
                     if verbose:
                         print(f'WARNING: Initial state not found (error {match_error_initial});'
@@ -402,8 +336,12 @@ class BoolStateMachine(object):
 
                     if match_error_held > 0.01: # if held state is unmatched, flag it with a nan
                         solsM_all = np.column_stack((solsM_all, cvect_h))
-                        charM_ext.append(char_h)
+                        charM_all = np.hstack((charM_all, char_h))
                         held_state = solsM_all.shape[1] - 1
+
+                        sc_dict2 = states_dict_2[sig_base_set]['States']
+                        sc_dict2.append(held_state)
+                        states_dict_2[sig_base_set]['States'] = sc_dict2
 
                         if verbose:
                             print(f'WARNING: Held state not found (error {match_error_held}); '
@@ -431,8 +369,12 @@ class BoolStateMachine(object):
 
                     if match_error_final > 0.01: # if state is unmatched, flag it
                         solsM_all = np.column_stack((solsM_all, cvect_f))
-                        charM_ext.append(char_f)
+                        charM_all = np.hstack((charM_all, char_f))
                         final_state = solsM_all.shape[1] -1
+
+                        sc_dict2 = states_dict_2[sig_base_set]['States']
+                        sc_dict2.append(final_state)
+                        states_dict_2[sig_base_set]['States'] = sc_dict2
 
                         if verbose:
                             print(f'WARNING: Final state not found (error {match_error_final}); '
@@ -465,7 +407,7 @@ class BoolStateMachine(object):
         self._solsM_all = solsM_all
         self._states_dict = states_dict_2
         self._sig_test_set = sig_test_set
-        self._charM_ext = charM_ext
+        self._charM_all = charM_all
         # self._charM_all = np.hstack((self._charM_all, charM_ext))
 
         # Create the multidigraph:
