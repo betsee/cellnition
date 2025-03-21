@@ -54,6 +54,14 @@ officially bundled with Python_:
 
    pip3 install cellnition
 
+Tutorials
+=========
+
+Cellnition tutorials are available as `Jupyter Notebooks <Jupyter_>`__:
+
+* `Tutorial 1`_.
+* `Tutorial 2`_.
+
 License
 =======
 
@@ -76,6 +84,10 @@ Cellnition is `open-source software released <cellnition license_>`__ under the
 .. # ------------------( LINKS ~ cellnition : local          )------------------
 .. _cellnition License:
    LICENSE
+.. _Tutorial 1:
+   ipynb/Tutorial1_ContinuousNFSM_v1.ipynb
+.. _Tutorial 2:
+   ipynb/Tutorial2_BooleanNFSM_v1.ipynb
 
 .. # ------------------( LINKS ~ cellnition : package        )------------------
 .. #FIXME: None of these exist, naturally. *sigh*
@@ -109,6 +121,10 @@ Cellnition is `open-source software released <cellnition license_>`__ under the
 .. # ------------------( LINKS ~ py : interpreter            )------------------
 .. _CPython:
    https://github.com/python/cpython
+
+.. # ------------------( LINKS ~ py : package : science      )------------------
+.. _Jupyter:
+   https://jupyter.org
 
 .. # ------------------( LINKS ~ py : package : test         )------------------
 .. _Codecov:
