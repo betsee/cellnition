@@ -60,7 +60,7 @@ Tutorials
 Cellnition tutorials are available as `Jupyter Notebooks <Jupyter_>`__:
 
 * `Tutorial 1`_.
-.. # * `Tutorial 2`_.
+* `Tutorial 2`_.
 
 License
 =======
