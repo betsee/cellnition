@@ -77,8 +77,8 @@ Tutorials
 
 Cellnition tutorials are available as `Jupyter Notebooks <Jupyter_>`__:
 
-* `Tutorial 1`_.
-* `Tutorial 2`_.
+* `Tutorial 1`_ : Create NFSMs from a continuous, differential-equation based GRN model.
+* `Tutorial 2`_ : Create NFSMs from a Boolean, logic-equation based GRN model.
 
 License
 =======
