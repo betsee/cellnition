@@ -22,6 +22,8 @@ import matplotlib.pyplot as plt
 from matplotlib import colors
 from matplotlib import colormaps
 from networkx import MultiDiGraph
+import matplotlib.image as image
+from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 
 class BoolStateMachine(object):
     '''
@@ -666,7 +668,7 @@ class BoolStateMachine(object):
             sig_i = int(sig_nme[1:]) # get the integer representing the input state
             sigs_vect_list.append(sig_test_set[sig_i].tolist()) # append the complete input signal to the list
 
-        seq_res, sol_res, sol_char_res = self._bnet.net_multisequence_compute(cc_o,
+        seq_tvect, seq_res, sol_res, sol_char_res = self._bnet.net_multisequence_compute(cc_o,
                                                                               sigs_vect_list,
                                                                               self._bnet._A_bool_f,
                                                                               n_max_steps=n_seq_steps,
@@ -675,24 +677,12 @@ class BoolStateMachine(object):
 
         matched_states = []
         matched_char = []
-        c_time = []
-        tvectr = []
 
-        t_len_o = 0
-        t_len = n_seq_steps + 1
-
-        for seq_new, cc_new, char_new in zip(seq_res, sol_res, sol_char_res):
+        for cc_new, char_new in zip(sol_res, sol_char_res):
             new_state, match_error = self._find_state_match(solsM_all[self._bnet.noninput_node_inds, :],
                                                            cc_new[self._bnet.noninput_node_inds])
             matched_states.append(new_state)
             matched_char.append(char_new)
-            c_time.extend(seq_new)
-
-            tvecti = np.arange(t_len_o, t_len)
-            t_len_o = t_len
-            t_len += t_len
-
-            tvectr.extend(tvecti)
 
             if verbose:
                 if match_error < match_tol:
@@ -700,7 +690,81 @@ class BoolStateMachine(object):
                 else:
                     print(f'WARNING! Best match State {new_state} exceeds match_error with error {match_error}!')
 
-        return tvectr, c_time, matched_states, matched_char
+        return seq_tvect, seq_res, matched_states, matched_char
+
+    def plot_sequence_trajectory(self,
+                             c_time: ndarray,
+                             tvectr: ndarray|list,
+                             phase_inds: ndarray|list,
+                             matched_states: ndarray|list,
+                             char_states: ndarray|list,
+                             gene_plot_inds: list|None=None,
+                             figsize: tuple = (10, 4),
+                             state_label_offset: float = 0.02,
+                             glyph_zoom: float=0.15,
+                             glyph_alignment: tuple[float, float]=(-0.0, -0.15),
+                             fontsize: str='medium',
+                             save_file: str|None = None,
+                             legend: bool=True,
+                             ):
+        '''
+
+        '''
+
+        if gene_plot_inds is None:
+            main_c = c_time[:, self._bnet.noninput_node_inds]
+        else:
+            main_c = c_time[:, gene_plot_inds]
+
+        N_plot_genes = main_c.shape[1]
+
+        # Resize the figure to fit the panel of plotted genes:
+        fig_width = figsize[0]
+        fig_height = figsize[1]
+        figsize = (fig_width, fig_height*N_plot_genes)
+
+        cmap = plt.get_cmap("tab10")
+
+        fig, axes = plt.subplots(N_plot_genes, 1, figsize=figsize, sharex=True, sharey=True)
+        for ii, cc in enumerate(main_c.T):
+            # gene_lab = f'Gene {ii}'
+            gene_lab = self._bnet.nodes_list[gene_plot_inds[ii]]
+            lineplt = axes[ii].plot(tvectr, cc, linewidth=2.0, label=gene_lab, color=cmap(ii))  # plot the time series
+            # annotate the plot with the matched state:
+            for (pi, pj), stateio, chario in zip(phase_inds, matched_states, char_states):
+                statei = stateio
+
+                char_i = chario
+                char_i_fname = self._node_image_dict[char_i]
+                logo = image.imread(char_i_fname)
+                imagebox = OffsetImage(logo, zoom=glyph_zoom)
+                pmid = pi
+                tmid = tvectr[pmid]
+                cc_max = np.max(cc[pi:pj])
+                cmid = cc_max + state_label_offset
+
+                axes[ii].text(tmid, cmid, f'State {statei}', fontsize=fontsize)
+
+                ab = AnnotationBbox(imagebox,
+                                    (tmid, cmid),
+                                    frameon=False,
+                                    box_alignment=glyph_alignment)
+                axes[ii].add_artist(ab)
+
+                axes[ii].spines['top'].set_visible(False)
+                axes[ii].spines['right'].set_visible(False)
+
+                axes[ii].set_ylabel('Expression Probability')
+
+                if legend:
+                    axes[ii].legend(frameon=False)
+
+        axes[-1].set_xlabel('Time')
+
+        if save_file is not None:
+            plt.savefig(save_file, dpi=300, transparent=True, format='png')
+
+        return fig, axes
 
     def get_state_distance_matrix(self, solsM_all):
         '''

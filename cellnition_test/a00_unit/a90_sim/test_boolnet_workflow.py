@@ -180,4 +180,19 @@ def test_boolean_net(tmp_path) -> None:
 
                                              )
 
-# def test_state_machine(tmp_path) -> None:
+    # Test pseudo-time sequence generation:
+    starting_state = 0  # State to start the system off in
+    input_list = ['I0', 'I1', 'I2']  # Input states that will be applied in time, each held for a period of delta_sig
+    n_seq_steps = len(bn.main_nodes) * 2  # Specify the number of iterations that the Boolean GRN solver will use to
+                                          # find an eq'm state (recommend 2x node number).
+    match_tol = 0.1  # Match tolerance for the found state to a state in solsM_all
+    verbose = True  # Recieve output from the method while it's still solving (True)?
+
+    tvectr, c_time, matched_states, char_states = bsm.sim_sequence_trajectory(starting_state,
+                                                                              bsm._solsM_all,
+                                                                              input_list,
+                                                                              bsm._sig_test_set,
+                                                                              n_seq_steps=n_seq_steps,
+                                                                              verbose=verbose,
+                                                                              match_tol=match_tol
+                                                                              )

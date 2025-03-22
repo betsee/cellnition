@@ -354,15 +354,14 @@ class BooleanNet(NetworkABC):
         solsv = [cc_o]  # holds a list of transient solutions
         sol_char = EquilibriumType.undetermined # initialize to undetermined
 
-        for i in range(n_max_steps):
+        for ii in range(n_max_steps):
 
             if verbose:
                 print(solsv[-1])
             # A true "OR" function will return the maximum of the list of booleans. This can
-            # be achieved by using the "ceiling" function. If cooperative interaction is
-            # desired, then rounding is better
+            # be achieved by using the "np.sign" as a "ceiling" function:
 
-            cc_i = np.sign(A_bool_f(cc_i)[0])  # calculate new state values
+            cc_i = np.sign(A_bool_f(cc_i)[0])  # calculate new state values for this next step i
 
             # If there are constraints on some node vals, force them to the constraint:
             if constraint_inds is not None and constraint_vals is not None:
@@ -370,31 +369,24 @@ class BooleanNet(NetworkABC):
 
             solsv.append(cc_i)
 
-            # Detect whether we're at a steady-state:
-            if (solsv[i] == solsv[i - 1]).all() is NumpyTrue:
+            # Detect whether we're at a steady-state at any point in this analysis:
+            if (solsv[ii] == solsv[ii - 1]).all() is NumpyTrue:
                 sol_char = EquilibriumType.attractor
                 break
 
-            elif i == n_max_steps -1:
+            # Otherwise, when we reach the end of the sequence, search for repeated motifs:
+            elif ii == n_max_steps -1:
                 # test to see if we have a more complicated repetition motif:
                 solvr = np.asarray(solsv)[:, self.noninput_node_inds] # get the reduced array
                 si = solvr[-1, :] # try selecting the last state to check for repetition...
                 matched_inds = [i for i, x in enumerate(solvr.tolist()) if x == si.tolist()] # look for repetition
                 if len(matched_inds) > 1: # if there's more than one incidence of the state
-                    # motif_period = matched_inds[-1] - matched_inds[-2]
-                    # solvrr = solvr[3:, :] # remove the first three states...
-                    # solvrr = solvr
-                    # test_repeat = np.roll(solvrr, motif_period - 1, axis=1) - solvrr # roll to make the arrays equivalent
-
-                    # if (np.sum(test_repeat) == 0):
                     motif = np.asarray(solsv)[matched_inds[-2]:matched_inds[-1], :] # extract a motif from the full array
                     cc_i = np.mean(motif, axis=0) # solution becomes the (non-integer!) mean of the motif
                     if len(motif) > 2:
                         sol_char = EquilibriumType.limit_cycle
-                    else: # otherwise the motif is a saddle (metabstable point):
+                    else: # otherwise the motif is a saddle (metabstable state):
                         sol_char = EquilibriumType.saddle
-
-        # self._solsv = solsv # save this so we can investigate the solution
 
         return cc_i, sol_char
 
@@ -407,10 +399,12 @@ class BooleanNet(NetworkABC):
                               verbose: bool=False
                               ):
         '''
-        Returns the sequence of states occuring after an initial state, cc_o.
+        Returns the sequence of n_max_step states occurring after an initial state, cc_o,
+        determines if the sequence reaches a dynamic equilibrium, and if so, the characteristic
+        of the eq'm as a point attractor or limit cycle.
         '''
         cc_i = cc_o  # initialize the function values (node values)
-        solsv = [np.asarray(cc_o)]  # holds a list of transient solutions
+        solsv = [np.asarray(cc_o)]  # holds a list of transient solutions, beginning with the initial state
         sol_char = EquilibriumType.undetermined # initialize to undetermined
 
         motif = None
@@ -423,38 +417,34 @@ class BooleanNet(NetworkABC):
             # be achieved by using the "ceiling" function. If cooperative interaction is
             # desired, then rounding is better
 
-            cc_i = np.sign(A_bool_f(cc_i)[0])  # calculate new state values
+            cc_i = np.sign(A_bool_f(cc_i)[0])  # calculate new state values of the sequence
 
             # If there are constraints on some node vals, force them to the constraint:
             if constraint_inds is not None and constraint_vals is not None:
                 cc_i[constraint_inds] = constraint_vals
 
-            solsv.append(cc_i)
+            solsv.append(cc_i) # append the new state to the sequence vector
 
-            if i == n_max_steps -1: # ready to characterize the array
-                # Detect whether we're at a steady-state:
-                if (solsv[i] == solsv[i - 1]).all() is NumpyTrue:
-                    sol_char = EquilibriumType.attractor
-                    motif = solsv[i]
+        # Now that the sequence has been collected, determine if it's a steady-state, and if so,
+        # characterize the eq'm:
+        if (solsv[-1] == solsv[-2]).all() is NumpyTrue:
+            sol_char = EquilibriumType.attractor
 
-                else:
-                    # test to see if we have a more complicated repetition motif:
-                    solvr = np.asarray(solsv)[:, self.noninput_node_inds] # get the reduced array
-                    si = solvr[-1, :] # try selecting the last state to check for repetition...
-                    matched_inds = [i for i, x in enumerate(solvr.tolist()) if x == si.tolist()] # look for repetition
-                    if len(matched_inds) > 1: # if there's more than one incidence of the state
-                        motif_period = matched_inds[-1] - matched_inds[-2]
-                        # solvrr = solvr[3:, :] # remove the first three states...
-                        solvrr = solvr
-                        test_repeat = np.roll(solvrr, motif_period - 1, axis=1) - solvrr # roll to make the arrays equivalent
+        else:
+            # test to see if we have a more complicated repetition motif:
+            solvr = np.asarray(solsv)[:, self.noninput_node_inds]  # get the reduced array
+            si = solvr[-1, :]  # try selecting the last state to check for repetition in the sequence...
+            matched_inds = [i for i, x in enumerate(solvr.tolist()) if x == si.tolist()]  # look for repetition
+            if len(matched_inds) > 1:  # if there's more than one incidence of the state
+                motif = np.asarray(solsv)[matched_inds[-2]:matched_inds[-1], :]  # extract a motif from the full seq
+                cc_i = np.mean(motif, axis=0)  # solution becomes the (non-integer!) mean of the motif
+                if len(motif) > 2:
+                    sol_char = EquilibriumType.limit_cycle
+                else:  # otherwise the motif is a saddle (metabstable state):
+                    sol_char = EquilibriumType.saddle
 
-                        if (np.sum(test_repeat) == 0):
-                            motif = np.asarray(solsv)[matched_inds[-2]:matched_inds[-1], :] # extract a motif from the full array
-                            cc_i = np.mean(motif, axis=0) # solution becomes the (non-integer!) mean of the motif
-                            if len(motif) > 2:
-                                sol_char = EquilibriumType.limit_cycle
-                            else: # otherwise the motif is a saddle (metabstable point):
-                                sol_char = EquilibriumType.saddle
+        # convert solsv to a numpy array with n_max_steps rows and self.N_Nodes columns:
+        solsv = np.asarray(solsv)
 
         return solsv, cc_i, sol_char, motif
 
@@ -468,11 +458,15 @@ class BooleanNet(NetworkABC):
         '''
 
         '''
-        sequence_results = []
         sol_results = []
         sol_char_results = []
+        sequence_results = None
+        pseudo_tvect = None
 
-        for sig_vals in sigs_vect:
+        tn_0 = 0
+        tn_1 = n_max_steps + 1
+
+        for ii, sig_vals in enumerate(sigs_vect):
             cc_o[constraint_inds] = sig_vals
             solsv, cc_o, sol_char, motif = self.net_sequence_compute(cc_o,
                                                                      A_bool_f,
@@ -481,11 +475,24 @@ class BooleanNet(NetworkABC):
                                                                      constraint_vals=sig_vals,
                                                                      verbose=verbose
                                                                      )
-            sequence_results.append(solsv)
-            sol_results.append(cc_o)
-            sol_char_results.append(sol_char)
 
-        return sequence_results, sol_results, sol_char_results
+            pseudo_tvect_i = np.arange(tn_0, tn_1)
+            # update the tn vectors for next time:
+            tn_0 = tn_1
+            tn_1 += n_max_steps + 1
+
+            if ii == 0:
+                sequence_results = solsv
+                pseudo_tvect = pseudo_tvect_i
+
+            else:
+                sequence_results = np.vstack((sequence_results, solsv))
+                pseudo_tvect = np.hstack((pseudo_tvect, pseudo_tvect_i))
+
+            sol_results.append(cc_o) # append the final eq'm state value
+            sol_char_results.append(sol_char) # append the eq'm characterization
+
+        return pseudo_tvect, sequence_results, sol_results, sol_char_results
 
 
 
