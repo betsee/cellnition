@@ -647,6 +647,61 @@ class BoolStateMachine(object):
 
         return G
 
+    def sim_sequence_trajectory(self,
+                                starting_state: int,
+                                solsM_all: ndarray,
+                                inputs_list: list[str],
+                                sig_test_set: ndarray,
+                                n_seq_steps: int = 20,
+                                verbose: bool=True,
+                                match_tol: float=0.1
+                                ):
+        '''
+
+        '''
+        cc_o = solsM_all[:, starting_state] # obtain the starting state of the system
+
+        sigs_vect_list = []
+        for sig_nme in inputs_list:
+            sig_i = int(sig_nme[1:]) # get the integer representing the input state
+            sigs_vect_list.append(sig_test_set[sig_i].tolist()) # append the complete input signal to the list
+
+        seq_res, sol_res, sol_char_res = self._bnet.net_multisequence_compute(cc_o,
+                                                                              sigs_vect_list,
+                                                                              self._bnet._A_bool_f,
+                                                                              n_max_steps=n_seq_steps,
+                                                                              constraint_inds=self._bnet.input_node_inds,
+                                                                              verbose=False)
+
+        matched_states = []
+        matched_char = []
+        c_time = []
+        tvectr = []
+
+        t_len_o = 0
+        t_len = n_seq_steps + 1
+
+        for seq_new, cc_new, char_new in zip(seq_res, sol_res, sol_char_res):
+            new_state, match_error = self._find_state_match(solsM_all[self._bnet.noninput_node_inds, :],
+                                                           cc_new[self._bnet.noninput_node_inds])
+            matched_states.append(new_state)
+            matched_char.append(char_new)
+            c_time.extend(seq_new)
+
+            tvecti = np.arange(t_len_o, t_len)
+            t_len_o = t_len
+            t_len += t_len
+
+            tvectr.extend(tvecti)
+
+            if verbose:
+                if match_error < match_tol:
+                    print(f'Detected State {new_state}, with error {match_error}')
+                else:
+                    print(f'WARNING! Best match State {new_state} exceeds match_error with error {match_error}!')
+
+        return tvectr, c_time, matched_states, matched_char
+
     def get_state_distance_matrix(self, solsM_all):
         '''
         Returns a matrix representing the L2 norm 'distance'

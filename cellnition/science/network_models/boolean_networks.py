@@ -461,7 +461,6 @@ class BooleanNet(NetworkABC):
     def net_multisequence_compute(self,
                                   cc_o: ndarray|list,
                                   sigs_vect: ndarray|list,
-                                  sigs_vect_inds: ndarray|list,
                                   A_bool_f: Callable,
                                   n_max_steps: int=20,
                                   constraint_inds: list|None=None,
@@ -472,7 +471,8 @@ class BooleanNet(NetworkABC):
         sequence_results = []
         sol_results = []
         sol_char_results = []
-        for s_lab, sig_vals in zip(sigs_vect_inds, sigs_vect):
+
+        for sig_vals in sigs_vect:
             cc_o[constraint_inds] = sig_vals
             solsv, cc_o, sol_char, motif = self.net_sequence_compute(cc_o,
                                                                      A_bool_f,
