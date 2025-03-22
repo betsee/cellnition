@@ -21,6 +21,24 @@
 **Cellnition** is an open-source simulator to create and analyze Network Finite
 State Machines (NFSMs) from gene regulatory network (GRN) models.
 
+Here GRNs are treated as analogue computers, where Cellnition's NFSMs are maps
+of the sequential logic inherent in the GRN as a dissipative dynamic system. 
+NFSMs capture the inherent "programming" of GRNs, providing clear identification of 
+which interventions can induce transitions between stable states (e.g. from 
+"diseased" to "healthy"), path-dependencies representing stable changes occuring 
+after a transient intervention is applied, and inducible cycles of behavior 
+taking the system through a complex multi-phase process (e.g. wound healing). 
+
+As an extension and improvement upon attractor landscape analysis, NFSMs reveal 
+the analogue computing operations inherent in GRNs, allowing for identification 
+of associated intelligent behaviors. NFSMs have a range of applications, 
+including the identification of strategies to renormalize cancer (see
+`Tutorial 2`_). 
+
+Read more about Cellnition's NFSM in our pre-print publication: 
+`Harnessing the Analogue Computing Power of Regulatory Networks with the 
+Regulatory Network Machine <preprint_>`__. 
+
 Cellnition is `portably implemented <cellnition codebase_>`__ in Python_,
 `continuously stress-tested <cellnition tests_>`__ via `GitHub Actions`_ **×**
 tox_ **×** pytest_  **×** Codecov_, and `permissively distributed <cellnition
@@ -143,6 +161,10 @@ Cellnition is `open-source software released <cellnition license_>`__ under the
    https://docs.conda.io/en/latest/miniconda.html
 .. _PyPI:
    https://pypi.org
+
+.. # ------------------( LINKS ~ science                    )------------------
+.. _preprint:
+   https://osf.io/preprints/osf/tb5ys_v1
 
 .. # ------------------( LINKS ~ soft : license             )------------------
 .. _MIT license:
