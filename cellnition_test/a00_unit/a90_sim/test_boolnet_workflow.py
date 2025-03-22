@@ -24,6 +24,7 @@ def test_boolean_net(tmp_path) -> None:
     a regulatory network's output.
     '''
     import os
+    import matplotlib.pyplot as plt
     from cellnition.science.network_models.network_library import TrinodeChain
     from cellnition.science.network_models.network_enums import CouplingType
     from cellnition.science.network_models.boolean_networks import BooleanNet
@@ -188,7 +189,7 @@ def test_boolean_net(tmp_path) -> None:
     match_tol = 0.1  # Match tolerance for the found state to a state in solsM_all
     verbose = True  # Recieve output from the method while it's still solving (True)?
 
-    tvectr, c_time, matched_states, char_states = bsm.sim_sequence_trajectory(starting_state,
+    tvectr, c_time, matched_states, char_states, phase_inds = bsm.sim_sequence_trajectory(starting_state,
                                                                               bsm._solsM_all,
                                                                               input_list,
                                                                               bsm._sig_test_set,
@@ -196,3 +197,22 @@ def test_boolean_net(tmp_path) -> None:
                                                                               verbose=verbose,
                                                                               match_tol=match_tol
                                                                               )
+
+    # # Plot the results of the pseudo-time simulation:
+    # fig, ax = bsm.plot_sequence_trajectory(c_time,
+    #                                        tvectr,
+    #                                        phase_inds,
+    #                                        matched_states,
+    #                                        char_states,
+    #                                        gene_plot_inds=bn.output_node_inds,
+    #                                        figsize=(10, 4),
+    #                                        state_label_offset=0.02,
+    #                                        glyph_zoom=0.15,
+    #                                        glyph_alignment=(-0.0, -0.15),
+    #                                        fontsize='medium',
+    #                                        save_file=None,
+    #                                        legend=True,
+    #                                        )
+    #
+    # plt.close(fig)
+

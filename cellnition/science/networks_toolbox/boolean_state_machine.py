@@ -668,7 +668,7 @@ class BoolStateMachine(object):
             sig_i = int(sig_nme[1:]) # get the integer representing the input state
             sigs_vect_list.append(sig_test_set[sig_i].tolist()) # append the complete input signal to the list
 
-        seq_tvect, seq_res, sol_res, sol_char_res = self._bnet.net_multisequence_compute(cc_o,
+        seq_tvect, seq_res, sol_res, sol_char_res, phase_inds = self._bnet.net_multisequence_compute(cc_o,
                                                                               sigs_vect_list,
                                                                               self._bnet._A_bool_f,
                                                                               n_max_steps=n_seq_steps,
@@ -690,7 +690,7 @@ class BoolStateMachine(object):
                 else:
                     print(f'WARNING! Best match State {new_state} exceeds match_error with error {match_error}!')
 
-        return seq_tvect, seq_res, matched_states, matched_char
+        return seq_tvect, seq_res, matched_states, matched_char, phase_inds
 
     def plot_sequence_trajectory(self,
                              c_time: ndarray,
@@ -728,17 +728,17 @@ class BoolStateMachine(object):
         fig, axes = plt.subplots(N_plot_genes, 1, figsize=figsize, sharex=True, sharey=True)
         for ii, cc in enumerate(main_c.T):
             # gene_lab = f'Gene {ii}'
-            gene_lab = self._bnet.nodes_list[gene_plot_inds[ii]]
+            gene_lab = np.asarray(self._bnet.nodes_list)[gene_plot_inds[ii]]
             lineplt = axes[ii].plot(tvectr, cc, linewidth=2.0, label=gene_lab, color=cmap(ii))  # plot the time series
             # annotate the plot with the matched state:
             for (pi, pj), stateio, chario in zip(phase_inds, matched_states, char_states):
                 statei = stateio
 
-                char_i = chario
+                char_i = chario.name
                 char_i_fname = self._node_image_dict[char_i]
                 logo = image.imread(char_i_fname)
                 imagebox = OffsetImage(logo, zoom=glyph_zoom)
-                pmid = pi
+                pmid = int((pi + pj)/2)
                 tmid = tvectr[pmid]
                 cc_max = np.max(cc[pi:pj])
                 cmid = cc_max + state_label_offset

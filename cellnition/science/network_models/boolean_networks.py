@@ -463,10 +463,14 @@ class BooleanNet(NetworkABC):
         sequence_results = None
         pseudo_tvect = None
 
+        phase_inds = [] # tuples marking the start and stop of each input intervention
+
         tn_0 = 0
         tn_1 = n_max_steps + 1
 
         for ii, sig_vals in enumerate(sigs_vect):
+            phase_inds.append((tn_0, tn_1))
+
             cc_o[constraint_inds] = sig_vals
             solsv, cc_o, sol_char, motif = self.net_sequence_compute(cc_o,
                                                                      A_bool_f,
@@ -492,7 +496,7 @@ class BooleanNet(NetworkABC):
             sol_results.append(cc_o) # append the final eq'm state value
             sol_char_results.append(sol_char) # append the eq'm characterization
 
-        return pseudo_tvect, sequence_results, sol_results, sol_char_results
+        return pseudo_tvect, sequence_results, sol_results, sol_char_results, phase_inds
 
 
 
