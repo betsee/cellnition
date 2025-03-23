@@ -74,6 +74,18 @@ officially bundled with Python_:
 
    pip3 install cellnition
 
+Features
+=========
+Cellnition embodies a range of functionality, including:
+
+* Work with regulatory networks imported from Cellnition's network-library, use Cellnition to procedurally generate regulatory networks with random or scale-free degree distributions, or import your own user-defined regulatory networks as directed graphs with activating or inhibiting edge characteristics.
+* Analyze and characterize regulatory network graphs with a variety of metrics (see the `characterize_graph`_ method). 
+* Use directed graph representations of regulatory networks to build fully-continuous, differential equation based simulators of network dynamics (see `ProbabilityNet`_ class and `Tutorial 1`_). 
+* Use directed graph representations of regulatory networks to build logic equation based Boolean simulators of network dynamics (see `BooleanNet`_ class and `Tutorial 2`_).
+* Explore regulatory network dynamics with comprehensive equillibrium state search and characterization capabilities, along with temporal simulators.
+* Create simulated datasets, including simulation of automated gene-knockout experiments for a continuous regulatory network model (see `GeneKnockout`_ class). 
+* Generate Network Finite State Machines (NFSMs) for continuous models (see `Tutorial 1`_) or for Boolean models (see `Tutorial 2`_). 
+
 Tutorials
 =========
 
@@ -127,6 +139,16 @@ Cellnition is `open-source software released <cellnition license_>`__ under the
    https://gitlab.com/betsee/cellnition/-/merge_requests
 .. _cellnition tests:
    https://gitlab.com/betsee/cellnition/actions?workflow=tests
+
+.. # ------------------( LINKS ~ cellnition : internal         )------------------
+.. _characterize_graph:
+   https://github.com/betsee/cellnition/blob/4b1e6b78c725cdb24bcf82b7c259ad6e726f42ce/cellnition/science/network_models/network_abc.py#L214
+.. _ProbabilityNet:
+   https://github.com/betsee/cellnition/blob/4b1e6b78c725cdb24bcf82b7c259ad6e726f42ce/cellnition/science/network_models/probability_networks.py#L30
+.. _BooleanNet:
+   https://github.com/betsee/cellnition/blob/4b1e6b78c725cdb24bcf82b7c259ad6e726f42ce/cellnition/science/network_models/boolean_networks.py#L25
+.. _GeneKnockout:
+   https://github.com/betsee/cellnition/blob/4b1e6b78c725cdb24bcf82b7c259ad6e726f42ce/cellnition/science/networks_toolbox/gene_knockout.py#L18
 
 .. # ------------------( LINKS ~ github                      )------------------
 .. _GitHub Actions:
