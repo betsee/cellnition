@@ -8,7 +8,7 @@
 .. #FIXME: Fill this description in with meaningful content, please.
 .. meta::
    :description lang=en:
-     Determine the sequential logic operations of regulatory network models.
+     Analyze gene regulatory networks (GRNs) via Network Finite State Machines (NFSMs).
 
 .. # ------------------( SYNOPSIS                            )------------------
 
