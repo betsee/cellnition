@@ -8,7 +8,7 @@
 .. #FIXME: Fill this description in with meaningful content, please.
 .. meta::
    :description lang=en:
-     Something, something, something.
+     Determine the sequential logic operations of regulatory network models.
 
 .. # ------------------( SYNOPSIS                            )------------------
 
@@ -21,21 +21,23 @@
 **Cellnition** is an open-source simulator to create and analyze Network Finite
 State Machines (NFSMs) from gene regulatory network (GRN) models.
 
-Here GRNs are treated as analogue computers, where Cellnition's NFSMs are maps
-of the sequential logic inherent in the GRN as a dissipative dynamic system. 
-NFSMs capture the inherent "programming" of GRNs, providing clear identification of 
-which interventions can induce transitions between stable states (e.g. from 
-"diseased" to "healthy"), path-dependencies representing stable changes occuring 
-after a transient intervention is applied, and inducible cycles of behavior 
-taking the system through a complex multi-phase process (e.g. wound healing). 
+Regulatory networks such as GRNs preside over complex phenomena in biological systems, 
+yet given a specific regulatory network, how do we know what it's capable of doing?
 
-As an extension and improvement upon attractor landscape analysis, NFSMs reveal 
-the analogue computing operations inherent in GRNs, allowing for identification 
-of associated intelligent behaviors. NFSMs have a range of applications, 
-including the identification of strategies to renormalize cancer (see
-`Tutorial 2`_). 
+Cellnition treats GRNs as analogue computers, where NFSMs map the sequential
+logic inherent in the GRN as a dissipative dynamic system. As an extension and 
+improvement upon attractor landscape analysis, NFSMs reveal the analogue computing 
+operations inherent in GRNs, allowing for identification of associated "intelligent 
+behaviors".  NFSMs capture the "analog programming" of GRNs, providing clear identification of:
 
-Read more about Cellnition's NFSM in our pre-print publication: 
+* interventions that can induce transitions between stable states (e.g. from "diseased" to "healthy") 
+* identification of path-dependencies, representing stable changes occuring after a transient intervention is applied (e.g. evaluating if a transient treatment with pharmacological agent can permanently heal a condition)
+* idenfication of inducible cycles of behavior that take the system through a complex multi-phase process (e.g. wound healing). 
+
+NFSMs have a range of applications, including the identification of strategies to 
+renormalize cancer (see `Tutorial 2`_). 
+
+Read more about Cellnition's NFSMs in our pre-print publication: 
 `Harnessing the Analogue Computing Power of Regulatory Networks with the 
 Regulatory Network Machine <preprint_>`__. 
 
