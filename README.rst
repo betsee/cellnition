@@ -78,13 +78,14 @@ Features
 =========
 Cellnition embodies a range of functionality, including:
 
-* Work with regulatory networks imported from Cellnition's network-library, use Cellnition to procedurally generate regulatory networks with random or scale-free degree distributions, or import your own user-defined regulatory networks as directed graphs with activating or inhibiting edge characteristics.
-* Analyze and characterize regulatory network graphs with a variety of metrics (see the `characterize_graph`_ method). 
+* Work with regulatory networks imported from Cellnition's network-library, use Cellnition to procedurally generate regulatory networks with random or scale-free degree distributions, or import your own user-defined regulatory networks as directed graphs with activating or inhibiting edge characteristics (see `Tutorial 1`_ and `Tutorial 2`_ for some examples).
+* Analyze and characterize regulatory network graphs with a variety of metrics (see the `characterize_graph`_ method and `Tutorial 1`_ and `Tutorial 2`_). 
 * Use directed graph representations of regulatory networks to build fully-continuous, differential equation based simulators of network dynamics (see `ProbabilityNet`_ class and `Tutorial 1`_). 
 * Use directed graph representations of regulatory networks to build logic equation based Boolean simulators of network dynamics (see `BooleanNet`_ class and `Tutorial 2`_).
-* Explore regulatory network dynamics with comprehensive equillibrium state search and characterization capabilities, along with temporal simulators.
+* Explore regulatory network dynamics with comprehensive equillibrium state search and characterization capabilities, along with temporal simulators (see `Tutorial 1`_ and `Tutorial 2`_ for some examples).
 * Create simulated datasets, including simulation of automated gene-knockout experiments for a continuous regulatory network model (see `GeneKnockout`_ class). 
 * Generate Network Finite State Machines (NFSMs) for continuous models (see `Tutorial 1`_) or for Boolean models (see `Tutorial 2`_). 
+* Create and export a variety of plots and visualizations, including of the regulatory network analytic equations, regulatory network directed graphs, heatmaps of gene expressions in equilibrium states, gene expressions in temporal simulations, and depictions of the general and event-driven NFSMs (see `Tutorial 1`_ and `Tutorial 2`_ for some examples).     
 
 Tutorials
 =========
