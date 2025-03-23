@@ -102,8 +102,8 @@ Cellnition is `open-source software released <cellnition license_>`__ under the
 `permissive MIT license <MIT license_>`__.
 
 .. # ------------------( IMAGES                              )------------------
-.. |cellnition-banner| image:: https://github.com/betsee/cellnition/raw/main/cellnition/data/png/cellnition_logo_lion_banner_i.png
-   :target: https://cellnition.streamlit.app
+.. |cellnition-banner| image:: https://github.com/user-attachments/assets/71d3d91e-fc7c-4960-a309-693978fee4e0
+   :target: https://github.com/betsee/cellnition
    :alt: Cellnition
 
 .. # ------------------( IMAGES ~ badge                      )------------------
