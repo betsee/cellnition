@@ -24,8 +24,8 @@ State Machines (NFSMs) from gene regulatory network (GRN) models.
 Regulatory networks such as GRNs preside over complex phenomena in biological systems, 
 yet given a specific regulatory network, how do we know what it's capable of doing?
 
-Cellnition treats GRNs as analogue computers, where NFSMs map the sequential
-logic inherent in the GRN as a dissipative dynamic system. As an extension and 
+Cellnition treats regulatory networks as analogue computers, where NFSMs map the sequential
+logic inherent in the network as a dissipative dynamic system. As an extension and 
 improvement upon attractor landscape analysis, NFSMs reveal the analogue computing 
 operations inherent in GRNs, allowing for identification of associated "intelligent 
 behaviors".  NFSMs capture the "analog programming" of GRNs, providing clear identification of:
