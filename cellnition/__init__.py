@@ -29,13 +29,13 @@ beartype_this_package()
 #       warnings.warn(msg, RuntimeWarning)
 filterwarnings(
     action='ignore',
-    module='^scipy\..*',
+    module=r'^scipy\..*',
     category=RuntimeWarning,
     message='^The iteration is not making good progress',
 )
 filterwarnings(
     action='ignore',
-    module='^scipy\..*',
+    module=r'^scipy\..*',
     category=RuntimeWarning,
     message='^xtol=0.000000 is too small',
 )
@@ -48,7 +48,7 @@ filterwarnings(
 #       warnings.warn(b"".join(errors).decode(self.encoding), RuntimeWarning)
 filterwarnings(
     action='ignore',
-    module='^pygraphviz\..*',
+    module=r'^pygraphviz\..*',
     category=RuntimeWarning,
     message='^Warning: some nodes with margin',
 )

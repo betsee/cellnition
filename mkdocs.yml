@@ -1,0 +1,39 @@
+# --------------------( LICENSE                            )--------------------
+# Copyright (c) 2023-2025 Alexis Pietak & Cecil Curry.
+# See "LICENSE" for further details.
+#
+# --------------------( SYNOPSIS                           )--------------------
+# Project-wide MkDocs configuration, applied to all invocations of the MkDocs
+# documentation generator within this project -- including both by directly
+# running the external "mkdocs" command locally and by indirectly running that
+# command remotely from GitHub Actions-based documentation workflows.
+#
+# --------------------( COMMANDS                           )--------------------
+# Commonly used MkDocs commands include:
+#     # Add a default MkDocs documentation tree to the current project:
+#     cd ~/py/${PROJECT_NAME}
+#     mkdocs new .
+#
+#     # Locally test the current MkDocs documentation tree:
+#     mkdocs serve
+#
+#     # Remotely push to the GitHub Pages-hosted Project Site:
+#     mkdocs gh-deploy
+
+# ....................{ MAIN                                }...................
+site_name: Cellnition
+
+# ....................{ PLUGINS                             }...................
+# Third-party MkDocs plugins currently employed by this project.
+plugins:
+  # Automatically generate API reference documentation from Python docstrings
+  # embedded inside the Python package defined by this project. See also:
+  #     https://github.com/mkdocstrings/mkdocstrings
+  - mkdocstrings
+
+# ....................{ THEME                               }...................
+# Third-party MkDocs UI theme currently employed by this project.
+theme:
+  # See also:
+  #     https://squidfunk.github.io/mkdocs-material
+  name: material

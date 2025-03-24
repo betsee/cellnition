@@ -234,6 +234,18 @@ dependencies = [
 #     https://stackoverflow.com/a/72524073/2809027
 [project.optional-dependencies]
 
+# MkDocs-specific documentation-time dependencies required to generate
+# documentation for this package via the third-party "mkdocs" command at the
+# command line.
+docs = [
+    # Theme stack -- which transitively requires reasonably recent versions of
+    # both MkDocs itself as well as all requisite MkDocs plugins.
+    "mkdocs-material >=9.6.0",
+
+    # API reference generation stack.
+    "mkdocstrings-python >= 1.16.0",
+]
+
 # Tox-specific test-time dependencies required to test this package via
 # the third-party "tox" command at the command line.
 #
@@ -251,7 +263,6 @@ test-tox = [
     #   is *NOT* supported by newer versions of these dependencies.
     #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-    # ....................{ CORE                           }....................
     # A relatively modern version of "pytest" is required. It's probably quite
     # old by now. I feel depressed just reading comments like this...
     "pytest >=4.0.0",
@@ -280,7 +291,7 @@ test = [
 # Developer-specific dependencies required to develop and contribute pull
 # requests (PRs) for this project. Notably, this includes *ALL* test- and
 # documentation-time dependencies.
-dev = ["beartype[test]"]
+dev = ["beartype[docs,test]"]
 
 # ....................{ PEP 621 ~ urls                     }....................
 # Table (i.e., dictionary) mapping from the PyPI-recognized name of each
