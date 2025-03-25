@@ -35,6 +35,8 @@ class ProbabilityNet(NetworkABC):
                  interaction_function_type: InterFuncType = InterFuncType.logistic,
                  node_expression_levels: float=5.0):
         '''
+        This class creates a fully-continuous, differential equation based model of a
+        regulatory network.
 
         '''
 
