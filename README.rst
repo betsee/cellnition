@@ -18,7 +18,7 @@
 
 |ci-badge|
 
-**Cellnition** is an open-source simulator to create and analyze Network Finite
+**Cellnition** is an open source simulator to create and analyze Network Finite
 State Machines (NFSMs) from gene regulatory network (GRN) models.
 
 Regulatory networks such as GRNs preside over complex phenomena in biological systems, 
@@ -43,9 +43,9 @@ Regulatory Network Machine <preprint_>`__.
 
 Cellnition is `portably implemented <cellnition codebase_>`__ in Python_,
 `continuously stress-tested <cellnition tests_>`__ via `GitHub Actions`_ **×**
-tox_ **×** pytest_  **×** Codecov_, and `permissively distributed <cellnition
-license_>`__ under the `MIT license`_. For maintainability, cellnition
-officially supports *only* the most recently released version of CPython_.
+tox_ **×** pytest_  **×** Codecov_, and `licensed <cellnition
+license_>`__ under a non-commercial use, open source `APACHE license`_ with Tufts Open Source License Rider v.1. 
+For maintainability, cellnition officially supports *only* the most recently released version of CPython_.
 
 .. # ------------------( TABLE OF CONTENTS                   )------------------
 .. # Blank line. By default, Docutils appears to only separate the subsequent
@@ -98,8 +98,9 @@ Cellnition tutorials are available as `Jupyter Notebooks <Jupyter_>`__:
 License
 =======
 
-Cellnition is `open-source software released <cellnition license_>`__ under the
-`permissive MIT license <MIT license_>`__.
+Cellnition is non-commerical use, open source software `licensed <cellnition license_>`__ under an
+`Apache 2.0 license <APACHE license_>`__ with Tufts Open Source License Rider v.1, restricting use
+to academic purposes only.
 
 .. # ------------------( IMAGES                              )------------------
 .. |cellnition-banner| image:: https://github.com/user-attachments/assets/71d3d91e-fc7c-4960-a309-693978fee4e0
@@ -194,3 +195,5 @@ Cellnition is `open-source software released <cellnition license_>`__ under the
 .. # ------------------( LINKS ~ soft : license             )------------------
 .. _MIT license:
    https://opensource.org/licenses/MIT
+.. _APACHE license:
+   https://www.apache.org/licenses/LICENSE-2.0
