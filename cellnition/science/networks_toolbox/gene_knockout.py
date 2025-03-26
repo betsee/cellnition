@@ -13,7 +13,6 @@ from numpy import ndarray
 import matplotlib.pyplot as plt
 from cellnition.science.network_models.probability_networks import ProbabilityNet
 
-# FIXME: DOCUMENT THROUGHOUT
 
 class GeneKnockout(object):
     '''

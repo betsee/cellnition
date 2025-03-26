@@ -23,12 +23,13 @@ from cellnition.science.network_models.network_enums import (EdgeType,
                                                              CouplingType,
                                                              EquilibriumType)
 
-# FIXME: I bet we can implement a node type via this same process
-# FIXME: This class should have a network-building start method so we get the external parameters needed
-# for use in different downstream tools (e.g. state_machine, network_workflow, etc)
 
 class ProbabilityNet(NetworkABC):
     '''
+    This module builds a probability network onto a graph model. The probability
+    network is based on the concept of the probability of seeing a gene product c_i.
+    The model is built analytically, on a fully-connected domain of nodes, where
+    interaction edges are +1 for activation, -1 for inhibition, and 0 for no connection.
     '''
     def __init__(self,
                  N_nodes: int,
