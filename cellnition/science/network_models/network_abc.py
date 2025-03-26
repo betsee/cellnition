@@ -4,90 +4,117 @@
 # See "LICENSE" for further details.
 
 '''
-This module is an abstract base class for network models.
+This module is a base class for continuous and Boolean regulatory network models.
 '''
-from abc import ABCMeta
 import numpy as np
 from numpy import ndarray
 import matplotlib.pyplot as plt
 import networkx as nx
-import sympy as sp
 from cellnition.science.network_models.network_enums import (EdgeType,
                                                              GraphType,
                                                              NodeType,
-                                                             InterFuncType)
-
+                                                             )
 import pygraphviz as pgv
 
-# TODO: Add in stochasticity
-# TODO: Time signals should be able to do flipped case (from 1 to zero)
-
-class NetworkABC(object, metaclass=ABCMeta):
+class NetworkABC(object):
     '''
-    This class allows one to generate a network using a random construction
-    algorithm, or from user-input edges. It then performs analysis on the
-    resulting graph to determine cycles, input and output degree distributions,
-    and hierarchical attributes. The class then enables the user to build an
-    analytical (i.e. symbolic math) module using the network, and has various routines
-    to determine equilibrium points and stable states of the network model. The
-    class then allows for time simulation of the network model as a dynamic system.
+    This baseclass allows one to generate a regulatory network as a graph using a
+    procedural construction algorithm, or from user-input edges. It can then perform
+    analysis on the resulting graph to determine cycles, input and output degree distributions,
+    hierarchical attributes, and other characteristics. The baseclass comes equipt with
+    various visualization methods to plot network degree distributions and visualize state heatmaps.
 
-    Public Attributes
-    -----------------
-    GG = nx.DiGraph(self.edges_list)
-    N_nodes = N_nodes # number of nodes in the network (as defined by user initially)
-    nodes_index = self.nodes_list
-    nodes_list = sorted(self.GG.nodes())
-    N_edges = len(self.edges_list)
-    edges_index = self.edges_list
-    edges_list
+    Attributes
+    ----------
+    N_edges : int
+        Total number of edges in the regulatory network.
+    N_nodes : int
+        Total number of nodes in the regulatory network.
+    edges_list : list[tuples]
+        List of the edges as tuples containing node names.
+    nodes_list : list
+        List of the nodes by numerical node index.
+    edges_index : list
+        List of the edges as edge indices.
+    nodes_index : list
+        List of the nodes by node name.
+    GG : networkx.DiGraph
+        The regulatory network graph as a networkx.DiGraph object.
+    selfloop_edge_inds : list
+        The edge indices that are self-loops (i.e. node A --> node A).
+    in_degree_sequence : list
+        The in-degree sequence of nodes, arranged according to node index order.
+    out_degree_sequence : list
+        The out-degree sequence of nodes, arranged according to node index order.
+    in_dmax : int
+        The maximum in-degree of the regulatory network.
+    out_dmax : int
+        The maximum out-degree of the regulatory network.
+    node_divergence : list
+        The divergence of each node, as the difference between in- and out- degree.
+    in_bins : list
+        Bins used to count of how many nodes have each binned in-degree (used to plot degree distribution histograms).
+    in_degree_counts : list
+        A count of how many nodes have each in-degree bin (used to plot degree distribution histograms).
+    out_bins : list
+        Bins used to count of how many nodes have each binned out-degree (used to plot degree distribution histograms).
+    out_degree_counts : list
+        A count of how many nodes have each out-degree bin (used to plot degree distribution histograms).
+    nodes_by_out_degree : list
+        Nodes arranged according to the number of outputs (out degree).
+    nodes_by_in_degree : list
+        Nodes arranged according to the number of inputs (in degree).
+    graph_cycles : list(tuple)
+        Cycles of the regulatory network, as defined by network nodes.
+    N_cycles : int
+        Number of simple cycles detected in the regulatory network.
+    nodes_in_cycles : list
+        Nodes of the regulatory network that do participate in cycles.
+    nodes_acyclic : list
+        Nodes of the regulatory network that do not participate in cycles.
+    hier_node_level : list
+        Overall hierarchical node levels of the graph (this is akin to a y-coordinate for each node of the network).
+    dem_coeff : float
+        The democracy coefficient parameter, measuring how much the influencers of a graph are influenced
+        themselves.
+    hier_incoherence : float
+        The hierarchical incoherence parameter, measuring how much feedback there is in the network, with higher
+        levels indicating more feedback, and lower levels indicating more hierarchy.
+    input_node_inds : list[int]
+        These are nodes with zero in degree, which represent the input nodes of the regulatory network.
+    output_node_inds : list[int]
+        These are nodes with zero out degree, which represent output nodes and potential effectors.
+    main_nodes : list[int]
+        The main nodes of the regulatory network, which are nodes that are neither input nor output nodes
+        (these are the internal nodes).
+    sensor_node_inds : list[int]
+        User-defined nodes with NodeType.sensor node types.
+    process_node_inds : list[int]
+        User-defined nodes with NodeType.process node types.
+    noninput_node_inds : list[int]
+        Nodes of the network excluding the input nodes, but still representing internal and output nodes.
+    factor_node_inds : list[int]
+        User-defined nodes with NodeType.factor node types.
+
     '''
 
-    def __init__(self
-                 ):
+    def __init__(self) -> None:
         '''
-        Initialize the class and build and characterize a network.
-
-        Parameters
-        -----------
-        N_nodes: int
-            The number of nodes to build the network (only used in randomly built networks, otherwise the number of
-            nodes is calculated from the number of unique nodes supplied in the edges list).
-
-        edges: list|ndarray|None = None
-            A list of tuples that defines edges of a network, where each directed edge is a pair of nodes. The
-            nodes may be integers or strings, but cannot be mixed type. If edges is left as None, then a
-            graph will be randomly constructed.
-
-        graph_type: GraphType = GraphType.scale_free
-            The type of graph to generate in randomly-constructed networks.
-
-        b_param: float = 0.20
-            For scale-free randomly-constructed networks, this determines the amount of interconnectivity between
-            the in and out degree distributions, and in practical terms, increases the number of cycles in the graph.
-            Note that 1 - beta - gamma must be greater than 0.0.
-
-        g_param: float=0.75
-            For scale-free randomly-constructed networks, this determines the emphasis on the network's
-            out degree distribution, and in practical terms, increases the scale-free character of the out-distribution
-            of the graph. Note that 1 - beta - gamma must be greater than 0.0.
-
-        delta_in: float=0.0
-            A parameter that increases the complexity of the network core, leading to more nodes being involved in
-            cycles.
-        delta_out: float = 0.0
-            A parameter that increases the complexity of the network core, leading to more nodes being involved in
-            cycles.
-
-        p_edge: float=0.2
-            For randomly constructed binomial-type networks, this parameter determines the probability of forming
-            an edge. As p_edge increases, the number of network edges increases drammatically.
+        Initialize the class to begin building and characterizing a regulatory network graph.
         '''
-        # Set some basic features of the network that may be overridden later:
+        pass
 
 
     def build_network_from_edges(self, edges: list[tuple]):
         '''
+        Use a list of tuples defining directed edges between nodes to
+        build a regulatory network.
+
+        Parameters
+        ----------
+        edges : list[tuple]
+            List with tuples defining each directed edge in the regulatory
+            network as passing from the first to second node in the tuple.
 
         '''
         self._graph_type = GraphType.user
@@ -109,31 +136,29 @@ class NetworkABC(object, metaclass=ABCMeta):
                                           graph_type: GraphType = GraphType.scale_free
                                           ):
         '''
-        Randomly generate a network with a scale-free or binomial degree distribution.
+        Procedurally generate a network with a scale-free or binomial (random) degree distribution.
 
         Parameters
         ----------
+        N_nodes : int
+            The number of nodes to build the network (only used in randomly built networks, otherwise the number of
+            nodes is calculated from the number of unique nodes supplied in the edges list).
         graph_type : GraphType = GraphType.scale_free
             The type of graph to generate in randomly-constructed networks.
-
         b_param : float = 0.20
             For scale-free randomly-constructed networks, this determines the amount of interconnectivity between
             the in and out degree distributions, and in practical terms, increases the number of cycles in the graph.
             Note that 1 - beta - gamma must be greater than 0.0.
-
         g_param : float=0.75
             For scale-free randomly-constructed networks, this determines the emphasis on the network's
             out degree distribution, and in practical terms, increases the scale-free character of the out-distribution
             of the graph. Note that 1 - beta - gamma must be greater than 0.0.
-
         delta_in : float=0.0
             A parameter that increases the complexity of the network core, leading to more nodes being involved in
             cycles.
-
         delta_out : float = 0.0
             A parameter that increases the complexity of the network core, leading to more nodes being involved in
             cycles.
-
         p_edge : float=0.2
             For randomly constructed binomial-type networks, this parameter determines the probability of forming
             an edge. As p_edge increases, the number of network edges increases dramatically.
@@ -193,7 +218,7 @@ class NetworkABC(object, metaclass=ABCMeta):
     def _make_node_edge_indices(self):
         '''
         Especially important for the case where node names are strings,
-        this method creates numerical (int) indices for the nodes and
+        this method creates numerical (i.e. integer) indices for the nodes and
         stores them in a nodes_index. It does the same for nodes in edges,
         storing them in an edges_index object.
 
@@ -216,6 +241,17 @@ class NetworkABC(object, metaclass=ABCMeta):
         Perform a number of graph-theory style characterizations on the network to determine
         cycle number, analyze in- and out- degree distribution, and analyze hierarchy. Hierarchical
         structure analysis was from the work of Moutsinas, G. et al. Scientific Reports 11 (2021).
+
+        Parameters
+        ----------
+        count_cycles : bool, default: True
+            Do you wish to perform a cycle count of the network (True)? Some regulatory networks have
+            very high numbers of cycles and in this case the cycle count can consume all the memory and
+            should therefore be disabled.
+        cycle_length_bound : int|None, default: None
+            Specify an upper bound for the length of a cycle in a network in terms of node number (e.g. 12).
+            For networks with large cycle numbers, specifying an upper bound can prevent the extreme counts
+            that would otherwise be produced.
 
         '''
 
@@ -376,24 +412,29 @@ class NetworkABC(object, metaclass=ABCMeta):
 
         return self.paths_matrix
 
-    def get_edge_types(self, p_acti: float=0.5, set_selfloops_acti: bool=True):
+    def get_edge_types(self, p_acti: float=0.5, set_selfloops_acti: bool=True) -> list:
         '''
-        Automatically generate an edge "type" vector for use in model building.
-        Edge type specifies whether the edge is an activating or inhibiting
+        Automatically generate a list of EdgeType for use in model building.
+        The edge type specifies whether the edge is an activating or inhibiting
         relationship between the nodes. This routine randomly chooses a set of
         activating and inhibiting edge types for a model.
 
         Parameters
         ----------
-        p_acti : float = 0.5
-            The probability of an edge being an activation. Note that this value
+        p_acti : float, default: 0.5
+            The probability of an edge type being an activator. Note that this value
             must be less than 1.0, and that the probability of an edge being an
             inhibitor becomes 1.0 - p_acti.
 
-        set_selfloops_acti : bool = True
-            Work shows that self-inhibition does not generate models with multistable
-            states. Therefore, this edge-type assignment routine allows one to
+        set_selfloops_acti : bool, default: True
+            Work shows that, in general, self-inhibition does not generate models with
+            multistable states. Therefore, this edge-type assignment routine allows one to
             automatically set all self-loops to be activation interactions.
+
+        Returns
+        -------
+        list
+            A list containing an EdgeType enum for every edge in the network.
 
         '''
 
@@ -410,17 +451,12 @@ class NetworkABC(object, metaclass=ABCMeta):
 
     def set_edge_types(self, edge_types: list|ndarray):
         '''
-        Assign edge_types to the graph and create an edge function list used in analytical model building.
+        Assign a list EdgeType to edges of the graph.
 
         Parameters
         ----------
-        edge_types : list
+        edge_types : list|ndarray
             A list of edge type enumerations; one for each edge of the network.
-
-        add_interactions : bool
-            In a network, the interaction of two or more regulators at a node can be multiplicative
-            (equivalent to an "And" condition) or additive (equivalent to an "or condition). This
-            bool specifies whether multiple interactions should be additive (True) or multiplicative (False).
         '''
         self.edge_types = edge_types
 
@@ -433,12 +469,14 @@ class NetworkABC(object, metaclass=ABCMeta):
 
     def set_node_types(self, node_type_dict: dict|None = None, pure_gene_edges_only: bool = False):
         '''
-        Assign node types to the graph.
+        Assign a dictionary of NodeType to nodes of the graph.
 
         Parameters
         ----------
-        node_types : list
+        node_type_dict : dict|None, default: None
             A list of node type enumerations for each node of the network.
+        pure_gene_edges_only : bool, default: False
+            Classify multiple non-process NodeType as "genes" (True) or only NodeType.gene (False).
         '''
 
         # Now that indices are set, give nodes a type attribute and classify node inds.
@@ -536,68 +574,30 @@ class NetworkABC(object, metaclass=ABCMeta):
 
         return path_edges
 
-    def read_edge_info_from_graph(self):
-        '''
-
-        '''
-        self.edges_list = []
-        self.edge_types = []
-
-        # get data stored on edge type key:
-        edge_data = nx.get_edge_attributes(self.GG, "edge_type")
-
-        for ei, et in edge_data.items():
-            # append the edge to the list:
-            self.edges_list.append(ei)
-
-            if et == 'Activator':
-                self.edge_types.append(EdgeType.A)
-            elif et == 'Inhibitor':
-                self.edge_types.append(EdgeType.I)
-            elif et == 'Normal':
-                self.edge_types.append(EdgeType.N)
-            else:
-                raise Exception("Edge type not found.")
-
-        self.N_edges = len(self.edges_list)
-
-    def read_node_info_from_graph(self):
-        '''
-
-        '''
-
-        self.node_types = []
-
-        # get data stored on edge type key:
-        node_data = nx.get_node_attributes(self.GG, "node_type")
-
-        for nde_i, nde_t in node_data.items():
-            if nde_t == 'Gene':
-                self.node_types.append(NodeType.gene)
-            elif nde_t == 'Process':
-                self.node_types.append(NodeType.process)
-            elif nde_t == 'Sensor':
-                self.node_types.append(NodeType.sensor)
-            elif nde_t == 'Effector':
-                self.node_types.append(NodeType.effector)
-            elif nde_t == 'Root Hub':
-                self.node_types.append(NodeType.core)
-            elif nde_t == 'Path':
-                self.node_types.append(NodeType.path)
-            else:
-                raise Exception("Node type not found.")
-
-    #----Plots and Data Export----------------
     def save_network(self, filename: str):
         '''
         Write a network, including edge types, to a saved file.
 
+        Parameters
+        ----------
+        filename : str
+            The full directory and filename to write the graph file to
+            as a gml format graph.
         '''
         nx.write_gml(self.GG, filename)
 
     def save_network_image(self, save_filename: str, use_dot_layout: bool=False):
         '''
-        Uses pygraphviz to create a nice plot of the network model.
+        Uses pygraphviz to create a basic plot of the network model.
+
+        Parameters
+        ----------
+        save_filename : str
+            The full directory and filename to write the graph image file to.
+            If the filename ends with '.png' the image will be a raster image, if it ends
+            with '.svg' it will be a vector graphics file.
+        use_dot_layout : bool, default: false
+            Use the 'dot' layout to build the graph.
 
         '''
         G_plt = pgv.AGraph(strict=False,
@@ -633,8 +633,16 @@ class NetworkABC(object, metaclass=ABCMeta):
 
         G_plt.draw(save_filename)
 
-    def plot_degree_distributions(self):
+    def plot_degree_distributions(self) -> tuple[object, object]:
         '''
+        Generate a plot of the in- and out- degree distributions of the
+        network as histograms. Requires self.characterize_graph() to have
+        been run previously.
+
+        Returns
+        -------
+        fig : matplotlib.figure
+        ax : matplotlib.axes
 
         '''
         fig, ax = plt.subplots(1, 2, figsize=(10, 4), sharey=True)
@@ -655,8 +663,34 @@ class NetworkABC(object, metaclass=ABCMeta):
                         figsave: str | None = None,
                         cmap: str | None =None,
                         save_format: str='png',
-                        figsize: tuple=(10,10)):
+                        figsize: tuple=(10,10)) -> tuple[object, object]:
         '''
+        Create and save a heatmap image representing a matrix of states for the
+        regulatory network.
+
+        Parameters
+        ----------
+        solsM : ndarray
+            The matrix of regulatory network states, with each state being a coloumn
+            of the matrix and each row representing the expression level of a node in
+            the network.
+        gene_inds : list|ndarray|None, default: None
+            A subset of the total nodes of the network that are to be displayed in the
+            visualized heatmap.
+        figsave : str|None, default: None
+            The full directory and filename to write the image file to. If None, no image
+            will be save to disk.
+        cmap : str|None, default: None
+            The matplotlib colormap to use for the image.
+        save_format : str, default: 'png'
+            The file format to save the image in ('svg' or 'png').
+        figsize : tuple, default: (10,10)
+            The size of the figure.
+
+        Returns
+        -------
+        fig : matplotlib.figure
+        ax : matplotlib.axes
 
         '''
 
@@ -697,9 +731,32 @@ class NetworkABC(object, metaclass=ABCMeta):
                           cmap: str | None = None,
                           cbar_label: str = '',
                           figsize: tuple = (10, 10),
-                          fontsize: int=16):
+                          fontsize: int=16) -> tuple[object, object]:
         '''
-        Plot a correlation or adjacency matrix for a subset of genes.
+        Plot a matrix of values as a heatmap.
+
+        Parameters
+        ----------
+        solsM : ndarray
+            The matrix of values to plot as a heatmap.
+        x_labels : list|ndarray|None
+            Labels to apply to each column of the solsM matrix, along the horizontal axis.
+        y_labels : list|ndarray|None
+            Labels to apply to each row of the solsM matrix, along the vertical axis.
+        figsave : str|None, default: None
+            The full directory and filename to write the image file to. If None, no image
+            will be save to disk. Only 'png' images can be exported.
+        cmap : str|None, default: None
+            The matplotlib colormap to use for the image.
+        cbar_label : str, default: ''
+            The text label to write along the image colorbar.
+        figsize : tuple, default: (10,10)
+            The size of the figure.
+
+        Returns
+        -------
+        fig : matplotlib.figure
+        ax : matplotlib.axes
 
         '''
 

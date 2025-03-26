@@ -29,7 +29,13 @@ plugins:
   # Automatically generate API reference documentation from Python docstrings
   # embedded inside the Python package defined by this project. See also:
   #     https://github.com/mkdocstrings/mkdocstrings
-  - mkdocstrings
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            # Prefer NumpyDoc-style Python docstrings. By default, "mkdocstrings"
+            # assumes Google-style Python docstrings.
+            docstring_style: numpy
 
 # ....................{ THEME                               }...................
 # Third-party MkDocs UI theme currently employed by this project.
