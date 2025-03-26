@@ -32,10 +32,27 @@ plugins:
   - mkdocstrings:
       handlers:
         python:
+          # List of all inventories (i.e., external URLs to Sphinx-formatted
+          # inventory files listing all Python attributes provided by the APIs
+          # hosted at those URLs). Third-party attributes provided by an
+          # inventory listed below will be implicitly linked to; all other
+          # third-party attributes will remain unlinked.
+          inventories:
+            # Official inventory providingS
+            # * All Python builtins.
+            # * The standard Python library.
+            - https://docs.python.org/3/objects.inv
+
           options:
             # Prefer NumpyDoc-style Python docstrings. By default, "mkdocstrings"
             # assumes Google-style Python docstrings.
             docstring_style: numpy
+
+          # List of all dirnames relative to this configuration file under which
+          # to discover documentation.
+          paths:
+            # The current working directory.
+            - "."
 
 # ....................{ THEME                               }...................
 # Third-party MkDocs UI theme currently employed by this project.

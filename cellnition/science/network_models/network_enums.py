@@ -88,7 +88,7 @@ class InterFuncType(Enum):
     this enumeration specifies the type of interaction function used when the level of one node
     acts to regulate the level of another node.
     InterFuncType.logistic specifies logistic function interactions
-    (see [`f_acti_logi_s`][cellnition.science.network_models.interaction_functions] and
+    (see [`f_acti_logi_s`][cellnition.science.network_models.interaction_functions.f_acti_logi_s] and
     [`f_inhi_logi_s`][cellnition.science.network_models.interaction_functions.f_inhi_logi_s]), whereas
     InterFuncType.hill specifies hill function interactions (see
     [`f_acti_hill_s`][cellnition.science.network_models.interaction_functions.f_acti_hill_s] and

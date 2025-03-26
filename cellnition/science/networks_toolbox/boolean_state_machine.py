@@ -27,7 +27,7 @@ from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 
 class BoolStateMachine(object):
     '''
-    Build and plots Network Finite State Machines (NFSMs) from a regulatory
+    Builds and plots Network Finite State Machines (NFSMs) from a regulatory
     network modelled using Boolean logic functions (see
     [`BooleanNet`][cellnition.science.network_models.boolean_networks.BooleanNet]).
     BoolStateMachine first performs a comprehensive search for stable
@@ -105,21 +105,44 @@ class BoolStateMachine(object):
         Parameters
         ----------
         verbose : bool, default: True
+            Print output while solving (`True`)?
         search_main_nodes_only : bool, default: False
+            Search only the `BooleanNet.main_nodes` (`True`) or search all noninput nodes,
+            `BooleanNet.noninput_node_inds` nodes (`False`)?
         n_max_steps : int, default: 20
+            The maximum number of steps that the Boolean regulatory network solver should use in
+            determining each eq'm. It is recommended that `n_max_steps` be greater than twice the
+            total node number (i.e. `n_max_steps >= 2*BooleanNet.N_nodes`).
         order_by_distance : bool, default: False
+            Order states by increasing distance from the zero state (`True`)?
         node_num_max : int|None, default: None
+            If `n_max_steps` is `True`, further limit the search space dimensions to the first node_num_max
+            nodes according to their hierarchical level (i.e. according to `BooleanNet.hier_node_level`)?
+            We have found that all equilibrium solutions can be returned by selecting the a subset of nodes
+            with the ones with the highest hierarchical level (i.e. closest to inputs) having maximum influence
+            on the network.
         output_nodes_only : bool, default: False
+            Define the uniqueness of equilibrium states using only the `BooleanNet.output_node_inds` (`True`) or
+            by using all non-input node inds using `BooleanNet.noninput_node_inds` (`False`)?
 
         Returns
         -------
         solsM : ndarray
+            The matrix of unique equilibrium state solutions, with each solution appearing in columns, and each row
+            representing the node expression level.
         charM_all : ndarray
+            The dynamic characterization of each equilibrium state in solsM, as a linear array of
+            [`EquilibriumType`][cellnition.science.network_enums.EquilibriumType]
+            enumerations.
         sols_list : list
+            The list of all (non-unique) equilibrium state solutions in the order that they were found.
         states_dict : OrderedDict
+            A dictionary with keys as tuples representing each input state, and values being the equilibrium
+            state index as the column index of `solsM`.
         sig_test_set : ndarray
-
-
+            An array containing each of the input states (i.e. all binary-node-level combinations of
+            `BooleanNet.input_node_inds`) which were applied to the network, for which equilibrium states
+            of the network were found.
 
         '''
         if self._bnet._A_bool_f is None:
