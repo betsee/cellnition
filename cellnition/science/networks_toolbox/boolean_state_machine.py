@@ -27,45 +27,39 @@ from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 
 class BoolStateMachine(object):
     '''
-    Build and plots a state transition diagram from a solution set and
-    corresponding GeneNetworkModel. This class uses time simulation,
-    starting the system off at the zero vector plus every stable state in
-    a supplied matrix, and by temporarily triggering signal nodes in the
-    network, it then looks to see if there is a new stable state for the
-    system after the perturbation. The transitions between states are
-    recorded in a state transition diagram, which is allowed to have parallel
-    edges. Due to complexity, self-loops are omitted.
+    Build and plots Network Finite State Machines (NFSMs) from a regulatory
+    network modelled using Boolean logic functions (see
+    [`BooleanNet`][cellnition.science.network_models.boolean_networks.BooleanNet]).
+    BoolStateMachine first performs a comprehensive search for stable
+    equilibrium states of the regulatory network. It then uses pseudo-time simulation,
+    starting the system off at every equilibrium state and every input signal,
+    applying a new input signal, and returning the system to the original input signal.
+    It then detects new equilibrium states occupied by the system after the application
+    of each input signal perturbation. The input-driven transitions between states are
+    recorded as the NFSMs of the system.
 
-    Public Attributes
+    Attributes
     -----------------
     G_states : MultiDiGraph
-        State transition network, showing how each steady-state of the
-        network is reached through a signal transition. This is MultiDiGraph,
-        which means parallel edges (meaning it is possible for different signals to
-        transition the system between the same two states). For simplicity, self-loops
-        are omitted from the diagrams.
+        General NFSM (G-NFSM), where each equilibrium-state of the
+        regulatory network is a node of the G-NFSM, and labeled directed edges indicate the
+        input state (as an edge label) inducing a transition between one equilibrium state
+        and another. This is a networkx MultiDiGraph,
+        which means parallel edges are allowed to exist and therefore it is possible for different signals to
+        transition the system between the same two state. `G_states` is created using the
+        `create_transition_network` method.
 
-    Private Attributes
-    ------------------
-    _gmod : GeneNetworkModel
-        An instance of GeneNetworkModel
 
-    _solsM : ndarray
-        A set of steady-state solutions from _gmod.
     '''
 
     def __init__(self, bnet: BooleanNet):
         '''
-        Initialize the BoolStateMachine.
+        Initialize the `BoolStateMachine`.
 
         Parameters
         ----------
         bnet : BooleanNet
-            An instance of Boolean network.
-
-        solsM : ndarray
-            A set of unique steady-state solutions from the GeneNetworkModel.
-            These will be the states of the StateMachine.
+            An instance of [`BooleanNet`][cellnition.science.network_models.boolean_networks.BooleanNet].
         '''
 
         self._bnet = bnet
@@ -102,10 +96,30 @@ class BoolStateMachine(object):
                                       order_by_distance: bool=False,
                                       node_num_max: int | None = None,
                                       output_nodes_only: bool = False
-                                      ):
+                                      ) -> tuple[ndarray, ndarray, list, OrderedDict, ndarray]:
         '''
-        Search through all possible combinations of signal node values
-        and collect and identify all equilibrium points of the system.
+        Search through all possible (binary valued) combinations of input nodes
+        (`BooleanNet.input_node_inds`) to find and dynamically characterize equilibrium
+        state of the regulatory network system.
+
+        Parameters
+        ----------
+        verbose : bool, default: True
+        search_main_nodes_only : bool, default: False
+        n_max_steps : int, default: 20
+        order_by_distance : bool, default: False
+        node_num_max : int|None, default: None
+        output_nodes_only : bool, default: False
+
+        Returns
+        -------
+        solsM : ndarray
+        charM_all : ndarray
+        sols_list : list
+        states_dict : OrderedDict
+        sig_test_set : ndarray
+
+
 
         '''
         if self._bnet._A_bool_f is None:
@@ -428,6 +442,8 @@ class BoolStateMachine(object):
 
         if save_graph_file:
             nx.write_gml(GG, save_graph_file)
+
+        self.G_states = GG
 
         return transition_edges_set, perturbation_edges_set, GG
 

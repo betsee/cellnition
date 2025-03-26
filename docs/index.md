@@ -1,4 +1,4 @@
-# Welcome to Cellnition
+# Welcome to Cellnition Docs
 
 For full documentation visit [mkdocs.org](  ).
 
@@ -14,4 +14,4 @@ For full documentation visit [mkdocs.org](  ).
     mkdocs.yml    # The configuration file.
     docs/
         index.md  # The documentation homepage.
-        ...       # Other markdown pages, images and other files.
+        usage.md  # Basic installation and usage information.
