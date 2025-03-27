@@ -4,7 +4,7 @@
 # See "LICENSE" for further details.
 
 '''
-This module defines several types of study networks.
+This module defines multiple regulatory networks for general use.
 '''
 from abc import ABCMeta
 import numpy as np
@@ -37,12 +37,12 @@ class LibNet(object, metaclass=ABCMeta):
         self.N_nodes = len(nodes)
 
 class ActivatorExample(LibNet):
+    '''
+    Simple two-node example of an activating interaction.
+    '''
 
     def __init__(self, activator_signals: bool=True, one_input: bool=False):
         '''
-        This is indicated to be a tri-stable network. It is used for
-        parameter space searches to look for further states with changes
-        to parameters. This is the monostable example in our first paper.
 
         '''
         # Initialize the superclass:
@@ -66,12 +66,12 @@ class ActivatorExample(LibNet):
         self.add_interactions = True
 
 class InhibitorExample(LibNet):
+    '''
+    Simple two-node example of an inhibiting interaction.
+    '''
 
     def __init__(self, activator_signals: bool=False, one_input: bool=False):
         '''
-        This is indicated to be a tri-stable network. It is used for
-        parameter space searches to look for further states with changes
-        to parameters. This is the monostable example in our first paper.
 
         '''
         # Initialize the superclass:
@@ -95,12 +95,12 @@ class InhibitorExample(LibNet):
         self.add_interactions = True
 
 class BinodeChain(LibNet):
+    '''
+    Simple example of two-nodes in a chain with input nodes acting on each internal node.
+    '''
 
     def __init__(self, activator_signals: bool=True, one_input: bool=False):
         '''
-        This is indicated to be a tri-stable network. It is used for
-        parameter space searches to look for further states with changes
-        to parameters. This is the monostable example in our first paper.
 
         '''
         # Initialize the superclass:
@@ -143,12 +143,12 @@ class BinodeChain(LibNet):
         self.add_interactions = True
 
 class BinodeDoubleChain(LibNet):
+    '''
+    Simple example of two-nodes in a double chain with input nodes acting on each internal node.
+    '''
 
     def __init__(self, activator_signals: bool=True, one_input: bool=False):
         '''
-        This is indicated to be a tri-stable network. It is used for
-        parameter space searches to look for further states with changes
-        to parameters. This is the monostable example in our first paper.
 
         '''
         # Initialize the superclass:
@@ -195,12 +195,13 @@ class BinodeDoubleChain(LibNet):
         self.add_interactions = True
 
 class BinodeChainSelfLoop(LibNet):
+    '''
+    Simple example of two-nodes in a chain, with self loop on one node, and
+     with input nodes acting on each internal node.
+    '''
 
     def __init__(self, activator_signals: bool=True, one_input: bool=False):
         '''
-        This is indicated to be a tri-stable network. It is used for
-        parameter space searches to look for further states with changes
-        to parameters.
 
         '''
         # Initialize the superclass:
@@ -238,12 +239,13 @@ class BinodeChainSelfLoop(LibNet):
         self.add_interactions = True
 
 class BinodeChainSelfLoops(LibNet):
+    '''
+     Simple example of two-nodes in a chain, with self loops on both nodes, and
+     with input nodes acting on each internal node.
+    '''
 
     def __init__(self, activator_signals: bool=True, one_input: bool=False):
         '''
-        This is indicated to be a tri-stable network. It is used for
-        parameter space searches to look for further states with changes
-        to parameters.
 
         '''
         # Initialize the superclass:
@@ -294,12 +296,13 @@ class BinodeChainSelfLoops(LibNet):
         self.add_interactions = True
 
 class BinodeCycle(LibNet):
+    '''
+     Simple example of two-nodes in a cycle,
+     with input nodes acting on each internal node.
+    '''
 
     def __init__(self, activator_signals: bool=True, one_input: bool=False):
         '''
-        This is indicated to be a tri-stable network. It is used for
-        parameter space searches to look for further states with changes
-        to parameters.
 
         '''
         # Initialize the superclass:
@@ -333,12 +336,13 @@ class BinodeCycle(LibNet):
         self.add_interactions = True
 
 class BinodeCycleSelfLoop(LibNet):
+    '''
+     Simple example of two-nodes in a cycle, with self loop on one node, and
+     with input nodes acting on each internal node.
+    '''
 
     def __init__(self, activator_signals: bool=True, one_input: bool=False):
         '''
-        This is indicated to be a tri-stable network. It is used for
-        parameter space searches to look for further states with changes
-        to parameters.
 
         '''
         # Initialize the superclass:
@@ -376,12 +380,13 @@ class BinodeCycleSelfLoop(LibNet):
         self.add_interactions = True
 
 class BinodeCycleSelfLoops(LibNet):
+    '''
+     Simple example of two-nodes in a cycle, with self loops on both nodes, and
+     with input nodes acting on each internal node.
+    '''
 
     def __init__(self, activator_signals: bool=True, one_input: bool=False):
         '''
-        This is indicated to be a tri-stable network. It is used for
-        parameter space searches to look for further states with changes
-        to parameters.
 
         '''
         # Initialize the superclass:
@@ -420,8 +425,8 @@ class BinodeCycleSelfLoops(LibNet):
 
 class TrinodeChain(LibNet):
     '''
-    Example of the lowest hierarchically incoherent network
-    for a 3-node network.
+     Simple example of three-nodes in a chain,
+     with input nodes acting on each internal node.
     '''
     # Initialize the superclass:
 
@@ -453,8 +458,8 @@ class TrinodeChain(LibNet):
 
 class TrinodeDoubleChain(LibNet):
     '''
-    Example of the lowest hierarchically incoherent network
-    for a 3-node network.
+     Simple example of three-nodes in a double chain,
+     with input nodes acting on each internal node.
     '''
     # Initialize the superclass:
 
@@ -489,8 +494,8 @@ class TrinodeDoubleChain(LibNet):
 
 class TrinodeChainSelfLoops(LibNet):
     '''
-    Example of the lowest hierarchically incoherent network
-    for a 3-node network.
+     Simple example of three-nodes in a chain, with self loops on each node, and
+     with input nodes acting on each internal node.
     '''
     # Initialize the superclass:
 
@@ -525,8 +530,8 @@ class TrinodeChainSelfLoops(LibNet):
 
 class TrinodeForkSelfLoops(LibNet):
     '''
-    Example of the lowest hierarchically incoherent network
-    for a 3-node network.
+     Simple example of three-nodes in a forked configuration, with self loops on each node, and
+     with input nodes acting on each internal node.
     '''
     # Initialize the superclass:
 
@@ -560,8 +565,8 @@ class TrinodeForkSelfLoops(LibNet):
         self.add_interactions = True
 class TrinodeFork(LibNet):
     '''
-    Example of the lowest hierarchically incoherent network
-    for a 3-node network.
+    Simple example of three-nodes in a forked configuration,
+     with input nodes acting on each internal node.
     '''
     # Initialize the superclass:
 
@@ -593,8 +598,8 @@ class TrinodeFork(LibNet):
 
 class TrinodeDoubleFork(LibNet):
     '''
-    Example of the lowest hierarchically incoherent network
-    for a 3-node network.
+    Simple example of three-nodes in a double forked configuration,
+     with input nodes acting on each internal node.
     '''
     # Initialize the superclass:
 
@@ -629,8 +634,9 @@ class TrinodeDoubleFork(LibNet):
 
 class TrinodeChainFullyConnected(LibNet):
     '''
-    Example of the lowest hierarchically incoherent network
-    for a 3-node network.
+    Simple example of three-nodes in a double chain configuration, with
+    self-loops on all internal nodes, and
+     with input nodes acting on each internal node.
     '''
     # Initialize the superclass:
 
@@ -668,8 +674,9 @@ class TrinodeChainFullyConnected(LibNet):
 
 class TrinodeForkFullyConnected(LibNet):
     '''
-    Example of the lowest hierarchically incoherent network
-    for a 3-node network.
+    Simple example of three-nodes in a double fork configuration, with
+    self-loops on all internal nodes, and
+     with input nodes acting on each internal node.
     '''
     # Initialize the superclass:
 
@@ -706,6 +713,10 @@ class TrinodeForkFullyConnected(LibNet):
         self.add_interactions = True
 
 class TrinodeCycle(LibNet):
+    '''
+    Simple example of three nodes in a cycle,
+    with input nodes acting on each internal node.
+    '''
 
     def __init__(self, activator_signals: bool=True):
         '''
@@ -735,6 +746,10 @@ class TrinodeCycle(LibNet):
         self.add_interactions = True
 
 class TrinodeDoubleCycle(LibNet):
+    '''
+    Simple example of three nodes in a double cycle,
+    with input nodes acting on each internal node.
+    '''
 
     def __init__(self, activator_signals: bool=False):
         '''
@@ -767,6 +782,11 @@ class TrinodeDoubleCycle(LibNet):
         self.add_interactions = True
 
 class TrinodeCycleSelfLoops(LibNet):
+    '''
+    Simple example of three nodes in a cycle,
+    with self-loops on all internal nodes, and
+    with input nodes acting on each internal node.
+    '''
 
     def __init__(self, activator_signals: bool=True):
         '''
@@ -800,6 +820,11 @@ class TrinodeCycleSelfLoops(LibNet):
         self.add_interactions = True
 
 class TrinodeCycleFullyConnected(LibNet):
+    '''
+    Simple example of three nodes in a double cycle,
+    with self-loops on all internal nodes, and
+    with input nodes acting on each internal node.
+    '''
 
     def __init__(self, activator_signals: bool=False):
         '''
@@ -836,6 +861,13 @@ class TrinodeCycleFullyConnected(LibNet):
         self.add_interactions = True
 
 class TrinodeCycleFullyConnected2(LibNet):
+    '''
+    Simple example of three nodes in a double cycle,
+    with self-loops on all internal nodes, and
+    with input nodes acting on each internal node.
+    (Not sure how this differs from TrinodeCycleFullyConnected,
+    but keeping just in case we need it someday.)
+    '''
 
     def __init__(self, activator_signals: bool=False):
         '''
@@ -872,6 +904,11 @@ class TrinodeCycleFullyConnected2(LibNet):
         self.add_interactions = True
 
 class TrinodeCyclesConnected(LibNet):
+    '''
+    Two three-node cycles connected together,
+    with self-loops on three internal nodes, and
+    with input nodes acting on three internal nodes.
+    '''
 
     def __init__(self, activator_signals: bool=False):
         '''
@@ -904,12 +941,13 @@ class TrinodeCyclesConnected(LibNet):
         self.add_interactions = True
 
 class BasicQuadnodeNet(LibNet):
+    '''
+    Simple example of four nodes in a cycle,
+    with input nodes acting on each internal node.
+    '''
 
     def __init__(self, activator_signals: bool=True):
         '''
-        This is indicated to be a tri-stable network. It is used for
-        parameter space searches to look for further states with changes
-        to parameters.
 
         '''
         # Initialize the superclass:
@@ -936,12 +974,14 @@ class BasicQuadnodeNet(LibNet):
         self.add_interactions = True
 
 class QuadnodeNet(LibNet):
+    '''
+    Simple example of four nodes in a cycle,
+    with self-loops on each internal node, and
+    with input nodes acting on each internal node.
+    '''
 
     def __init__(self, activator_signals: bool=True):
         '''
-        This is indicated to be a tri-stable network. It is used for
-        parameter space searches to look for further states with changes
-        to parameters.
 
         '''
         # Initialize the superclass:
@@ -971,6 +1011,10 @@ class QuadnodeNet(LibNet):
         self.add_interactions = True
 
 class PentanodeNet(LibNet):
+    '''
+    Simple example of five nodes in a cycle,
+    with input nodes acting on each internal node.
+    '''
 
     def __init__(self, activator_signals: bool=True):
         '''
@@ -1004,6 +1048,11 @@ class PentanodeNet(LibNet):
         self.add_interactions = True
 
 class FullTrinodeNet(LibNet):
+    '''
+    Example of three nodes in a cycle, with many
+    output nodes spanning from the core three nodes,
+    and three input nodes acting on the three core nodes.
+    '''
 
     def __init__(self, activator_signals: bool=True):
         '''
@@ -1050,6 +1099,12 @@ class FullTrinodeNet(LibNet):
         self.add_interactions = True
 
 class FullTrinodeNetFeedback(LibNet):
+    '''
+    Example of three nodes in a cycle, with many
+    output nodes spanning from the core three nodes,
+    and three input nodes acting on the three core nodes.
+    This network has feedback between output and input nodes.
+    '''
 
     def __init__(self, activator_signals: bool=True):
         '''
@@ -1100,6 +1155,10 @@ class FullTrinodeNetFeedback(LibNet):
         self.add_interactions = True
 
 class BiLoopControlNet3(LibNet):
+    '''
+    Example of a simple network arrangement that can act as a
+    homeostat by creating attractor limit cycles.
+    '''
 
     def __init__(self, activator_signals: bool=True):
         '''
@@ -1127,6 +1186,10 @@ class BiLoopControlNet3(LibNet):
                                }
 
 class BiLoopControlNet2(LibNet):
+    '''
+    Example of a simple network arrangement that can act as a
+    homeostat by creating attractor limit cycles.
+    '''
 
     def __init__(self, activator_signals: bool=True):
         '''
@@ -1156,6 +1219,10 @@ class BiLoopControlNet2(LibNet):
                                }
 
 class BiLoopControlNet(LibNet):
+    '''
+    Example of a simple network arrangement that can act as a
+    homeostat by creating attractor limit cycles.
+    '''
 
     def __init__(self, activator_signals: bool=True):
         '''
@@ -1186,12 +1253,14 @@ class BiLoopControlNet(LibNet):
                                }
 
 class FullQuadnodeNet(LibNet):
+    '''
+    Example of four nodes in a cycle, with many
+    output nodes spanning from the core four nodes,
+    and three input nodes acting on the four core nodes.
+    '''
 
     def __init__(self, activator_signals: bool=True):
         '''
-        This is indicated to be a tri-stable network. It is used for
-        parameter space searches to look for further states with changes
-        to parameters.
 
         '''
         # Initialize the superclass:
@@ -1229,16 +1298,20 @@ class FullQuadnodeNet(LibNet):
         self.add_interactions = True
 
 class StemCellNetFull(LibNet):
+    '''
+    This biological network is the Oct4-Sox2-Nanog multistable core
+    network of embryonic stem cells, with extrinsic signalling
+    factors included.
+
+    The network is sourced from the reference:
+    Mossahbi-Mohammadi, M. et al. FGF signalling pathway: A key regulator of stem
+    cell pluripotency. Frontiers in Cell and Developmental Biology. 8:79. 2020.
+
+    '''
 
     def __init__(self, activator_signals: bool=True):
         '''
-        This biological network is the Oct4-Sox2-Nanog multistable core
-        network of embryonic stem cells, with extrinsic signalling
-        factors included.
 
-        The network is sourced from the reference:
-        Mossahbi-Mohammadi, M. et al. FGF signalling pathway: A key regulator of stem
-        cell pluripotency. Frontiers in Cell and Developmental Biology. 8:79. 2020.
 
         '''
         # Initialize the superclass:
@@ -1325,18 +1398,19 @@ class StemCellNetFull(LibNet):
 
 class StemCellNet(LibNet):
     '''
+    This biological network is the Oct4-Sox2-Nanog multistable core
+    network of embryonic stem cells, with extrinsic signalling
+    factors excluded.
+
+    The network is sourced from the reference:
+    Mossahbi-Mohammadi, M. et al. FGF signalling pathway: A key regulator of stem
+    cell pluripotency. Frontiers in Cell and Developmental Biology. 8:79. 2020.
 
     '''
 
     def __init__(self, activator_signals: bool=True):
         '''
-        This biological network is the Oct4-Sox2-Nanog multistable core
-        network of embryonic stem cells, with extrinsic signalling
-        factors included.
 
-        The network is sourced from the reference:
-        Mossahbi-Mohammadi, M. et al. FGF signalling pathway: A key regulator of stem
-        cell pluripotency. Frontiers in Cell and Developmental Biology. 8:79. 2020.
 
         '''
         # Initialize the superclass:
@@ -1394,19 +1468,15 @@ class StemCellNet(LibNet):
 
 class StemCellTriad(LibNet):
     '''
-
+    This biological network is based on the Oct4-Sox2-Nanog multistable core
+    network of embryonic stem cells, with basic signalling factors included.
+    Here we are using this network to explore different combinations and
+    permutations of edge interaction types.
     '''
 
     def __init__(self, activator_signals: bool=True):
         '''
-        This biological network is the Oct4-Sox2-Nanog multistable core
-        network of embryonic stem cells, with basic signalling factors included.
-        Here we are using this network to explore different combinations and
-        permutations of edge interaction types.
 
-        The network is sourced from the reference:
-        Mossahbi-Mohammadi, M. et al. FGF signalling pathway: A key regulator of stem
-        cell pluripotency. Frontiers in Cell and Developmental Biology. 8:79. 2020.
 
         '''
         # Initialize the superclass:
@@ -1444,18 +1514,18 @@ class StemCellTriad(LibNet):
 
 class StemCellQuadrad(LibNet):
     '''
+    This biological network is the Oct4-Sox2-Nanog + KLF4 multistable core
+    network of embryonic stem cells, with some extrinsic signalling
+    factors included.
+
+    The network is sourced from the reference:
+    Mossahbi-Mohammadi, M. et al. FGF signalling pathway: A key regulator of stem
+    cell pluripotency. Frontiers in Cell and Developmental Biology. 8:79. 2020.
 
     '''
 
     def __init__(self, activator_signals: bool=True):
         '''
-        This biological network is the Oct4-Sox2-Nanog + KLF4 multistable core
-        network of embryonic stem cells, with extrinsic signalling
-        factors included.
-
-        The network is sourced from the reference:
-        Mossahbi-Mohammadi, M. et al. FGF signalling pathway: A key regulator of stem
-        cell pluripotency. Frontiers in Cell and Developmental Biology. 8:79. 2020.
 
         '''
         # Initialize the superclass:
@@ -1510,8 +1580,10 @@ class StemCellQuadrad(LibNet):
 
 class StemCellTriadChain(LibNet):
     '''
-    Example of the lowest hierarchically incoherent network
-    for a 3-node network.
+    No matter which combination of activating or inhibiting edges were chosen,
+    equilibrium states corresponding to the SOX2-OCT4-NANOG triad system could
+    not be produced with a fully-connected cycle. We found that by breaking the
+    cycle into a double chain, biorealistic equilibrium states could be produced.
     '''
     # Initialize the superclass:
 
@@ -1549,8 +1621,11 @@ class StemCellTriadChain(LibNet):
 
 class StemCellTriadChain0(LibNet):
     '''
-    Example of the lowest hierarchically incoherent network
-    for a 3-node network.
+    No matter which combination of activating or inhibiting edges were chosen,
+    equilibrium states corresponding to the SOX2-OCT4-NANOG triad system could
+    not be produced with a fully-connected cycle. We found that by breaking the
+    cycle into a double chain, biorealistic equilibrium states could be produced.
+    (Not sure how this differs from StemCellTriadChain; keeping just in case).
     '''
     # Initialize the superclass:
 
@@ -1588,8 +1663,11 @@ class StemCellTriadChain0(LibNet):
 
 class StemCellTriadChain2(LibNet):
     '''
-    Example of the lowest hierarchically incoherent network
-    for a 3-node network. With KLF4
+    No matter which combination of activating or inhibiting edges were chosen,
+    equilibrium states corresponding to the SOX2-OCT4-NANOG triad system could
+    not be produced with a fully-connected cycle. We found that by breaking the
+    cycle into a double chain, biorealistic equilibrium states could be produced.
+    (Not sure how this differs from StemCellTriadChain; keeping just in case).
     '''
     # Initialize the superclass:
 
@@ -1630,27 +1708,141 @@ class StemCellTriadChain2(LibNet):
 
 class AKTNet(LibNet):
     '''
+    This biological network is the PI3K/AKT/mTOR (PAM) signaling transduction pathway.
+
+    The network is sourced from the reference:
+
+    Glaviano et al. PI3K/AKT/mTOR signaling transduction pathway and targeted therapies in cancer.
+    Mol Cancer. 2023 Aug 18;22(1):138. doi: 10.1186/s12943-023-01827-6.
+
+    The modelled network has been slightly simplified from the source reference by combining elements in direct
+    signalling chains, and is the version that appeared in the first pre-print of our RNM paper.
 
     '''
 
     def __init__(self, activator_signals: bool=True):
         '''
-        This biological network is the PI3K/AKT/mTOR (PAM) signaling transduction pathway.
 
-        The network is sourced from the reference:
-
-        Glaviano et al. PI3K/AKT/mTOR signaling transduction pathway and targeted therapies in cancer.
-        Mol Cancer. 2023 Aug 18;22(1):138. doi: 10.1186/s12943-023-01827-6.
-
-        The modelled network has been slightly simplified from the source reference by combining elements in direct
-        signalling chains and by adding an inhibitory relationship between "Cell Survival" and "Apoptosis", which is
-        known and prevents nonsense output.
 
         '''
         # Initialize the superclass:
         super().__init__()
 
         self.name = 'AKTNet'
+
+        self.N_nodes = 24
+        self.edges = [
+                      # Input edges:
+                      ('Growth_RTK', 'RAS'),
+                      ('Growth_RTK', 'GAB12'),
+                      ('Survival_RTK', 'PI3K'),
+                      ('Wnt_Frizzled', 'Dsh'),
+
+                      # RTK-Growth sub-pathway:
+                      ('RAS', 'RAF'),
+                      ('RAS', 'PI3K'),
+                      ('GAB12', 'PI3K'),
+                      ('RAF', 'ERK'),
+                      ('ERK', 'TSCComplex'),
+                      ('ERK', 'eIF4E'),
+
+                      # RTK-survival sub-pathway:
+                      ('PI3K', 'AKT'),
+                      ('AKT', 'RAF'),
+                      ('AKT', 'TSCComplex'),
+                      ('AKT', 'FOXO'),
+                      ('AKT', 'AxinComplex'),
+                      ('AKT', 'bCAT'),
+                      ('TSCComplex', 'mTORC1'),
+                      ('mTORC1', 'EBP1'),
+                      ('EBP1', 'eIF4E'),
+
+                      # WNT-Frizzled sub-pathway
+                      ('Dsh', 'AxinComplex'),
+                      ('AxinComplex', 'bCAT'),
+
+                      # Output edges
+                      ('ERK', 'CellSurvival'),
+                      ('eIF4E', 'Translation'),
+                      ('mTORC1', 'CellCycle'),
+                      ('mTORC1', 'CellSurvival'),
+                      ('mTORC1', 'Metabolism'),
+                      ('bCAT', 'Proliferation'),
+                      ('bCAT', 'Proteosomes'),
+                      ('FOXO', 'Apoptosis'),
+
+                 ]
+
+        self.edge_types = [
+                          # Input edge types:
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+
+                           # RTK-Growth sub-pathway:
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.I,
+                           EdgeType.A,
+
+                          # RTK-survival sub-pathway:
+                           EdgeType.A,
+                           EdgeType.I,
+                           EdgeType.I,
+                           EdgeType.I,
+                           EdgeType.I,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.I,
+                           EdgeType.I,
+
+                         # WNT-Frizzled sub-pathway:
+                           EdgeType.I,
+                           EdgeType.A,
+
+                         # Output edge types:
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+                           EdgeType.A,
+                      ]
+
+        self.node_type_dict = None
+
+        self.add_interactions = True
+
+        self.N_input_edges = 3
+class AKTNet1(LibNet):
+    '''
+    This biological network is the PI3K/AKT/mTOR (PAM) signaling transduction pathway.
+
+    The network is sourced from the reference:
+
+    Glaviano et al. PI3K/AKT/mTOR signaling transduction pathway and targeted therapies in cancer.
+    Mol Cancer. 2023 Aug 18;22(1):138. doi: 10.1186/s12943-023-01827-6.
+
+    The modelled network has been slightly simplified from the source reference by combining elements in direct
+    signalling chains and by removing some cross-talk connections between pathways in order to
+    prevent nonsense output.
+
+    '''
+
+    def __init__(self, activator_signals: bool=True):
+        '''
+
+
+        '''
+        # Initialize the superclass:
+        super().__init__()
+
+        self.name = 'AKTNet1'
 
         self.N_nodes = 26
         self.edges = [
@@ -1743,18 +1935,14 @@ class AKTNet(LibNet):
         self.add_interactions = True
 
         self.N_input_edges = 3
-
 class hESC_9a(LibNet):
     '''
-    Works from the DNase Footprint derived TF networks to generate
+    Uses the DNase Footprint derived TF networks at regulatory_networks.org to generate
     more structure around the classic SOX2-OCT4-NANOG triad.
-
     '''
 
     def __init__(self, activator_signals: bool=True, use_special_edges: bool=True):
         '''
-        Works from the DNase Footprint derived TF networks to generate
-        more structure around the classic SOX2-OCT4-NANOG triad.
 
         '''
         # Initialize the superclass:
@@ -1911,15 +2099,13 @@ class hESC_9a(LibNet):
 
 class hESC_9b(LibNet):
     '''
-    Works from the DNase Footprint derived TF networks to generate
+    Uses the DNase Footprint derived TF networks at regulatory_networks.org to generate
     more structure around the classic SOX2-OCT4-NANOG triad.
 
     '''
 
     def __init__(self, activator_signals: bool=True):
         '''
-        Works from the DNase Footprint derived TF networks to generate
-        more structure around the classic SOX2-OCT4-NANOG triad.
 
         '''
         # Initialize the superclass:
@@ -2009,15 +2195,12 @@ class hESC_9b(LibNet):
 
 class hESC_9(LibNet):
     '''
-    Works from the DNase Footprint derived TF networks to generate
+    Uses the DNase Footprint derived TF networks at regulatory_networks.org to generate
     more structure around the classic SOX2-OCT4-NANOG triad.
-    This network allows inputs on all Yamanka factors (SOX2, OCT4, NANOG and KLF4)
     '''
 
     def __init__(self, activator_signals: bool=True):
         '''
-        Works from the DNase Footprint derived TF networks to generate
-        more structure around the classic SOX2-OCT4-NANOG triad.
 
         '''
         # Initialize the superclass:
@@ -2035,7 +2218,6 @@ class hESC_9(LibNet):
         SP2 = 'SP2'
         SP3 = 'SP3'
         EGR2 = 'EGR2'
-
 
         self.edges = [
             (EGR2, KLF15),
@@ -2106,221 +2288,17 @@ class hESC_9(LibNet):
 
         self.N_input_edges = 4
 
-class inference_B(LibNet):
-    '''
-    Works from the DNase Footprint derived TF networks to generate
-    more structure around the classic SOX2-OCT4-NANOG triad.
-    This network allows inputs on all Yamanka factors (SOX2, OCT4, NANOG and KLF4)
-    '''
-
-    def __init__(self, activator_signals: bool=True):
-        '''
-        Works from the DNase Footprint derived TF networks to generate
-        more structure around the classic SOX2-OCT4-NANOG triad.
-
-        '''
-        # Initialize the superclass:
-        super().__init__()
-
-        self.name = 'GRN_B'
-
-        self.N_nodes = 15
-        SOX2 = 'G0'
-        POU5F1 = 'G1'
-        NANOG = 'G2'
-        KLF4 = 'G3'
-        KLF15 = 'G4'
-        SP1 = 'G5'
-        SP2 = 'G6'
-        SP3 = 'G7'
-        EGR2 = 'G8'
-        S0 = 'G9'
-        S1 = 'G10'
-        S2 = 'G11'
-        E3 = 'G12'
-        E0 = 'G13'
-        E1 = 'G14'
-        E2 = 'G15'
-
-
-        self.edges = [
-            (EGR2, KLF15),
-            (EGR2, KLF4),
-            (EGR2, POU5F1),
-            (EGR2, SOX2),
-            (EGR2, SP1),
-            (EGR2, SP2),
-            (EGR2, SP3),
-            (KLF15, KLF15),
-            (KLF15, KLF4),
-            (KLF15, POU5F1),
-            (KLF15, SOX2),
-            (KLF15, SP1),
-            (KLF15, SP2),
-            (KLF15, SP3),
-            (KLF4, KLF15),
-            (KLF4, KLF4),
-            (KLF4, NANOG),
-            (KLF4, POU5F1),
-            (KLF4, SOX2),
-            (KLF4, SP1),
-            (NANOG, POU5F1),
-            (NANOG, SOX2),
-            (POU5F1, EGR2),
-            (POU5F1, NANOG),
-            (POU5F1, POU5F1),
-            (POU5F1, SOX2),
-            (SOX2, NANOG),
-            (SOX2, POU5F1),
-            (SOX2, SOX2),
-            (SP1, EGR2),
-            (SP1, KLF15),
-            (SP1, KLF4),
-            (SP1, POU5F1),
-            (SP1, SOX2),
-            (SP1, SP1),
-            (SP1, SP2),
-            (SP1, SP3),
-            (SP2, EGR2),
-            (SP2, KLF15),
-            (SP2, KLF4),
-            (SP2, POU5F1),
-            (SP2, SOX2),
-            (SP2, SP1),
-            (SP2, SP2),
-            (SP2, SP3),
-            (SP3, EGR2),
-            (SP3, KLF15),
-            (SP3, KLF4),
-            (SP3, POU5F1),
-            (SP3, SOX2),
-            (SP3, SP1),
-            (SP3, SP2),
-            (SP3, SP3),
-            (S2, NANOG),
-            (S1, SOX2),
-            (S0, POU5F1),
-            (SOX2, E0),
-            (SOX2, E3),
-            (KLF4, E1),
-            (POU5F1, E2)
-                 ]
-
-        self.edge_types = [EdgeType.A for i in self.edges]
-        # self.edge_types[-4:] = [EdgeType.I, EdgeType.I, EdgeType.I, EdgeType.I]
-
-        self.node_type_dict = None
-
-        self.add_interactions = True
-
-        self.N_input_edges = 3
-
-class inference_A(LibNet):
-    '''
-
-    '''
-
-    def __init__(self, activator_signals: bool=True):
-        '''
-        This biological network is the PI3K/AKT/mTOR signaling transduction pathway.
-
-        The network is sourced from the reference:
-
-        Glaviano et al. PI3K/AKT/mTOR signaling transduction pathway and targeted therapies in cancer.
-        Mol Cancer. 2023 Aug 18;22(1):138. doi: 10.1186/s12943-023-01827-6.
-
-        The modelled network has been simplified from the source reference by combining elements in direct
-        signalling chains.
-
-        '''
-        # Initialize the superclass:
-        super().__init__()
-
-        self.name = 'GRN_A'
-
-        GrowthRTK = 'G0'
-        RAS = 'G1'
-        GAB12 = 'G2'
-        SurvivalRTK = 'G3'
-        PI3K = 'G4'
-        WntFrizzled = 'G5'
-        Dsh = 'G6'
-        RAF = 'G7'
-        AKT = 'G8'
-        TSCComplex = 'G9'
-        FOXO = 'G10'
-        AxinComplex = 'G11'
-        ERK= 'G12'
-        bCAT = 'G13'
-        mTORC1 = 'G14'
-        eIF4E = 'G15'
-        EBP1 = 'G16'
-
-        self.N_nodes = 17
-        self.edges = [
-                      (GrowthRTK, RAS),
-                      (GrowthRTK, GAB12),
-                      (SurvivalRTK, PI3K),
-                      (WntFrizzled, Dsh),
-                      (RAS, RAF),
-                      (RAS, PI3K),
-                      (GAB12, PI3K),
-                      (PI3K, AKT),
-                      (AKT, RAF),
-                      (AKT, TSCComplex),
-                      (AKT, FOXO),
-                      (AKT, AxinComplex),
-                      (AKT, bCAT),
-                      (Dsh, AxinComplex),
-                      (AxinComplex, bCAT),
-                      (RAF, ERK),
-                      (ERK, TSCComplex),
-                      (ERK, mTORC1),
-                      (ERK, eIF4E),
-                      (TSCComplex, mTORC1),
-                      (mTORC1, EBP1),
-                      (EBP1, eIF4E),
-
-                 ]
-
-        self.edge_types = [EdgeType.A,
-                           EdgeType.A,
-                           EdgeType.A,
-                           EdgeType.A,
-                           EdgeType.A,
-                           EdgeType.A,
-                           EdgeType.A,
-                           EdgeType.A,
-                           EdgeType.I,
-                           EdgeType.I,
-                           EdgeType.I,
-                           EdgeType.I,
-                           EdgeType.A,
-                           EdgeType.I,
-                           EdgeType.A,
-                           EdgeType.A,
-                           EdgeType.I,
-                           EdgeType.A,
-                           EdgeType.A,
-                           EdgeType.A,
-                           EdgeType.I,
-                           EdgeType.I
-                      ]
-
-
-        self.node_type_dict = None
-
-        self.add_interactions = True
-
-
 class MAPK_net(LibNet):
+    '''
+    This method imports the MAPK cancer cell fate network developed by
+    Grieco et al. "Integrative Modelling of the Influence of MAPK Network on
+    Cancer Cell Fate Decision." PLoS Comp. Bio. 9(10): e1003286. 2013
+    https://doi.org/10.1371/journal.pcbi.1003286
+    '''
 
     def __init__(self):
         '''
-        This method imports the MAPK cancer cell fate network developed by
-        Grieco et al. "Integrative Modelling of the Influence of MAPK Network on
-        Cancer Cell Fate Decision." PLoS Comp. Bio. 9(10): e1003286. 2013
-        https://doi.org/10.1371/journal.pcbi.1003286
+
         '''
 
         super().__init__()

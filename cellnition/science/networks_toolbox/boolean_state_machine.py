@@ -12,6 +12,7 @@ import copy
 import numpy as np
 import networkx as nx
 import pygraphviz as pgv
+from pygraphviz import AGraph
 from cellnition.science.network_models.boolean_networks import BooleanNet
 from cellnition.science.network_models.network_enums import EquilibriumType
 from cellnition._util.path.utilpathmake import FileRelative
@@ -236,45 +237,61 @@ class BoolStateMachine(object):
                                   output_nodes_only: bool = False
                                   ) -> tuple[set, set, MultiDiGraph]:
         '''
-        Build a state transition matrix/diagram by starting the system
-        in different states and seeing which state it ends up in after
-        a time simulation. This method iterates through all 'signal'
-        nodes of a network and sets them to the sigmax level, harvesting
-        the new steady-state reached after perturbing the network.
+        This method builds the Network Finite State Machine by starting the system
+        in different equilibrium states, applying different input signals, and seeing
+        which equilibrium state the system ends up in after
+        a time simulation.
 
         Parameters
         ----------
-        dt: float = 1.0e-3
-            Timestep for the time simulation.
+        states_dict : dict
+            A dictionary with keys as tuples representing each input state, and values being the equilibrium
+            state index as the column index of `solsM`. This is returned by `steady_state_solutions_search'.
+        sig_test_set : list|ndarray
+            An array containing each of the input states (i.e. all binary-node-level combinations of
+            `BooleanNet.input_node_inds`) which were applied to the network, for which equilibrium states
+            of the network were found. This is returned by `steady_state_solutions_search'.
+        solsM_allo : ndarray
+            The matrix of unique equilibrium state solutions, with each solution appearing in columns, and each row
+            representing the node expression level. This is returned by `steady_state_solutions_search'.
+        charM_allo : ndarray
+            The dynamic characterization of each equilibrium state in solsM, as a linear array of
+            [`EquilibriumType`][cellnition.science.network_enums.EquilibriumType]
+            enumerations. This is returned by `steady_state_solutions_search'.
+        verbose : bool, default: True
+            Print output while solving (`True`)?
+        remove_inaccessible_states : bool, default: False
+            If there are states in the NFSM that aren't reachable by any other state, remove them? (Don't think
+            this variable currently works).
+        save_graph_file: str|None, default: None
+            Full directory and filename to save a gml format graph of the resulting G-NFSM.
+        n_max_steps: int, default: 10
+            The maximum number of steps that the Boolean regulatory network solver should use in
+            determining each eq'm. It is recommended that `n_max_steps` be greater than twice the
+            total node number (i.e. `n_max_steps >= 2*BooleanNet.N_nodes`).
+        output_nodes_only: bool, default: False
+            Define the uniqueness of equilibrium states using only the `BooleanNet.output_node_inds` (`True`) or
+            by using all non-input node inds using `BooleanNet.noninput_node_inds` (`False`)?
 
-        tend: float = 100.0
-            End time for the time simulation. This must be long
-            enough to allow the system to reach the second steady-state.
-
-        sig_tstart: float = 33.0
-            The time to start the signal perturbation. Care must be taken
-            to ensure enough time is allotted prior to starting the perturbation
-            for the system to have reached an initial steady state.
-
-        sig_tend: float = 66.0
-            The time to end the signal perturbation.
-
-        sig_base: float = 1.0
-            Baseline magnitude of the signal node.
-
-        sig_active: float = 1.0
-            Magnitude of the signal pulse during the perturbation.
-
-        delta_window: float = 1.0
-            Time to sample prior to the application of the signal perturbation,
-            in which the initial steady-state is collected.
-
-        verbose: bool = True
-            Print out log statements (True)?
-
-        tol: float = 1.0e-6
-            Tolerance, below which a state is accepted as a match. If the state
-            match error is above tol, it is added to the matrix as a new state.
+        Returns
+        -------
+        transition_edges_set : set
+            Set containing tuples defining all edges representing transitions of the general-NFSM (G-NFSM).
+            Each tuple marks the transition from eq'm state i to j under the action of input state k, so (i, j, k).
+            Eq'm state indices are to the columns of `solsM_allo`, and input state indices are to `sig_test_set`.
+            Note, as new eq'm states
+            may be detected during the run of this method, `self._solsM_all` and `self._charM_all` should be used to
+            reference eq'm states and their characterization instead of the original `solsM_allo` and `charM_allo`.
+        perturbation_edges_set : set
+            Set containing tuples defining all edges representing transitions of the event-driven NFSM (E-NFSM).
+            Each tuple marks the transition from eq'm state i to j under the action of transiently held input state k,
+            where the system is returned to the base input state l, so (i, j, k, l).
+            Eq'm state indices are to the columns of `solsM_allo`, and input state indices are to `sig_test_set`.
+            Note, as new eq'm states may be detected during the run of this method,
+            `self._solsM_all` and `self._charM_all` should be used to
+            reference eq'm states and their characterization instead of the original `solsM_allo` and `charM_allo`.
+        GG : MultiDiGraph
+            The networkx MultiDiGraph object representing the G-NFSM.
 
         '''
 
@@ -484,15 +501,49 @@ class BoolStateMachine(object):
                                       node_colors: list|None = None,
                                       cmap_str: str = 'rainbow_r',
                                       transp_str: str = '80',
-                                      ):
+                                      ) -> AGraph:
         '''
+        This method creates a plot of a general network finite state machine (G-NFSM), which has nodes representing
+        equilibrium states of a regulatory network, edges as the transition between two equilibrium states, and
+        the label on each edge representing the input state index applied and held to transition the network
+        between the two equilibrium states. The result is saved to an image file on disk.
+
+        Parameters
+        ----------
+        nodes_listo : list
+            List of nodes forming the G-NFSM.
+        edges_list : list
+            List of edges forming the G-NFSM.
+        charM_all : list|ndarray
+            The dynamic characteristic of all unique equilbrium states.
+        save_file : str|None, default: None
+            The complete directory and filename to save an image of the G-NFSM graph (as 'png' or 'svg').
+        graph_layout : str, default:'dot'
+            Graphviz layout for the graph.
+        mono_edge : bool, default: False
+            Merge close edges into a single path (`True`)?
+        rank : str, default:'same'
+            Graphviz rank key.
+        constraint : bool, default: False
+            Graphviz constraint key.
+        concentrate : bool, default: True
+            Graphviz concentrate key.
+        fontsize : float, default: 18.0
+            Font size to use on node labels.
+        node_colors : list|None, default: None
+            Values that should be mapped to nodes (e.g. these may be distance from a 'cancer' state).
+        cmap_str : str, default: 'rainbow_r'
+            Colormap to use to color the nodes.
+        transp_str : str, default: '80'
+            Transparancy (as a hex value) to lighten the node coloring.
+
+        Returns
+        -------
+        AGraph
+            The pygraphviz object representing the G-NFSM.
 
         '''
-        # FIXME: we probably also want the option to just plot a subset of the state dict?
-        # FIXME: Should these be options in the method?
-
         # Convert nodes from string to int
-
         self._charM_all = charM_all
         nodes_list = [int(ni) for ni in nodes_listo]
         img_pos = 'bc'  # position of the glyph in the node
@@ -571,36 +622,62 @@ class BoolStateMachine(object):
                                         transp_str: str='80',
                                         ):
         '''
-        This network plotting and generation function is based on the concept
-        that an input node state can be associated with several gene network
-        states if the network has multistability. Here we create a graph with
-        subgraphs, where each subgraph represents the possible states for a
-        held input node state. In the case of multistability, temporary
-        perturbations to the held state can result in transitions between
-        the multistable state (resulting in a memory and path-dependency). The
-        graph indicates which input signal perturbation leads to which state
+        This method creates a plot of an event-driven network finite state machine (E-NFSM), which has nodes representing
+        equilibrium states of a regulatory network, edges as the transition between two equilibrium states occuring under
+        the application of a transiently applied input signal, and a more 'permanent' input signal to which the
+        system returns after the transient perturbation.
+
+        An input state can be associated with several possible equilibrium
+        states if the network has multistability. If this is the case, then the
+        equilibrium state that the system transitions to depends not only on the applied input
+        state, but also the equilibrium state that the system is in to begin with.
+
+        To capture this path dependency, here we create a graph with subgraphs, where each subgraph
+        represents the possible states for a
+        held input state (the 'held context' case is represented by the subgraph).
+        In the case of multistability, temporary
+        perturbations to the held input state can result in transitions between
+        the multistable states. The
+        sub-graph indicates which temporarily-applied input signal leads to which state
         transition via the edge label. Input signal states are represented as
-        integers, where the integer codes for a binary bit string of signal state values.
+        integers, where the integer codes for a binary bit string of signal state values; equilibrium states
+        are indexed according to their column index in solsM_all.
+
+        The result is saved to an image file on disk.
 
         Parameters
         ----------
+        nodes_listo : list
+            List of nodes forming the E-NFSM.
         pert_edges_set : set
-            Tuples of state i, state j, perturbation input integer, base input integer, generated
-            by create_transition_network.
+            List of edges forming the E-NFSM.
+        charM_all : list|ndarray
+            The dynamic characteristic of all unique equilbrium states.
+        save_file : str|None, default: None
+            The complete directory and filename to save an image of the E-NFSM graph (as 'png' or 'svg').
+        graph_layout : str, default:'dot'
+            Graphviz layout for the graph.
+        mono_edge : bool, default: False
+            Merge close edges into a single path (`True`)?
+        rank : str, default:'same'
+            Graphviz rank key.
+        constraint : bool, default: False
+            Graphviz constraint key.
+        concentrate : bool, default: True
+            Graphviz concentrate key.
+        fontsize : float, default: 18.0
+            Font size to use on node labels.
+        node_colors : list|None, default: None
+            Values that should be mapped to nodes (e.g. these may be distance from a 'cancer' state).
+        cmap_str : str, default: 'rainbow_r'
+            Colormap to use to color the nodes.
+        transp_str : str, default: '80'
+            Transparancy (as a hex value) to lighten the node coloring.
 
-        states_dict: dict
-            Dictionary of states and their stability characterization tags for each input signal set.
-
-        nodes_list : list|None = None
-            A list of nodes to include in the network. This is useful to filter out inaccessible states,
-            if desired.
-
-        save_file : str|None = None
-            A file to save the network image to. If None, no image is saved.
-
-        graph_layout : str = 'dot'
-            Layout for the graph when saving to image.
-
+        Returns
+        -------
+        AGraph
+            The pygraphviz object representing the E-NFSM.
         '''
 
 
