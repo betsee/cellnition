@@ -117,7 +117,7 @@ Cellnition is non-commerical use, open source software `licensed <cellnition lic
 to academic purposes only.
 
 .. # ------------------( IMAGES                              )------------------
-.. |cellnition-banner| image:: https://github.com/user-attachments/assets/71d3d91e-fc7c-4960-a309-693978fee4e0
+.. |cellnition-banner| image:: https://github.com/user-attachments/assets/50f45c9b-980a-473f-9362-361d3f62061a
    :target: https://github.com/betsee/cellnition
    :alt: Cellnition
 
