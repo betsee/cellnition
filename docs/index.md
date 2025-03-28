@@ -134,6 +134,7 @@ and a sponsored research agreement from [Astonishing Labs](https://astonishingla
 Rider v.1, restricting use to academic purposes only.
 
 [Link References]::
+[Levin Lab]: https://as.tufts.edu/biology/levin-lab
 [CPython]: https://github.com/python/cpython
 [Codecov]: https://about.codecov.io
 [pytest]: https://docs.pytest.org
