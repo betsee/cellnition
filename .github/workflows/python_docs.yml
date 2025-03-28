@@ -26,6 +26,28 @@ on:
     branches:
       - 'main'
 
+# ....................{ VARIABLES                          }....................
+# List of private environment variables specific to this configuration and
+# globally set for *ALL* jobs declared below. To avoid conflict with
+# third-party processes, prefix the name of each variable by "_".
+env:
+  #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  # CAUTION: Optional in-flight test-time dependencies (e.g., NumPy, mypy) are
+  # intentionally listed in the "test" key of the
+  # "[project.optional-dependencies]" section of the top-level "pyproject.toml"
+  # file rather than below. "tox" isolates both the package being tested and its
+  # dependency tree to virtual environments. Listing in-flight dependencies
+  # here would install those dependencies outside those virtual environments,
+  # thus reducing to a pointless, expensive, and failure-prone noop.
+  #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  # Whitespace-delimited list of the names of all Debian-based non-Pythonic
+  # mandatory dependencies to be installed by APT below. These include:
+  # * GraphViz, a mandatory C-based dependency of the "pygraphviz" Python
+  #   package required as a mandatory runtime dependency of this package.
+  _APT_PACKAGE_NAMES: |
+    graphviz
+    graphviz-dev
+
 # ....................{ PERMISSIONS                        }....................
 # Enable the "write" permission as required for static site generation.
 permissions:
@@ -40,6 +62,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # ..................{ SETUP                            }..................
       - name: "Checking out repository..."
         uses: 'actions/checkout@v4'
 
@@ -74,6 +97,29 @@ jobs:
           restore-keys: |
             mkdocs-material-
 
+      # ..................{ INSTALL                          }..................
+      # Install APT-based Ubuntu system dependencies. Note that:
+      # * We intentionally update APT *BEFORE* all remaining dependencies, as
+      #   the latter requires the package cache created by the former. If
+      #   omitted, the first such attempt fails with a fatal error resembling:
+      #     $ sudo apt-get install -y graphviz
+      #     Reading package lists...
+      #     Building dependency tree...
+      #     Reading state information...
+      #     E: Unable to locate package graphviz
+      #
+      # Note that we intentionally prefer the antiquated "apt-get" command to
+      # the modern "apt" command, as the latter complains about an unstable
+      # command-line API:
+      #     WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+      - name: 'Upgrading system packager dependencies...'
+        run: |
+          sudo apt-get update --quiet --quiet --yes
+      - name: 'Installing system package dependencies...'
+        run: |
+          sudo apt-get install --quiet --quiet --yes ${_APT_PACKAGE_NAMES}
+
+      # Install "pip"-based Python dependencies.
       - name: "Upgrading packager dependencies..."
         run: |
           set -xe
@@ -91,8 +137,9 @@ jobs:
       - name: "Installing package dependencies..."
         run: |
           set -xe
-          python3 -m pip --quiet install -e .[doc]
+          python3 -m pip --quiet install -e .[docs]
 
+      # ..................{ DEPLOY                           }..................
       # Generate the static site in the local "site/" subdirectory and then
       # deploy that site to the "gh-pages" branch of this repository. See also:
       #     # Further options for this MkDocs subcommand.
