@@ -133,7 +133,7 @@ class BoolStateMachine(object):
             representing the node expression level.
         charM_all : ndarray
             The dynamic characterization of each equilibrium state in solsM, as a linear array of
-            [`EquilibriumType`][cellnition.science.network_enums]
+            [`EquilibriumType`][cellnition.science.network_models.network_enums]
             enumerations.
         sols_list : list
             The list of all (non-unique) equilibrium state solutions in the order that they were found.
@@ -256,7 +256,7 @@ class BoolStateMachine(object):
             representing the node expression level. This is returned by `steady_state_solutions_search'.
         charM_allo : ndarray
             The dynamic characterization of each equilibrium state in solsM, as a linear array of
-            [`EquilibriumType`][cellnition.science.network_enums.EquilibriumType]
+            [`EquilibriumType`][cellnition.science.network_models.network_enums.EquilibriumType]
             enumerations. This is returned by `steady_state_solutions_search'.
         verbose : bool, default: True
             Print output while solving (`True`)?
