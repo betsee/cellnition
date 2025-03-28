@@ -29,7 +29,7 @@ genetic oscillator instead of a monotonic gene expression in time).
 NFSMs have a range of applications, including facilitating the 
 identification of strategies to renormalize cancer.
 
-Read more about *Cellnition's* NFSMs in our publication: [Harnessing the Analogue Computing Power of
+Read more about *Cellnition's* NFSMs in our pre-print publication: [Harnessing the Analogue Computing Power of
 Regulatory Networks with the Regulatory Network Machine](https://osf.io/preprints/osf/tb5ys_v1).
 
 Please cite our publication in any work that utilizes *Cellnition*:
@@ -88,6 +88,26 @@ equilibrium states, gene expressions in temporal simulations, and depictions of 
 (see [Tutorial 1][] and [Tutorial 2][] for some examples).
 
 ## Getting Started
+
+The general workflow to create NFSMs in *Cellnition* comprises 6 main steps:
+
+1. Build, import, or procedurally generate a regulatory network as a directed graph.
+2. Characterize the graph to automatically categorize input, output & internal nodes.
+3. Build a computational model of the regulatory network.
+4. Identify all unique equilibrium output states for each input state via state space search.
+5. Create the NFSMs. Cellnition does this by starting the system in each equilibrium state, 
+applying each input state, and determining the equilibrium state that the system transitions to.
+6. Output, plot, and analyze the resulting Network Finite State Machines. 
+
+![Cellnition Workflow with Clinical Application](img/cellnition_workflow_1.png)
+
+The Jupyter Notebook [Tutorials](https://github.com/betsee/cellnition#tutorials) are a great 
+place to get started with *Cellnition*. 
+
+## Issues
+
+Please use the *Cellnition* [issue tracker](https://github.com/betsee/cellnition/issues) to 
+report any problems or feedback pertaining to the codebase.  
 
 
 ## About
