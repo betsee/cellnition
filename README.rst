@@ -18,6 +18,9 @@
 
 |ci-badge|
 
+   `Cellnition documentation is officially available at our GitHub Pages-hosted site
+   <cellnition docs_>`__.
+
 **Cellnition** is an open source simulator to create and analyze Network Finite
 State Machines (NFSMs) from gene regulatory network (GRN) models.
 
@@ -151,6 +154,8 @@ to academic purposes only.
    https://cellnition.streamlit.app
 .. _cellnition codebase:
    https://gitlab.com/betsee/cellnition
+.. _cellnition docs:
+   https://betsee.github.io/cellnition
 .. _cellnition pulls:
    https://gitlab.com/betsee/cellnition/-/merge_requests
 .. _cellnition tests:
