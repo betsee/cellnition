@@ -13,6 +13,8 @@ The general workflow to create NFSMs in *Cellnition* comprises 6 main steps:
 applying each input state, and determining the equilibrium state that the system transitions to.
 6. Output, plot, and analyze the resulting Network Finite State Machines. 
 
+The general concept of working with Cellnition can be appreciated in the following flowchart:
+
 ![Cellnition Workflow with Clinical Application](img/cellnition_workflow_1.png)
 
 

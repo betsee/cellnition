@@ -13,7 +13,7 @@ title: Welcome
   }
 </style>
 
-![Welcome to Cellnition](https://github.com/user-attachments/assets/71d3d91e-fc7c-4960-a309-693978fee4e0)
+![Welcome to Cellnition](https://github.com/user-attachments/assets/50f45c9b-980a-473f-9362-361d3f62061a)
 
 *Cellnition* is an open source simulator to create and analyze Network Finite State Machines (NFSMs)
 from regulatory network models.
