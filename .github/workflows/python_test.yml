@@ -249,7 +249,7 @@ jobs:
       # # installed to this tree. See also this well-written Medium post:
       # #     https://medium.com/ai2-blog/python-caching-in-github-actions-e9452698e98d
       # - name: 'Restoring Python tree...'
-      #   uses: 'actions/cache@v3'
+      #   uses: 'actions/cache@v4'
       #   with:
       #     # Newline-delimited list of the absolute dirnames of all directories
       #     # to be cached, including:

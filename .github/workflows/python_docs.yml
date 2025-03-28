@@ -1,0 +1,103 @@
+---
+# --------------------( LICENSE                            )--------------------
+# Copyright (c) 2023-2025 Alexis Pietak & Cecil Curry.
+# See "LICENSE" for further details.
+#
+# --------------------( SYNOPSIS                           )--------------------
+# GitHub-specific static site generation configuration, enabling automated
+# deployment of the MkDocs-driven documentation for this project into the
+# "gh-pages" branch of this repository on each push of a commit to the "main"
+# branch of this repository.
+#
+# --------------------( SEE ALSO                           )--------------------
+# * https://squidfunk.github.io/mkdocs-material/publishing-your-site
+#   Official MkDocs Material workflow strongly inspiring this configuration.
+
+# ....................{ METADATA                           }....................
+# Non-human-readable (i.e., machine-readable) label associated with this
+# GitHub Actions workflow.
+name: docs
+
+# ....................{ TRIGGER                            }....................
+# Confine deployment to only new commits to the "main" branch.
+on:
+  push:
+    # List of the names of all branches to trigger deployments from.
+    branches:
+      - 'main'
+
+# ....................{ PERMISSIONS                        }....................
+# Enable the "write" permission as required for static site generation.
+permissions:
+  contents: write
+
+# ....................{ MAIN                               }....................
+jobs:
+  # ...................{ GITHUB                             }...................
+  # Job generating a new static site to GitHub Pages for this commit.
+  deploy:
+    name: "Create static site on GitHub Pages"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: "Checking out repository..."
+        uses: 'actions/checkout@v4'
+
+      # Push to the "gh-pages" branch as a GitHub Actions-specific bot. I sigh.
+      - name: "Configuring git credentials..."
+        run: |
+          set -xe
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+
+      - name: "Installing latest stable Python 3.x..."
+        uses: 'actions/setup-python@v5'
+        with:
+          python-version: '3.x'
+
+      # Define a new "${CACHE_ID}" environment variable whose value is the
+      # current 0-based number of the current week with respect to the entire
+      # year. This number is guaranteed to be in the range [0, 53].
+      - name: "Setting caching environment variables..."
+        run: |
+          set -xe
+          echo "CACHE_ID=$(date --utc '+%V')" >> $GITHUB_ENV
+
+      # Restore all MkDocs assets previously cached for the current week by the
+      # most recent run of this workflow. This cache is tied to the week and
+      # thus automatically expires on the Sunday of each new week.
+      - name: "Restoring cached MkDocs assets..."
+        uses: actions/cache@v4
+        with:
+          key: "mkdocs-material-${{ env.CACHE_ID }}"
+          path: ".cache"
+          restore-keys: |
+            mkdocs-material-
+
+      - name: "Upgrading packager dependencies..."
+        run: |
+          set -xe
+          python3 -m pip --quiet install --upgrade pip hatch wheel
+
+      # Install all documentation-time dependencies required to generate
+      # documentation for this project. Technically, this also uselessly
+      # installs this package and all runtime dependencies required to use this
+      # package, all of which is irrelevant to documentation generation.
+      # Pragmatically, this approach has the distinct benefit of centralizing
+      # all documentation-time dependencies in the top-level "pyproject.toml"
+      # file for this project, avoid Don't Repeat Yourself (DRY) violations here
+      # that would otherwise require us to manually list these dependencies
+      # here. In short, this is the least bad approach.
+      - name: "Installing package dependencies..."
+        run: |
+          set -xe
+          python3 -m pip --quiet install -e .[doc]
+
+      # Generate the static site in the local "site/" subdirectory and then
+      # deploy that site to the "gh-pages" branch of this repository. See also:
+      #     # Further options for this MkDocs subcommand.
+      #     mkdocs gh-deploy --help
+      - name: 'Deploying documentation to "gh-pages" branch...'
+        run: |
+          set -xe
+          mkdocs gh-deploy --force --no-history
