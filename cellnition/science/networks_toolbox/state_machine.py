@@ -4,8 +4,8 @@
 # See "LICENSE" for further details.
 
 '''
-This module builds and plots a state transition diagram from a solution
-set and corresponding GeneNetworkModel.
+This module contains the StateMachine class, which builds and plots Network Finite State Machines from a
+continuous, differential-equation based model of a regulatory network.
 '''
 
 import copy
@@ -27,31 +27,29 @@ from networkx import MultiDiGraph
 
 class StateMachine(object):
     '''
-    Build and plots a state transition diagram from a solution set and
-    corresponding GeneNetworkModel. This class uses time simulation,
-    starting the system off at the zero vector plus every stable state in
-    a supplied matrix, and by temporarily triggering signal nodes in the
-    network, it then looks to see if there is a new stable state for the
-    system after the perturbation. The transitions between states are
-    recorded in a state transition diagram, which is allowed to have parallel
-    edges. Due to complexity, self-loops are omitted.
+    Builds and plots Network Finite State Machines (NFSMs) from a regulatory
+    network modelled using continuous, differential equation based functions (see
+    [`ProbabilityNet`][cellnition.science.network_models.probability_networks.ProbabilityNet]).
+    StateMachine first performs a comprehensive search for stable
+    equilibrium states of the regulatory network. It then uses time simulation,
+    starting the system off at every equilibrium state and every input signal,
+    applying a new input signal transiently, and returning the system to the original input signal.
+    It then detects new equilibrium states occupied by the system after the application
+    of each input signal perturbation. The input-driven transitions between states are
+    recorded as the NFSMs of the system.
 
-    Public Attributes
+    Attributes
     -----------------
     G_states : MultiDiGraph
-        State transition network, showing how each steady-state of the
-        network is reached through a signal transition. This is MultiDiGraph,
-        which means parallel edges (meaning it is possible for different signals to
-        transition the system between the same two states). For simplicity, self-loops
-        are omitted from the diagrams.
+        General NFSM (G-NFSM), where each equilibrium-state of the
+        regulatory network is a node of the G-NFSM, and labeled directed edges indicate the
+        input state (as an edge label) inducing a transition between one equilibrium state
+        and another. This is a networkx MultiDiGraph,
+        which means parallel edges are allowed to exist and therefore it is possible for different signals to
+        transition the system between the same two state. `G_states` is created using the
+        `create_transition_network` method.
 
-    Private Attributes
-    ------------------
-    _gmod : GeneNetworkModel
-        An instance of GeneNetworkModel
 
-    _solsM : ndarray
-        A set of steady-state solutions from _gmod.
     '''
 
     def __init__(self, pnet: ProbabilityNet):
@@ -108,10 +106,49 @@ class StateMachine(object):
                                       order_by_distance: bool = False,
                                       node_num_max: int | None = None,
                                       output_nodes_only: bool = False
-                                      ):
+                                      )-> tuple[ndarray, ndarray, list, OrderedDict, ndarray]:
         '''
-        Search through all possible combinations of signal node values
-        and collect and identify all equilibrium points of the system.
+        Search through all possible (binary valued) combinations of input nodes
+        (`ProbabilityNet.input_node_inds`) to find and dynamically characterize equilibrium
+        state of the regulatory network system.
+
+        Parameters
+        ----------
+        verbose : bool, default: True
+            Print output while solving (`True`)?
+        search_main_nodes_only : bool, default: False
+            Search only the `BooleanNet.main_nodes` (`True`) or search all noninput nodes,
+            `BooleanNet.noninput_node_inds` nodes (`False`)?
+        order_by_distance : bool, default: False
+            Order states by increasing distance from the zero state (`True`)?
+        node_num_max : int|None, default: None
+            If `n_max_steps` is `True`, further limit the search space dimensions to the first node_num_max
+            nodes according to their hierarchical level (i.e. according to `BooleanNet.hier_node_level`)?
+            We have found that all equilibrium solutions can be returned by selecting the a subset of nodes
+            with the ones with the highest hierarchical level (i.e. closest to inputs) having maximum influence
+            on the network.
+        output_nodes_only : bool, default: False
+            Define the uniqueness of equilibrium states using only the `BooleanNet.output_node_inds` (`True`) or
+            by using all non-input node inds using `BooleanNet.noninput_node_inds` (`False`)?
+
+        Returns
+        -------
+        solsM : ndarray
+            The matrix of unique equilibrium state solutions, with each solution appearing in columns, and each row
+            representing the node expression level.
+        charM_all : ndarray
+            The dynamic characterization of each equilibrium state in solsM, as a linear array of
+            [`EquilibriumType`][cellnition.science.network_enums]
+            enumerations.
+        sols_list : list
+            The list of all (non-unique) equilibrium state solutions in the order that they were found.
+        states_dict : OrderedDict
+            A dictionary with keys as tuples representing each input state, and values being the equilibrium
+            state index as the column index of `solsM`.
+        sig_test_set : ndarray
+            An array containing each of the input states (i.e. all binary-node-level combinations of
+            `BooleanNet.input_node_inds`) which were applied to the network, for which equilibrium states
+            of the network were found.
 
         '''
 
@@ -243,45 +280,30 @@ class StateMachine(object):
                                   save_time_runs: bool=False
                                   ) -> tuple[set, set, MultiDiGraph]:
         '''
-        Build a state transition matrix/diagram by starting the system
-        in different states and seeing which state it ends up in after
-        a time simulation. This method iterates through all 'signal'
-        nodes of a network and sets them to the sigmax level, harvesting
-        the new steady-state reached after perturbing the network.
+        This method builds the Network Finite State Machines by starting the system
+        in different equilibrium states, applying different input signals, and seeing
+        which equilibrium state the system ends up in after
+        a time simulation.
 
         Parameters
         ----------
-        dt: float = 1.0e-3
-            Timestep for the time simulation.
+        states_dict : dict
+        sig_test_set : list|ndarray
+        solsM_allo : ndarray
+        charM_allo : ndarray
+        dt : float, default: 5.0e-3
+        delta_sig : float, default: 40.0
+        t_relax : float, default: 10.0
+        dt_samp : float, default:0.1
+        verbose : bool, default: True
+        match_tol : float, default: 0.05
+        d_base : float|list[float], default: 1.0
+        n_base : float|list[float], default: 15.0
+        beta_base : float|list[float], default: 0.25
+        remove_inaccessible_states : bool, default:False
+        save_graph_file : str|None, default:None
+        save_time_runs : bool, default:False
 
-        tend: float = 100.0
-            End time for the time simulation. This must be long
-            enough to allow the system to reach the second steady-state.
-
-        sig_tstart: float = 33.0
-            The time to start the signal perturbation. Care must be taken
-            to ensure enough time is allotted prior to starting the perturbation
-            for the system to have reached an initial steady state.
-
-        sig_tend: float = 66.0
-            The time to end the signal perturbation.
-
-        sig_base: float = 1.0
-            Baseline magnitude of the signal node.
-
-        sig_active: float = 1.0
-            Magnitude of the signal pulse during the perturbation.
-
-        delta_window: float = 1.0
-            Time to sample prior to the application of the signal perturbation,
-            in which the initial steady-state is collected.
-
-        verbose: bool = True
-            Print out log statements (True)?
-
-        tol: float = 1.0e-6
-            Tolerance, below which a state is accepted as a match. If the state
-            match error is above tol, it is added to the matrix as a new state.
 
         '''
 

@@ -26,18 +26,27 @@ from cellnition.science.network_models.network_enums import (EdgeType,
 
 class ProbabilityNet(NetworkABC):
     '''
-    This module builds a probability network onto a graph model. The probability
-    network is based on the concept of the probability of seeing a gene product c_i.
-    The model is built analytically, on a fully-connected domain of nodes, where
-    interaction edges are +1 for activation, -1 for inhibition, and 0 for no connection.
+    This class builds a fully-continuous, differential-equation based model of a regulatory network
+    from a directed graph. The class can produce and characterize the directed graph upon which the continuous model
+    is based by importing from the Cellnition [`network_library`][cellnition.science.network_models.network_library],
+    from user-defined edges, or by using procedurally generated
+    graphs. Once the directed graph representing the regulatory network is formed, `ProbabilityNet` generates
+    a continuous, differential-equation based analytic model of the regulatory network,
+    along with numerical counterparts for general simulation in time or in equilibrium state search.
+    The simulation object produced by this class can be used to build Network Finite State Machines (NFSMs) using the
+    [`StateMachine`][cellnition.science.networks_toolbox.state_machine.StateMachine] class.
+
+    This class is called a "probability network", as the differential equations specifying change in regulatory
+    network node expression level produce output that is always limited to the range of 0.0 and 1.0, thereby
+    effectively computing the probability of seeing a gene product (node expression level) rather than an absolute
+    protein concentration (i.e. a node level = 0.21 represents a 21% probability of node expression).
     '''
     def __init__(self,
                  N_nodes: int,
                  interaction_function_type: InterFuncType = InterFuncType.logistic,
                  node_expression_levels: float=5.0):
         '''
-        This class creates a fully-continuous, differential equation based model of a
-        regulatory network.
+        Initialize the ProbabilityNet class.
 
         '''
 

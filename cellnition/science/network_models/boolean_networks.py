@@ -24,42 +24,19 @@ import networkx as nx
 
 class BooleanNet(NetworkABC):
     '''
-    Initialize the class and build and characterize a network.
+    This class builds a Boolean model of a regulatory network from a directed graph. The
+    class can produce and characterize the directed graph upon which the Boolean model is based by importing
+    from the Cellnition [`network_library`][cellnition.science.network_models.network_library],
+    from user-defined edges, or by using procedurally generated
+    graphs. One the directed graphs representing the regulatory network is formed, a Boolean, logic-equation based
+    analytic model of the regulatory network is automatically generated, along with numerical counterparts for
+    general simulation of the regulatory network. The simulation object produced by this class can be used to
+    build Network Finite State Machines (NFSMs) using the
+    [`BoolStateMachine`][cellnition.science.networks_toolbox.boolean_state_machine.BoolStateMachine] class.
 
-    Parameters
-    -----------
-    N_nodes: int
-        The number of nodes to build the network (only used in randomly built networks, otherwise the number of
-        nodes is calculated from the number of unique nodes supplied in the edges list).
+    Attributes
+    ----------
 
-    edges: list|ndarray|None = None
-        A list of tuples that defines edges of a network, where each directed edge is a pair of nodes. The
-        nodes may be integers or strings, but cannot be mixed type. If edges is left as None, then a
-        graph will be randomly constructed.
-
-    graph_type: GraphType = GraphType.scale_free
-        The type of graph to generate in randomly-constructed networks.
-
-    b_param: float = 0.20
-        For scale-free randomly-constructed networks, this determines the amount of interconnectivity between
-        the in and out degree distributions, and in practical terms, increases the number of cycles in the graph.
-        Note that 1 - beta - gamma must be greater than 0.0.
-
-    g_param: float=0.75
-        For scale-free randomly-constructed networks, this determines the emphasis on the network's
-        out degree distribution, and in practical terms, increases the scale-free character of the out-distribution
-        of the graph. Note that 1 - beta - gamma must be greater than 0.0.
-
-    delta_in: float=0.0
-        A parameter that increases the complexity of the network core, leading to more nodes being involved in
-        cycles.
-    delta_out: float = 0.0
-        A parameter that increases the complexity of the network core, leading to more nodes being involved in
-        cycles.
-
-    p_edge: float=0.2
-        For randomly constructed binomial-type networks, this parameter determines the probability of forming
-        an edge. As p_edge increases, the number of network edges increases drammatically.
     '''
     def __init__(self):
         '''

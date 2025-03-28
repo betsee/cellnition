@@ -4,7 +4,8 @@
 # See "LICENSE" for further details.
 
 '''
-This module defines multiple regulatory networks for general use.
+This module defines multiple regulatory networks as directed graphs
+for general use in Cellnition regulatory network models.
 '''
 from abc import ABCMeta
 import numpy as np
