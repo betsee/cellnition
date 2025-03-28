@@ -24,8 +24,19 @@
 site_name: Cellnition
 
 # ....................{ PLUGINS                             }...................
-# Third-party MkDocs plugins currently employed by this project.
+# Both first- and third-party MkDocs plugins currently employed by this project.
 plugins:
+  # ....................{ PLUGINS ~ builtin                 }...................
+  # First-party MkDocs plugins bundled with Mkdocs itself.
+
+  # Enable the builtin search bar, which the Material theme seamlessly
+  # integrates with. See also:
+  #     https://squidfunk.github.io/mkdocs-material/setup/setting-up-site-search
+  - search
+
+  # ....................{ PLUGINS ~ third-party             }...................
+  # Third-party MkDocs plugins external to Mkdocs itself.
+
   # Automatically generate API reference documentation from Python docstrings
   # embedded inside the Python package defined by this project. See also:
   #     https://github.com/mkdocstrings/mkdocstrings
@@ -60,3 +71,32 @@ theme:
   # See also:
   #     https://squidfunk.github.io/mkdocs-material
   name: material
+
+  # Theme-specific features.
+  features:
+    # Enable search highlighting, dynamically displaying all occurrences of the
+    # search term in each found document.
+    - search.highlight
+
+    # Enable search suggestions, dynamically displaying the likeliest completion
+    # for the last word which can be accepted with the <Right> arrow key.
+    - search.suggest
+
+  # Theme-specific color scheme(s). See also:
+  #     https://squidfunk.github.io/mkdocs-material/setup/changing-the-colors
+  palette:
+    # Palette toggle for dark mode.
+    #
+    # Note that "slate" is Material's name for its default dark mode.
+    - scheme: slate
+      toggle:
+        icon: material/weather-night
+        name: Switch to light mode
+
+    # Palette toggle for light mode.
+    #
+    # Note that "slate" is Material's name for its default light mode.
+    - scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode

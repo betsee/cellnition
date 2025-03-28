@@ -1,4 +1,19 @@
-# Welcome to Cellnition Docs!
+---
+title: Welcome
+---
+<!-- Hide the title defined above in favour of the banner displayed below while
+     still listing this title in the site-wide navigation block to the left.
+     Note that this is an obscure MkDocs kludge first publicized here:
+     https://github.com/mkdocs/mkdocs/discussions/2431#discussioncomment-7750379
+  -->
+<style>
+  .md-typeset h1,
+  .md-content__button {
+    display: none;
+  }
+</style>
+
+![Welcome to Cellnition](https://github.com/user-attachments/assets/71d3d91e-fc7c-4960-a309-693978fee4e0)
 
 *Cellnition* is an open source simulator to create and analyze Network Finite State Machines (NFSMs)
 from regulatory network models.
@@ -9,36 +24,10 @@ in biological systems, yet given a specific regulatory network, how do we know w
 *Cellnition* aims to provide a detailed answer to that question, by treating regulatory
 networks as analogue computers, where NFSMs map the sequential logic, 
 or analogue "software program",
-inherent in the regulatory network's dynamics. 
-
-As an extension and improvement upon attractor landscape analysis,
-NFSMs reveal the analogue computing operations inherent in regulatory networks,
-allowing for identification of associated "intelligent behaviors".
-
-By capturing the analog programming of regulatory networks, 
-NFSMs provide clear identification of:
-
-- Interventions that can induce transitions between stable states (e.g. from "diseased" to "healthy").
-- Identification of path-dependencies, representing stable changes occurring after a transient intervention
-is applied (e.g. evaluating if a transient treatment with pharmacological agent can permanently heal a condition).
-- Identification of inducible cycles of behavior that take the system through a complex
-multi-phase process (e.g. wound healing).
-- How to target regimes of dynamic activity in a regulatory network (e.g. how to engage a
-genetic oscillator instead of a monotonic gene expression in time).
+inherent in the regulatory network's dynamics.
 
 NFSMs have a range of applications, including facilitating the 
 identification of strategies to renormalize cancer.
-
-Read more about *Cellnition's* NFSMs in our pre-print publication: [Harnessing the Analogue Computing Power of
-Regulatory Networks with the Regulatory Network Machine](https://osf.io/preprints/osf/tb5ys_v1).
-
-Please cite our publication in any work that utilizes *Cellnition*:
-
-```
-Pietak, Alexis, and Michael Levin.
- “Harnessing the Analog Computing Power of Regulatory Networks 
- with the Regulatory Network Machine.” OSF Preprints, 2 Dec. 2024. Web.
-```
 
 ## Installation
 
@@ -49,60 +38,6 @@ officially bundled with [Python](https://www.python.org):
 ```bash
 pip install cellnition
 ```
-
-## Features
-
-*Cellnition* embodies a range of functionality, including:
-
-- Work with regulatory networks imported from *Cellnition's* 
-[`network_library`][cellnition.science.network_models.network_library],
-use *Cellnition* to
-[procedurally generate regulatory networks][cellnition.science.network_models.network_abc.NetworkABC] 
-with random or scale-free degree distributions, or import your own user-defined regulatory
-networks as directed graphs with activating or inhibiting edge characteristics
-(see [Tutorial 1][] and [Tutorial 2][] for some examples).
-- Analyze and characterize regulatory network graphs with a variety of metrics
-(see the [`characterize_graph`][cellnition.science.network_models.network_abc.NetworkABC] method
-and [Tutorial 1][] and [Tutorial 2][]).
-- Use directed graph representations of regulatory networks to build fully-continuous,
-differential-equation based simulators of network dynamics (see 
-[`ProbabilityNet`][cellnition.science.network_models.probability_networks.ProbabilityNet] 
-and [Tutorial 1][]).
-- Use directed graph representations of regulatory networks to build logic-equation based Boolean
-simulators of network dynamics (see [`BooleanNet`][cellnition.science.network_models.boolean_networks.BooleanNet]  
-and [Tutorial 2][]).
-- Explore regulatory network dynamics with comprehensive equilibrium state search and
- characterization capabilities, along with temporal simulators (see [Tutorial 1][] and
-[Tutorial 2][] for some examples).
-- Create simulated datasets, including simulation of automated gene-knockout experiments
- for a continuous regulatory network model (see [`GeneKnockout`]()).
-- Generate NFSMs for continuous models (see 
-[`StateMachine`][cellnition.science.networks_toolbox.state_machine.StateMachine]
-and [Tutorial 1][])
- or for Boolean models (see 
-[`BoolStateMachine`][cellnition.science.networks_toolbox.boolean_state_machine.BoolStateMachine]
-and [Tutorial 2][]).
-- Create and export a variety of plots and visualizations, including of the regulatory network
-model analytic equations, regulatory network directed graphs, heatmaps of gene expressions in
-equilibrium states, gene expressions in temporal simulations, and depictions of the general and event-driven NFSMs
-(see [Tutorial 1][] and [Tutorial 2][] for some examples).
-
-## Getting Started
-
-The general workflow to create NFSMs in *Cellnition* comprises 6 main steps:
-
-1. Build, import, or procedurally generate a regulatory network as a directed graph.
-2. Characterize the graph to automatically categorize input, output & internal nodes.
-3. Build a computational model of the regulatory network.
-4. Identify all unique equilibrium output states for each input state via state space search.
-5. Create the NFSMs. Cellnition does this by starting the system in each equilibrium state, 
-applying each input state, and determining the equilibrium state that the system transitions to.
-6. Output, plot, and analyze the resulting Network Finite State Machines. 
-
-![Cellnition Workflow with Clinical Application](img/cellnition_workflow_1.png)
-
-The Jupyter Notebook [Tutorials](https://github.com/betsee/cellnition#tutorials) are a great 
-place to get started with *Cellnition*. 
 
 ## Issues
 
@@ -118,6 +53,17 @@ continuously stress-tested via [GitHub Actions]() **×**
 a non-commercial use, open source [APACHE license][] with Tufts Open Source License Rider v.1.
 For maintainability, cellnition officially supports *only* the most recently released
 version of [CPython]().
+
+Read more about *Cellnition's* NFSMs in our pre-print publication: [Harnessing the Analogue Computing Power of
+Regulatory Networks with the Regulatory Network Machine](https://osf.io/preprints/osf/tb5ys_v1).
+
+Please cite our publication in any work that utilizes *Cellnition*:
+
+```
+Pietak, Alexis, and Michael Levin.
+ “Harnessing the Analog Computing Power of Regulatory Networks 
+ with the Regulatory Network Machine.” OSF Preprints, 2 Dec. 2024. Web.
+```
 
 ## Acknowledgements 
 
