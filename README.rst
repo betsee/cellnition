@@ -41,6 +41,12 @@ Read more about Cellnition's NFSMs in our pre-print publication:
 `Harnessing the Analogue Computing Power of Regulatory Networks with the 
 Regulatory Network Machine <preprint_>`__. 
 
+Please cite our pre-print in any work that utilizes *Cellnition*::
+
+Pietak, Alexis, and Michael Levin.
+ “Harnessing the Analog Computing Power of Regulatory Networks 
+ with the Regulatory Network Machine.” OSF Preprints, 2 Dec. 2024. Web.
+
 Cellnition is `portably implemented <cellnition codebase_>`__ in Python_,
 `continuously stress-tested <cellnition tests_>`__ via `GitHub Actions`_ **×**
 tox_ **×** pytest_  **×** Codecov_, and `licensed <cellnition
@@ -94,6 +100,14 @@ Cellnition tutorials are available as `Jupyter Notebooks <Jupyter_>`__:
 
 * `Tutorial 1`_ : Create NFSMs from a continuous, differential-equation based GRN model.
 * `Tutorial 2`_ : Create NFSMs from a Boolean, logic-equation based GRN model.
+
+Acknowledgements
+================
+
+Cellnition creators are grateful for collaboration opportunities and funding support
+from the `Levin Lab <Levin Lab_>`__ at `Tufts University <Tufts_>`__, with funds for this work supplied from the `Templeton World Charity
+Foundation grant TWCF0606 <TWCF_>`__ 
+and a sponsored research agreement from `Astonishing Labs <AstonishingLabs_>`__.
 
 License
 =======
@@ -191,6 +205,14 @@ to academic purposes only.
 .. # ------------------( LINKS ~ science                    )------------------
 .. _preprint:
    https://osf.io/preprints/osf/tb5ys_v1
+.. _Levin Lab:
+   https://as.tufts.edu/biology/levin-lab
+.. _Tufts:
+   https://www.tufts.edu
+.. _TWCF: 
+   https://www.templetonworldcharity.org/projects-resources/project-database/0606
+.. _AstonishingLabs:
+   https://astonishinglabs.com/
 
 .. # ------------------( LINKS ~ soft : license             )------------------
 .. _MIT license:
