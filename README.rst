@@ -43,7 +43,7 @@ Regulatory Network Machine <preprint_>`__.
 
 Please cite our pre-print in any work that utilizes *Cellnition*::
 
-Pietak, Alexis, and Michael Levin.
+Pietak, Alexis, and Levin, Michael.
  “Harnessing the Analog Computing Power of Regulatory Networks 
  with the Regulatory Network Machine.” OSF Preprints, 2 Dec. 2024. Web.
 
