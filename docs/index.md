@@ -47,13 +47,6 @@ report any problems or feedback pertaining to the codebase.
 
 ## About
 
-Cellnition is portably implemented in [Python](),
-continuously stress-tested via [GitHub Actions]() **×**
-[tox]() **×** [pytest]()  **×** [Codecov](), and [licensed][license] under
-a non-commercial use, open source [APACHE license][] with Tufts Open Source License Rider v.1.
-For maintainability, cellnition officially supports *only* the most recently released
-version of [CPython]().
-
 Read more about *Cellnition's* NFSMs in our pre-print publication: [Harnessing the Analogue Computing Power of
 Regulatory Networks with the Regulatory Network Machine](https://osf.io/preprints/osf/tb5ys_v1).
 
@@ -64,6 +57,12 @@ Pietak, Alexis, and Michael Levin.
  “Harnessing the Analog Computing Power of Regulatory Networks 
  with the Regulatory Network Machine.” OSF Preprints, 2 Dec. 2024. Web.
 ```
+Cellnition is portably implemented in [Python](),
+continuously stress-tested via [GitHub Actions]() **×**
+[tox]() **×** [pytest]()  **×** [Codecov](), and [licensed][license] under
+a non-commercial use, open source [APACHE license][] with Tufts Open Source License Rider v.1.
+For maintainability, cellnition officially supports *only* the most recently released
+version of [CPython]().
 
 ## Acknowledgements 
 

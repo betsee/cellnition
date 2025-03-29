@@ -1,4 +1,4 @@
-# Introduction
+# Background
 
 *Cellnition* is an open source simulator to create and analyze Network Finite State Machines (NFSMs)
 from regulatory network models.

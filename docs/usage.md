@@ -5,13 +5,34 @@ place to get started with *Cellnition*.
 
 The general workflow to create NFSMs in *Cellnition* comprises 6 main steps:
 
-1. Build, import, or procedurally generate a regulatory network as a directed graph.
-2. Characterize the graph to automatically categorize input, output & internal nodes.
-3. Build a computational model of the regulatory network.
-4. Identify all unique equilibrium output states for each input state via state space search.
-5. Create the NFSMs. Cellnition does this by starting the system in each equilibrium state, 
-applying each input state, and determining the equilibrium state that the system transitions to.
-6. Output, plot, and analyze the resulting Network Finite State Machines. 
+1. Define [via edges][cellnition.science.network_models.network_abc.NetworkABC.build_network_from_edges]
+   (user-defined or [imported][cellnition.science.network_models.network_library]), or 
+[procedurally generate][cellnition.science.network_models.network_abc.NetworkABC.randomly_generate_special_network] 
+a regulatory network as a directed graph in a 
+[computationally-agnostic][cellnition.science.network_models.basic_network.BasicNet], 
+[Continuous][cellnition.science.network_models.probability_networks.ProbabilityNet], or 
+[Boolean][cellnition.science.network_models.boolean_networks.BooleanNet] oriented computational workflow.
+2. [Characterize the graph][cellnition.science.network_models.network_abc.NetworkABC.characterize_graph] 
+to automatically categorize input, output & internal nodes,
+along with other features such as cycles and node hierarchical level.
+3. Build a computational model of the regulatory network for 
+[Continuous][cellnition.science.network_models.probability_networks.ProbabilityNet.build_analytical_model] 
+or 
+[Boolean][cellnition.science.network_models.boolean_networks.BooleanNet.build_boolean_model] 
+models.
+4. Use the computational model in a state machine to identify all unique equilibrium 
+output states for each input state via state space search
+available for [Continuous][cellnition.science.networks_toolbox.state_machine.StateMachine.steady_state_solutions_search] 
+or [Boolean][cellnition.science.networks_toolbox.boolean_state_machine.BoolStateMachine.steady_state_solutions_search] 
+models.
+5. Create the NFSMs in 
+[Continuous][cellnition.science.networks_toolbox.state_machine.StateMachine.create_transition_network] 
+or 
+[Boolean][cellnition.science.networks_toolbox.boolean_state_machine.BoolStateMachine.create_transition_network] 
+systems. Cellnition does this by starting the system in each equilibrium state, 
+applying each input state, and determining the equilibrium state that the system transitions 
+to.
+6. Output, plot, and analyze the resulting Network Finite State Machines! 
 
 The general concept of working with Cellnition can be appreciated in the following flowchart:
 

@@ -5,25 +5,29 @@
 - Work with regulatory networks imported from *Cellnition's* 
 [`network_library`][cellnition.science.network_models.network_library],
 use *Cellnition* to
-[procedurally generate regulatory networks][cellnition.science.network_models.network_abc.NetworkABC] 
+[procedurally generate regulatory networks][cellnition.science.network_models.network_abc.NetworkABC.randomly_generate_special_network] 
 with random or scale-free degree distributions, or import your own user-defined regulatory
 networks as directed graphs with activating or inhibiting edge characteristics
 (see [Tutorial 1][] and [Tutorial 2][] for some examples).
 - Analyze and characterize regulatory network graphs with a variety of metrics
-(see the [`characterize_graph`][cellnition.science.network_models.network_abc.NetworkABC] method
-and [Tutorial 1][] and [Tutorial 2][]).
+(see the [`characterize_graph`][cellnition.science.network_models.network_abc.NetworkABC.characterize_graph] 
+method and [Tutorial 1][] and [Tutorial 2][]).
 - Use directed graph representations of regulatory networks to build fully-continuous,
 differential-equation based simulators of network dynamics (see 
-[`ProbabilityNet`][cellnition.science.network_models.probability_networks.ProbabilityNet] 
+[`ProbabilityNet`][cellnition.science.network_models.probability_networks.ProbabilityNet.build_analytical_model] 
 and [Tutorial 1][]).
 - Use directed graph representations of regulatory networks to build logic-equation based Boolean
-simulators of network dynamics (see [`BooleanNet`][cellnition.science.network_models.boolean_networks.BooleanNet]  
+simulators of network dynamics (see [`BooleanNet`][cellnition.science.network_models.boolean_networks.BooleanNet.build_boolean_model]  
 and [Tutorial 2][]).
-- Explore regulatory network dynamics with comprehensive equilibrium state search and
- characterization capabilities, along with temporal simulators (see [Tutorial 1][] and
+- Explore regulatory network dynamics with comprehensive 
+[equilibrium state search][cellnition.science.networks_toolbox.state_machine.StateMachine.steady_state_solutions_search] 
+and characterization capabilities, along with 
+[temporal simulators][cellnition.science.networks_toolbox.state_machine.StateMachine.sim_time_trajectory] 
+(see [Tutorial 1][] and
 [Tutorial 2][] for some examples).
 - Create simulated datasets, including simulation of automated gene-knockout experiments
- for a continuous regulatory network model (see [`GeneKnockout`]()).
+ for a continuous regulatory network model (see 
+[`GeneKnockout`][cellnition.science.networks_toolbox.gene_knockout.GeneKnockout]).
 - Generate NFSMs for continuous models (see 
 [`StateMachine`][cellnition.science.networks_toolbox.state_machine.StateMachine]
 and [Tutorial 1][])
@@ -31,8 +35,13 @@ and [Tutorial 1][])
 [`BoolStateMachine`][cellnition.science.networks_toolbox.boolean_state_machine.BoolStateMachine]
 and [Tutorial 2][]).
 - Create and export a variety of plots and visualizations, including of the regulatory network
-model analytic equations, regulatory network directed graphs, heatmaps of gene expressions in
-equilibrium states, gene expressions in temporal simulations, and depictions of the general and event-driven NFSMs
+model [analytic equations][cellnition.science.network_models.probability_networks.ProbabilityNet.save_model_equations], 
+[regulatory network directed graphs][cellnition.science.networks_toolbox.netplot.plot_network], 
+[heatmaps of gene expressions][cellnition.science.network_models.network_abc.NetworkABC.plot_sols_array] 
+in equilibrium states, 
+gene expressions in [temporal simulations][cellnition.science.networks_toolbox.state_machine.StateMachine.plot_time_trajectory], 
+and depictions of the [general NFSM][cellnition.science.networks_toolbox.state_machine.StateMachine.plot_state_transition_network] 
+and the [event-driven NFSM][cellnition.science.networks_toolbox.state_machine.StateMachine.plot_state_perturbation_network]
 (see [Tutorial 1][] and [Tutorial 2][] for some examples).
 
 
