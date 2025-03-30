@@ -28,13 +28,13 @@ Cellnition treats regulatory networks as analogue computers, where NFSMs map the
 logic inherent in the network as a dissipative dynamic system. As an extension and 
 improvement upon attractor landscape analysis, NFSMs reveal the analogue computing 
 operations inherent in GRNs, allowing for identification of associated "intelligent 
-behaviors".  NFSMs capture the "analog programming" of GRNs, providing clear identification of:
+behaviors".  NFSMs capture the "analog programming" of GRNs, which aim to provide clear identification of:
 
 * Interventions that can induce transitions between stable states (e.g. from "diseased" to "healthy") 
 * Identification of path-dependencies, representing stable changes occurring after a transient intervention is applied (e.g. evaluating if a transient treatment with pharmacological agent can permanently heal a condition)
 * Identification of inducible cycles of behavior that take the system through a complex multi-phase process (e.g. wound healing). 
 
-NFSMs have a range of applications, including the identification of strategies to 
+NFSMs have a range of applications, including the identification of potential strategies to 
 renormalize cancer (see `Tutorial 2`_). 
 
 Read more about Cellnition's NFSMs in our pre-print publication: 
