@@ -18,16 +18,16 @@ allowing for identification of associated "intelligent behaviors".
 By capturing the analog programming of regulatory networks, 
 NFSMs provide clear identification of:
 
-- Interventions that can induce transitions between stable states (e.g. from "diseased" to "healthy").
+- Interventions that can potentially induce transitions between stable states (e.g. from "diseased" to "healthy").
 - Identification of path-dependencies, representing stable changes occurring after a transient intervention
-is applied (e.g. evaluating if a transient treatment with pharmacological agent can permanently heal a condition).
-- Identification of inducible cycles of behavior that take the system through a complex
+is applied (e.g. evaluating if a transient treatment with pharmacological agent might permanently heal a condition).
+- Identification of potential inducible cycles of behavior that take the system through a complex
 multi-phase process (e.g. wound healing).
-- How to target regimes of dynamic activity in a regulatory network (e.g. how to engage a
+- Potential targets of dynamic activity in a regulatory network (e.g. how to engage a
 genetic oscillator instead of a monotonic gene expression in time).
 
 NFSMs have a range of applications, including facilitating the 
-identification of strategies to renormalize cancer.
+identification of potential strategies to renormalize cancer.
 
 Read more about *Cellnition's* NFSMs in our pre-print publication: [Harnessing the Analogue Computing Power of
 Regulatory Networks with the Regulatory Network Machine](https://osf.io/preprints/osf/tb5ys_v1).

@@ -27,7 +27,7 @@ or analogue "software program",
 inherent in the regulatory network's dynamics.
 
 NFSMs have a range of applications, including facilitating the 
-identification of strategies to renormalize cancer.
+identification of potential strategies to renormalize cancer.
 
 ## Installation
 
