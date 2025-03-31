@@ -110,9 +110,7 @@ Acknowledgements
 ================
 
 Cellnition creators are grateful for collaboration opportunities and funding support
-from the `Levin Lab <Levin Lab_>`__ at `Tufts University <Tufts_>`__, with funds for this work supplied from the `Templeton World Charity
-Foundation grant TWCF0606 <TWCF_>`__ 
-and a sponsored research agreement from `Astonishing Labs <AstonishingLabs_>`__.
+from the `Levin Lab <Levin Lab_>`__ at `Tufts University <Tufts_>`__.
 
 License
 =======
@@ -216,10 +214,6 @@ to academic purposes only.
    https://as.tufts.edu/biology/levin-lab
 .. _Tufts:
    https://www.tufts.edu
-.. _TWCF: 
-   https://www.templetonworldcharity.org/projects-resources/project-database/0606
-.. _AstonishingLabs:
-   https://astonishinglabs.com/
 
 .. # ------------------( LINKS ~ soft : license             )------------------
 .. _MIT license:
