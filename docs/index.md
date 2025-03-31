@@ -67,10 +67,7 @@ version of [CPython]().
 ## Acknowledgements 
 
 *Cellnition* creators are grateful for collaboration opportunities and funding support
-from the [Levin Lab]()
-at [Tufts University](), with funds for this work supplied from the [Templeton World Charity
-Foundation grant TWCF0606](https://www.templetonworldcharity.org/projects-resources/project-database/0606) 
-and a sponsored research agreement from [Astonishing Labs](https://astonishinglabs.com/).
+from the [Levin Lab]() at [Tufts University]().
 
 ## License
 
