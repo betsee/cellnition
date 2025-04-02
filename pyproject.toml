@@ -281,7 +281,7 @@ test-tox-coverage = [
 # the third-party "pytest" and "tox" commands at the command line.
 test = [
     # Tox-specific test-time dependencies.
-    "beartype[test-tox,test-tox-coverage]",
+    "cellnition[test-tox,test-tox-coverage]",
 
     # A relatively modern version of "tox" is required. It's probably quite old
     # by now. I feel depressed just reading comments like this...
@@ -291,14 +291,14 @@ test = [
 # Developer-specific dependencies required to develop and contribute pull
 # requests (PRs) for this project. Notably, this includes *ALL* test- and
 # documentation-time dependencies.
-dev = ["beartype[docs,test]"]
+dev = ["cellnition[docs,test]"]
 
 # ....................{ PEP 621 ~ urls                     }....................
 # Table (i.e., dictionary) mapping from the PyPI-recognized name of each
 # relevant project URL to that URL.
 [project.urls]
 #FIXME: Replace with a link to more suitable documentation, please.
-Docs =     "https://github.com/betsee/cellnition/blob/main/README.rst"
+Docs =     "https://betsee.github.io/cellnition"
 GitHub =   "https://github.com/betsee/cellnition"
 Forums =   "https://github.com/betsee/cellnition/discussions"
 Issues =   "https://github.com/betsee/cellnition/issues"

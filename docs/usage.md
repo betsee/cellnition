@@ -32,12 +32,7 @@ or
 systems. Cellnition does this by starting the system in each equilibrium state, 
 applying each input state, and determining the equilibrium state that the system transitions 
 to.
-6. Output, plot, and analyze the resulting Network Finite State Machines! 
-
-The general concept of working with Cellnition can be appreciated in the following flowchart:
-
-![Cellnition Workflow with Clinical Application](img/cellnition_workflow_1.png)
-
+6. Output, plot, and analyze the resulting Network Finite State Machines!
 
 [Link References]::
 [Levin Lab]: https://as.tufts.edu/biology/levin-lab
@@ -52,3 +47,5 @@ The general concept of working with Cellnition can be appreciated in the followi
 [license]: https://github.com/betsee/cellnition/blob/main/LICENSE
 [Tutorial 1]: https://github.com/betsee/cellnition/blob/main/ipynb/Tutorial1_ContinuousNFSM_v1.ipynb
 [Tutorial 2]: https://github.com/betsee/cellnition/blob/main/ipynb/Tutorial2_BooleanNFSM_v1.ipynb
+[TWCFGrant]: https://www.templetonworldcharity.org/projects-resources/project-database/0606
+[TuftsRoyalties]: https://viceprovost.tufts.edu/policies-forms-guides/policy-rights-and-responsibilities-respect-intellectual-property
