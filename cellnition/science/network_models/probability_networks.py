@@ -15,6 +15,7 @@ from collections.abc import Callable
 import numpy as np
 from numpy import ndarray
 from scipy.optimize import fsolve
+from scipy.sparse import lil_array
 import sympy as sp
 from sympy import MutableDenseMatrix
 from cellnition.science.network_models.network_abc import NetworkABC
@@ -762,7 +763,7 @@ class ProbabilityNet(NetworkABC):
                      tvectr: ndarray|list,
                      cvecti: ndarray|list,
                      sig_inds: ndarray|list|None = None,
-                     sig_vals: list | ndarray | None = None,
+                     sig_vals: list | ndarray | lil_array| None = None,
                      constrained_inds: list | None = None,
                      constrained_vals: list | None = None,
                      d_base: float|list[float] = 1.0,
@@ -794,7 +795,10 @@ class ProbabilityNet(NetworkABC):
             cvecti += dt * dcdt
 
             # manually set the signal node values:
-            cvecti[sig_inds] = sig_vals[ti, sig_inds]
+            if type(sig_vals) is lil_array:
+                cvecti[sig_inds] = sig_vals[ti, sig_inds].toarray()
+            else:
+                cvecti[sig_inds] = sig_vals[ti, sig_inds]
 
             if tt in tvectr:
                 concs_time.append(cvecti * 1)

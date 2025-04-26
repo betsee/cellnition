@@ -470,80 +470,110 @@ def test_continuous_net(tmp_path) -> None:
 #
 
 #
-# def test_time_sim(tmp_path) -> None:
-#     '''
-#     Test the time simulation capabilities of the probability network.
-#
-#     Parameters
-#     ----------
-#     tmp_path : pathlib.Path
-#         Abstract path encapsulating a temporary directory unique to this unit
-#         test, created in the base temporary directory.
-#
-#     '''
-#     import numpy as np
-#     from cellnition.science.network_models.network_enums import CouplingType, InterFuncType
-#     from cellnition.science.network_models.network_library import TrinodeNet
-#     from cellnition.science.network_workflow import NetworkWorkflow
-#
-#     libg = TrinodeNet()
-#
-#     # Absolute or relative dirname of a test-specific temporary directory to
-#     # which "NetworkWorkflow" will emit GraphML and other files.
-#     save_path = str(tmp_path)
-#
-#     netflow = NetworkWorkflow(save_path)
-#
-#     interfunctype = InterFuncType.hill
-#
-#     if interfunctype is InterFuncType.logistic:
-#         d_base = 1.0
-#         n_base = 15.0
-#         beta_base = 0.25
-#     else:
-#         d_base = 1.0
-#         n_base = 3.0
-#         beta_base = 5.0
-#
-#     pnet, update_string, fname_base = netflow.make_network_from_edges(libg.edges,
-#                                                                       edge_types=libg.edge_types,
-#                                                                       interaction_function_type=interfunctype,
-#                                                                       coupling_type=CouplingType.specified,
-#                                                                       network_name=libg.name,
-#                                                                       i=0)
-#
-#     dt = 1.0e-3
-#     dt_samp = 0.15
-#
-#     sig_inds = pnet.input_node_inds
-#     N_sigs = len(sig_inds)
-#
-#     space_sig = 25.0  # spacing between two signal perturbations
-#     delta_sig = 10.0  # Time for a signal perturbation
-#
-#     sig_times = [(space_sig + space_sig * i + delta_sig * i, delta_sig + space_sig + space_sig * i + delta_sig * i) for
-#                  i in range(N_sigs)]
-#
-#     tend = sig_times[-1][1] + space_sig
-#
-#     sig_base_vals = [0.0, 0.0, 0.0]
-#     sig_mags = [(int(sigi) + pnet.p_min, int(not (int(sigi))) + pnet.p_min) for sigi in sig_base_vals]
-#
-#     cvecti = np.zeros(pnet.N_nodes) + pnet.p_min
-#
-#     # Get the full time vector and the sampled time vector (tvectr)
-#     tvect, tvectr = pnet.make_time_vects(tend, dt, dt_samp)
-#
-#     c_signals = pnet.make_pulsed_signals_matrix(tvect, sig_inds, sig_times, sig_mags)
-#
-#     ctime = pnet.run_time_sim(tvect,
-#                               tvectr,
-#                               cvecti,
-#                               sig_inds=sig_inds,
-#                               sig_vals=c_signals,
-#                               constrained_inds=None,
-#                               constrained_vals=None,
-#                               d_base=d_base,
-#                               n_base=n_base,
-#                               beta_base=beta_base
-#                              )
+def test_time_sim(tmp_path) -> None:
+    '''
+    Test the time simulation capabilities of the probability network.
+
+    Parameters
+    ----------
+    tmp_path : pathlib.Path
+        Abstract path encapsulating a temporary directory unique to this unit
+        test, created in the base temporary directory.
+
+    '''
+    import os
+    import numpy as np
+    from cellnition.science.network_models.network_enums import CouplingType, InterFuncType
+    from cellnition.science.network_models.probability_networks import ProbabilityNet
+    from cellnition.science.network_models.network_library import StemCellTriadChain
+
+    libg = StemCellTriadChain()
+
+    # Absolute or relative dirname of a test-specific temporary directory to
+    # which "NetworkWorkflow" will emit GraphML and other files.
+    save_path = str(tmp_path)
+
+    # Study parameters:
+    # Small value taken for zero:
+    pmin = 1.0e-6
+
+    # Number of linear points to search in state space:
+    N_space = 2
+
+    # Specify how the nodes should interact:
+    multi_coupling_type = CouplingType.mix1
+
+    # interaction_function_type = InterFuncType.hill
+    interaction_function_type = InterFuncType.logistic
+
+    return_saddles = True
+    node_express_levels = 5.0
+
+    # Set parameters for the network:
+    d_base = 1.0  # decay rate
+
+    if interaction_function_type is InterFuncType.logistic:
+        n_base = 50.0  # standard is 30.0, slope
+        b_base = 0.5  # standard is 0.5, centre
+
+    else:
+        n_base = 3.0  # standard is 3.0, slope
+        b_base = 2.0  # standard is 2.0, reciprocal centre
+
+    net_name = libg.name
+    save_path = os.path.join(tmp_path, f'{net_name}')
+    if not os.path.isdir(save_path):
+        os.makedirs(save_path)
+
+    # Create the continuous differential-equation based model:
+    pnet = ProbabilityNet(libg.N_nodes,
+                          interaction_function_type=interaction_function_type,
+                          node_expression_levels=node_express_levels)
+
+    pnet.build_network_from_edges(libg.edges)
+    pnet.characterize_graph()  # characterize the graph and set key params
+    pnet.set_node_types()  # set the node types
+    pnet.set_edge_types(libg.edge_types)  # set the edge types to the network
+
+    # Get the adjacency matrices for this model:
+    A_add_s, A_mul_s, A_full_s = pnet.build_adjacency_from_edge_type_list(libg.edge_types,
+                                                                          pnet.edges_index,
+                                                                          coupling_type=multi_coupling_type)
+    pnet.build_analytical_model(A_add_s, A_mul_s)
+
+
+    dt = 1.0e-3
+    dt_samp = 0.15
+
+    sig_inds = pnet.input_node_inds
+    N_sigs = len(sig_inds)
+
+    space_sig = 25.0  # spacing between two signal perturbations
+    delta_sig = 10.0  # Time for a signal perturbation
+
+    sig_times = [(space_sig + space_sig * i + delta_sig * i, delta_sig + space_sig + space_sig * i + delta_sig * i) for
+                 i in range(N_sigs)]
+
+    tend = sig_times[-1][1] + space_sig
+
+    sig_base_vals = [0.0, 0.0, 0.0]
+    sig_mags = [(int(sigi) + pnet.p_min, int(not (int(sigi))) + pnet.p_min) for sigi in sig_base_vals]
+
+    cvecti = np.zeros(pnet.N_nodes) + pnet.p_min
+
+    # Get the full time vector and the sampled time vector (tvectr)
+    tvect, tvectr = pnet.make_time_vects(tend, dt, dt_samp)
+
+    c_signals = pnet.make_pulsed_signals_matrix(tvect, sig_inds, sig_times, sig_mags)
+
+    ctime = pnet.run_time_sim(tvect,
+                              tvectr,
+                              cvecti,
+                              sig_inds=sig_inds,
+                              sig_vals=c_signals,
+                              constrained_inds=None,
+                              constrained_vals=None,
+                              d_base=d_base,
+                              n_base=n_base,
+                              beta_base=b_base
+                             )

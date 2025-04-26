@@ -476,6 +476,41 @@ class BooleanNet(NetworkABC):
         return pseudo_tvect, sequence_results, sol_results, sol_char_results, phase_inds
 
 
+    def dyn_stim_sequence_compute(self,
+                                  cc_o: ndarray|list,
+                                  A_bool_f: Callable,
+                                  n_max_steps: int=20,
+                                  constraint_inds: list|None=None,
+                                  constraint_vals: list|None=None,
+                                  verbose: bool=False
+                                  ):
+        '''
+        Returns the sequence of n_max_step states occurring after an initial state, cc_o,
+        under a dynamically specified stimulation.
+        '''
+        cc_i = cc_o  # initialize the function values (node values)
+        solsv = [np.asarray(cc_o)]  # holds a list of transient solutions
+
+        for i in range(n_max_steps):
+
+            if verbose:
+                print(solsv[-1])
+            # A true "OR" function will return the maximum of the list of booleans. This can
+            # be achieved by using the "ceiling" function. If cooperative interaction is
+            # desired, then rounding is better
+
+            cc_i = np.sign(A_bool_f(cc_i)[0])  # calculate new state values of the sequence
+
+            # If there are constraints on some node vals, force them to the constraint:
+            if constraint_inds is not None and constraint_vals is not None:
+                cc_i[constraint_inds] = constraint_vals
+
+            solsv.append(cc_i) # append the new state to the sequence vector
+
+
+        return solsv, cc_i
+
+
 
 
     def solve_system_equms(self,
