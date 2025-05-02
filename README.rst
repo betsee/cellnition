@@ -104,6 +104,7 @@ Tutorials
 * `Tutorial 1`_ : Create NFSMs from a continuous, differential-equation based GRN model.
 * `Tutorial 2`_ : Create NFSMs from a Boolean, logic-equation based GRN model.
 * `Tutorial 3`_ : Apply a dynamic stimulation to a continuous, differential-equation based GRN model.
+* `Tutorial 4`_ : Apply a dynamic stimulation to a Boolean based GRN model.
 
 Acknowledgements
 ================
@@ -152,6 +153,8 @@ to academic purposes only.
    ipynb/Tutorial2_BooleanNFSM_v1.ipynb
 .. _Tutorial 3:
    ipynb/Tutorial3_ContinuousTimeStim_v2.ipynb
+.. _Tutorial 4:
+   ipynb/Tutorial4_BooleanTimeSim_v2.ipynb
 
 .. # ------------------( LINKS ~ cellnition : package        )------------------
 .. #FIXME: None of these exist, naturally. *sigh*
