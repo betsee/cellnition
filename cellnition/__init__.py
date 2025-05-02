@@ -29,15 +29,21 @@ beartype_this_package()
 #       warnings.warn(msg, RuntimeWarning)
 filterwarnings(
     action='ignore',
-    module=r'^scipy\..*',
+    #FIXME: See below, please. *sigh*
+    # module=r'^scipy\..*',
     category=RuntimeWarning,
-    message='^The iteration is not making good progress',
+    message=r'^The iteration is not making good progress',
 )
 filterwarnings(
     action='ignore',
-    module=r'^scipy\..*',
+    #FIXME: Ideally, this warning should be matched as originating from the
+    #"scipy" package. Unfortunately, for unknown reasons, CPython claims this
+    #warning originates from *OUR* package instead: e.g.,
+    #    home/pietakio/py/cellnition/cellnition/science/network_models/probability_networks.py:562:
+    #    RuntimeWarning: xtol=0.000000 is too small, no further improvement in the approximate
+    # module=r'^scipy\..*',
     category=RuntimeWarning,
-    message='^xtol=0.000000 is too small',
+    message=r'^xtol=0\.000000 is too small,',
 )
 
 # Unconditionally ignore all non-fatal warnings emitted by the third-party
@@ -48,9 +54,11 @@ filterwarnings(
 #       warnings.warn(b"".join(errors).decode(self.encoding), RuntimeWarning)
 filterwarnings(
     action='ignore',
-    module=r'^pygraphviz\..*',
+    #FIXME: This *SHOULD* work, but currently doesn't. Perhaps regular
+    #expressions are prohibited as the "module" parameter? No idea.
+    # module=r'^pygraphviz\..*',
     category=RuntimeWarning,
-    message='^Warning: some nodes with margin',
+    message=r'^Warning: some nodes with margin',
 )
 
 # ....................{ GLOBALS                            }....................
