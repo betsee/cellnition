@@ -116,12 +116,12 @@ Thanks goes out to Brian Curry for his volunteer assistance with the *Cellnition
 Disclaimer
 ==========
 
-Alexis Pietak created **Cellnition**, and co-authored the associated `scientific manuscript <preprint_>`__, as an 
+Alexis Pietak created **Cellnition**, and co-authored the associated `scientific manuscript <paper_>`__, as an 
 external contractor ("Affiliate Research Scientist") for `Tufts University <Tufts_>`__. Under the established `terms <TuftsRoyalties_>`__ of 
 `Tufts University <Tufts_>`__, as an external contractor, Alexis recieves no royalties nor other financial benefits or entitlements in connection with any intellectual 
-property associated with the **Cellnition** project or its associated `scientific manuscript <preprint_>`__.
+property associated with the **Cellnition** project or its associated `scientific manuscript <paper_>`__.
 
-Note that the functionality provided and work presented in **Cellnition** and its associated `scientific manuscript <preprint_>`__ are at a 
+Note that the functionality provided and work presented in **Cellnition** and its associated `scientific manuscript <paper_>`__ are at a 
 theoretical and computational stage, with any and all potential applications for the work requiring verification by real world experiments and comprehensive testing.   
 
 License
