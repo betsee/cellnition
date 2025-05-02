@@ -37,15 +37,13 @@ behaviors".  NFSMs capture the "analog programming" of GRNs, which aim to provid
 NFSMs have a range of potential applications, including the identification of potential strategies to 
 renormalize cancer (see `Tutorial 2`_). 
 
-Read more about **Cellnition's** NFSMs in our pre-print publication: 
+Read more about **Cellnition's** NFSMs in our publication: 
 `Harnessing the Analogue Computing Power of Regulatory Networks with the 
-Regulatory Network Machine <preprint_>`__. 
-
-Please cite our pre-print in any work that utilizes **Cellnition**::
+Regulatory Network Machine <paper_>`__. Please cite this publication in any work that utilizes **Cellnition**:
 
 Pietak, Alexis, and Levin, Michael.
  “Harnessing the Analog Computing Power of Regulatory Networks 
- with the Regulatory Network Machine.” OSF Preprints, 2 Dec. 2024. Web.
+ with the Regulatory Network Machine.” *iScience*, 28 April 2025, 112536.
 
 **Cellnition** is `portably implemented <cellnition codebase_>`__ in Python_,
 `continuously stress-tested <cellnition tests_>`__ via `GitHub Actions`_ **×**
@@ -223,8 +221,8 @@ to academic purposes only.
    https://pypi.org
 
 .. # ------------------( LINKS ~ external                    )------------------
-.. _preprint:
-   https://osf.io/preprints/osf/tb5ys_v1
+.. _paper:
+   https://www.sciencedirect.com/science/article/pii/S2589004225007977
 .. _Levin Lab:
    https://as.tufts.edu/biology/levin-lab
 .. _Tufts:
